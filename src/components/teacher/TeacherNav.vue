@@ -21,6 +21,7 @@ const route = useRoute()
 const navItems = [
   { icon: '📊', label: '总览', route: '/teacher' },
   { icon: '👥', label: '学生', route: '/teacher/students' },
+  { icon: '🐾', label: '宠物', route: '/teacher/pets' },
   { icon: '📋', label: '任务', route: '/teacher/tasks' },
   { icon: '🏆', label: '排行', route: '/teacher/stats' },
   { icon: '⚙️', label: '设置', route: '/teacher/settings' },

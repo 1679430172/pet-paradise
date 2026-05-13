@@ -34,7 +34,10 @@
           </div>
         </div>
       </div>
-      <div v-else class="card empty-state">该学生尚未创建宠物</div>
+      <div v-else class="card empty-pet-card">
+        <p class="empty-pet-text">该学生尚未创建宠物</p>
+        <button class="btn btn-primary" @click="showAdoptDialog = true">🐾 为其领养宠物</button>
+      </div>
 
       <div class="history-section">
         <h3>积分记录</h3>
@@ -50,6 +53,59 @@
         </div>
       </div>
     </template>
+
+    <!-- 领养宠物弹窗 -->
+    <div v-if="showAdoptDialog" class="dialog-overlay" @click.self="closeAdoptDialog">
+      <div class="dialog card">
+        <h3>为 {{ studentProfile?.username }} 领养宠物</h3>
+
+        <div class="adopt-section">
+          <label class="adopt-label">选择种类</label>
+          <div class="species-grid">
+            <div
+              v-for="s in PET_SPECIES"
+              :key="s"
+              class="species-card"
+              :class="{ selected: adoptSpecies === s }"
+              @click="adoptSpecies = s"
+            >
+              <span class="species-icon">{{ speciesIcons[s] }}</span>
+              <span class="species-name">{{ PET_SPECIES_LABELS[s] }}</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="adopt-section">
+          <label class="adopt-label">选择颜色</label>
+          <div class="color-grid">
+            <div
+              v-for="c in PET_COLORS"
+              :key="c"
+              class="color-dot"
+              :class="{ selected: adoptColor === c }"
+              :style="{ background: c }"
+              @click="adoptColor = c"
+            />
+          </div>
+        </div>
+
+        <div class="adopt-section">
+          <label class="adopt-label">宠物名字</label>
+          <input v-model="adoptName" class="form-input" type="text" placeholder="输入宠物的名字" maxlength="10" />
+        </div>
+
+        <p v-if="adoptError" class="form-error">{{ adoptError }}</p>
+
+        <div class="dialog-actions">
+          <button class="btn-cancel" @click="closeAdoptDialog">取消</button>
+          <button class="btn btn-primary" :disabled="!adoptSpecies || !adoptName || adopting" @click="handleAdopt">
+            {{ adopting ? '领养中...' : '确认领养' }}
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <div v-if="toast" class="toast">{{ toast }}</div>
   </div>
 </template>
 
@@ -57,6 +113,7 @@
 import { ref, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useTeacherStore } from '../../stores/teacher'
+import { PET_SPECIES, PET_SPECIES_LABELS, PET_COLORS } from '../../lib/constants'
 
 const route = useRoute()
 const router = useRouter()
@@ -66,6 +123,15 @@ const loading = ref(true)
 const studentProfile = ref<any>(null)
 const petInfo = ref<any>(null)
 const completions = ref<any[]>([])
+
+// 领养宠物状态
+const showAdoptDialog = ref(false)
+const adoptSpecies = ref('')
+const adoptColor = ref(PET_COLORS[0])
+const adoptName = ref('')
+const adoptError = ref('')
+const adopting = ref(false)
+const toast = ref('')
 
 const speciesIcons: Record<string, string> = {
   cat: '🐱', dog: '🐶', rabbit: '🐰', hamster: '🐹', bird: '🐦', turtle: '🐢'
@@ -88,6 +154,35 @@ onMounted(async () => {
   completions.value = result.completions || []
   loading.value = false
 })
+
+function closeAdoptDialog() {
+  showAdoptDialog.value = false
+  adoptSpecies.value = ''
+  adoptColor.value = PET_COLORS[0]
+  adoptName.value = ''
+  adoptError.value = ''
+}
+
+async function handleAdopt() {
+  if (!studentProfile.value) return
+  adoptError.value = ''
+  adopting.value = true
+  const { data, error } = await teacherStore.adoptPetForStudent(
+    studentProfile.value.id,
+    adoptName.value.trim(),
+    adoptSpecies.value,
+    adoptColor.value,
+  )
+  adopting.value = false
+  if (error) {
+    adoptError.value = error.message || '领养失败，请重试'
+    return
+  }
+  petInfo.value = data
+  toast.value = `已为 ${studentProfile.value.username} 领养宠物`
+  setTimeout(() => { toast.value = '' }, 2500)
+  closeAdoptDialog()
+}
 </script>
 
 <style scoped>
@@ -257,5 +352,154 @@ onMounted(async () => {
 .completion-points {
   font-weight: 700;
   color: var(--color-success);
+}
+
+.empty-pet-card {
+  text-align: center;
+  padding: 20px 16px;
+  margin-bottom: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  align-items: center;
+}
+
+.empty-pet-text {
+  color: #999;
+  font-size: 0.9rem;
+}
+
+.empty-pet-card .btn {
+  padding: 10px 20px;
+}
+
+/* Adopt dialog */
+.dialog-overlay {
+  position: fixed;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: rgba(0, 0, 0, 0.4);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 200;
+  padding: 20px;
+}
+
+.dialog {
+  width: 100%;
+  max-width: 400px;
+  max-height: 85vh;
+  overflow-y: auto;
+  padding: 20px;
+}
+
+.dialog h3 {
+  font-size: 1.1rem;
+  margin-bottom: 12px;
+}
+
+.adopt-section {
+  margin-bottom: 14px;
+}
+
+.adopt-label {
+  display: block;
+  font-size: 0.85rem;
+  color: #666;
+  margin-bottom: 6px;
+}
+
+.species-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+}
+
+.species-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 10px 6px;
+  background: white;
+  border: 2px solid var(--color-border, #eee);
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.species-card.selected {
+  border-color: var(--color-primary);
+  background: #FFF0F5;
+}
+
+.species-icon {
+  font-size: 1.6rem;
+}
+
+.species-name {
+  font-size: 0.75rem;
+  color: #666;
+}
+
+.color-grid {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.color-dot {
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  cursor: pointer;
+  border: 3px solid transparent;
+  transition: all 0.2s;
+}
+
+.color-dot.selected {
+  border-color: #333;
+  transform: scale(1.15);
+}
+
+.form-error {
+  color: var(--color-danger, #e74c3c);
+  font-size: 0.8rem;
+  margin: 4px 0 8px;
+}
+
+.dialog-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.btn-cancel {
+  flex: 1;
+  padding: 10px;
+  border-radius: 8px;
+  border: 1px solid #ddd;
+  background: white;
+  color: #666;
+  cursor: pointer;
+  font-size: 0.9rem;
+}
+
+.dialog-actions .btn {
+  flex: 1;
+}
+
+.toast {
+  position: fixed;
+  top: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--color-success);
+  color: white;
+  padding: 10px 20px;
+  border-radius: 8px;
+  font-size: 0.9rem;
+  z-index: 300;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
 }
 </style>

@@ -1,6 +1,9 @@
 <template>
   <div class="page teacher-page">
-    <h1 class="page-title">学生管理</h1>
+    <div class="header-row">
+      <h1 class="page-title">学生管理</h1>
+      <button class="btn btn-primary btn-sm" @click="showCreateDialog = true">+ 新增学生</button>
+    </div>
 
     <div class="search-bar">
       <input
@@ -58,6 +61,29 @@
       </div>
     </div>
 
+    <!-- 新增学生弹窗 -->
+    <div v-if="showCreateDialog" class="dialog-overlay" @click.self="closeCreateDialog">
+      <div class="dialog card">
+        <h3>新增学生</h3>
+        <p class="dialog-hint">创建后学生可直接用以下账号登录</p>
+        <div class="form-field">
+          <label>用户名</label>
+          <input v-model="newUsername" class="form-input" type="text" placeholder="2-12 个字符" maxlength="12" />
+        </div>
+        <div class="form-field">
+          <label>初始密码</label>
+          <input v-model="newPassword" class="form-input" type="text" placeholder="至少 4 位" />
+        </div>
+        <p v-if="createError" class="form-error">{{ createError }}</p>
+        <div class="dialog-actions">
+          <button class="btn btn-secondary" @click="closeCreateDialog">取消</button>
+          <button class="btn btn-primary" :disabled="creating" @click="handleCreateStudent">
+            {{ creating ? '创建中...' : '确认创建' }}
+          </button>
+        </div>
+      </div>
+    </div>
+
     <!-- 成功提示 -->
     <div v-if="toast" class="toast">{{ toast }}</div>
   </div>
@@ -79,6 +105,13 @@ const searchQuery = ref('')
 const showDialog = ref(false)
 const selectedStudent = ref<Profile | null>(null)
 const toast = ref('')
+
+// 新增学生状态
+const showCreateDialog = ref(false)
+const newUsername = ref('')
+const newPassword = ref('')
+const createError = ref('')
+const creating = ref(false)
 
 onMounted(async () => {
   await Promise.all([
@@ -119,11 +152,83 @@ async function handleDelete(student: Profile) {
     setTimeout(() => { toast.value = '' }, 2500)
   }
 }
+
+function closeCreateDialog() {
+  showCreateDialog.value = false
+  newUsername.value = ''
+  newPassword.value = ''
+  createError.value = ''
+}
+
+async function handleCreateStudent() {
+  createError.value = ''
+  const uname = newUsername.value.trim()
+  if (uname.length < 2 || uname.length > 12) {
+    createError.value = '用户名需要 2-12 个字符'
+    return
+  }
+  if (newPassword.value.length < 4) {
+    createError.value = '密码至少 4 位'
+    return
+  }
+  creating.value = true
+  const { error } = await teacherStore.createStudent(uname, newPassword.value)
+  creating.value = false
+  if (error) {
+    createError.value = error.message || '创建失败，请重试'
+    return
+  }
+  toast.value = `已新增学生「${uname}」`
+  setTimeout(() => { toast.value = '' }, 2500)
+  closeCreateDialog()
+}
 </script>
 
 <style scoped>
 .teacher-page {
   padding-bottom: 80px;
+}
+
+.header-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+  gap: 12px;
+}
+
+.header-row .page-title {
+  margin: 0;
+}
+
+.form-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 12px;
+}
+
+.form-field label {
+  font-size: 0.85rem;
+  color: #666;
+}
+
+.form-error {
+  color: var(--color-danger, #e74c3c);
+  font-size: 0.8rem;
+  margin: -4px 0 8px;
+}
+
+.dialog-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.dialog-actions .btn {
+  flex: 1;
+  padding: 10px 16px;
+  font-size: 0.9rem;
 }
 
 .search-bar {

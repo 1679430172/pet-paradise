@@ -98,6 +98,12 @@ const router = createRouter({
       meta: { requiresAuth: true, role: 'teacher' },
     },
     {
+      path: '/teacher/pets',
+      name: 'teacher-pets',
+      component: () => import('../pages/teacher/TeacherPets.vue'),
+      meta: { requiresAuth: true, role: 'teacher' },
+    },
+    {
       path: '/teacher/settings',
       name: 'teacher-settings',
       component: () => import('../pages/teacher/TeacherSettings.vue'),
