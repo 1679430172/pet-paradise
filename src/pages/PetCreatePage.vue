@@ -1,7 +1,7 @@
 <template>
   <div class="create-page">
     <div class="create-header">
-      <h1>选择你的宠物</h1>
+      <h1>{{ petStore.pets.length > 0 ? '领养新伙伴' : '选择你的宠物' }}</h1>
       <p>选一个可爱的伙伴陪伴你吧！</p>
     </div>
 
@@ -47,28 +47,36 @@
     </div>
 
     <!-- 预览 -->
-    <div class="preview card" v-if="species">
-      <div class="preview-pet" :style="{ background: color }">
-        <span class="preview-icon">{{ speciesIcons[species] }}</span>
-      </div>
+    <div class="preview card" v-if="species" :style="{ background: color }">
+      <PetAvatar
+        class="preview-pet"
+        :species="species"
+        :level="1"
+        :size="120"
+        show-stage
+      />
       <p class="preview-name">{{ name || '未命名' }}</p>
+      <p class="preview-hint">新生宠物从「蛋」开始成长</p>
     </div>
+
+    <p v-if="errorMsg" class="form-error">{{ errorMsg }}</p>
 
     <button
       class="btn btn-primary create-btn"
       :disabled="!species || !name || loading"
       @click="handleCreate"
     >
-      {{ loading ? '创建中...' : '领养它！' }}
+      {{ loading ? '领养中...' : '领养它！' }}
     </button>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { usePetStore } from '../stores/pet'
 import { PET_SPECIES, PET_SPECIES_LABELS, PET_COLORS } from '../lib/constants'
+import PetAvatar from '../components/pet/PetAvatar.vue'
 
 const router = useRouter()
 const petStore = usePetStore()
@@ -77,6 +85,7 @@ const species = ref('')
 const color = ref(PET_COLORS[0])
 const name = ref('')
 const loading = ref(false)
+const errorMsg = ref('')
 
 const speciesIcons: Record<string, string> = {
   cat: '🐱',
@@ -87,14 +96,27 @@ const speciesIcons: Record<string, string> = {
   turtle: '🐢',
 }
 
+onMounted(async () => {
+  if (petStore.pets.length === 0) {
+    await petStore.fetchPets()
+  }
+  if (!petStore.canAdoptNew) {
+    errorMsg.value = '当前宠物尚未达到完全体（Lv.20），暂不能领养新宠物'
+    setTimeout(() => router.replace('/'), 1200)
+  }
+})
+
 async function handleCreate() {
   if (!species.value || !name.value) return
+  errorMsg.value = ''
   loading.value = true
   const { error } = await petStore.createPet(name.value, species.value, color.value) ?? {}
   loading.value = false
-  if (!error) {
-    router.push('/')
+  if (error) {
+    errorMsg.value = error.message || '领养失败'
+    return
   }
+  router.push('/')
 }
 </script>
 
@@ -192,12 +214,6 @@ async function handleCreate() {
 }
 
 .preview-pet {
-  width: 100px;
-  height: 100px;
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
   margin: 0 auto 12px;
 }
 
@@ -208,6 +224,19 @@ async function handleCreate() {
 .preview-name {
   font-family: var(--font-fun);
   font-size: 1.2rem;
+}
+
+.preview-hint {
+  font-size: 0.72rem;
+  color: var(--color-text-muted);
+  margin-top: 4px;
+}
+
+.form-error {
+  color: var(--color-danger, #e74c3c);
+  font-size: 0.85rem;
+  text-align: center;
+  margin: 8px 0;
 }
 
 .create-btn {

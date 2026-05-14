@@ -13,26 +13,41 @@
         <div class="points-badge">{{ studentProfile.points }} 积分</div>
       </div>
 
-      <div v-if="petInfo" class="pet-section card">
-        <h3>宠物信息</h3>
-        <div class="pet-detail">
-          <span class="pet-species">{{ speciesIcon(petInfo.species) }} {{ petInfo.name }}</span>
-          <span class="pet-level">Lv.{{ petInfo.level }}</span>
+      <div v-if="pets.length > 0" class="pet-section card">
+        <h3>宠物列表（{{ pets.length }}）</h3>
+        <div v-for="p in pets" :key="p.id" class="pet-item">
+          <PetAvatar
+            :species="p.species"
+            :level="p.level"
+            :size="56"
+            show-stage
+          />
+          <div class="pet-item-info">
+            <div class="pet-detail">
+              <span class="pet-species">{{ p.name }}</span>
+              <span class="pet-level" :class="{ maxed: p.level >= MAX_LEVEL }">Lv.{{ p.level }}</span>
+            </div>
+            <div class="pet-stats">
+              <div class="pet-stat">
+                <span>饱食</span>
+                <div class="stat-bar"><div class="stat-fill" :style="{ width: (p.hunger || 0) + '%' }"></div></div>
+              </div>
+              <div class="pet-stat">
+                <span>快乐</span>
+                <div class="stat-bar"><div class="stat-fill happy" :style="{ width: (p.happiness || 0) + '%' }"></div></div>
+              </div>
+              <div class="pet-stat">
+                <span>清洁</span>
+                <div class="stat-bar"><div class="stat-fill clean" :style="{ width: (p.cleanliness || 0) + '%' }"></div></div>
+              </div>
+            </div>
+          </div>
         </div>
-        <div class="pet-stats">
-          <div class="pet-stat">
-            <span>饱食</span>
-            <div class="stat-bar"><div class="stat-fill" :style="{ width: petInfo.hunger + '%' }"></div></div>
-          </div>
-          <div class="pet-stat">
-            <span>快乐</span>
-            <div class="stat-bar"><div class="stat-fill happy" :style="{ width: petInfo.happiness + '%' }"></div></div>
-          </div>
-          <div class="pet-stat">
-            <span>清洁</span>
-            <div class="stat-bar"><div class="stat-fill clean" :style="{ width: petInfo.cleanliness + '%' }"></div></div>
-          </div>
-        </div>
+        <button
+          v-if="canAdoptNew"
+          class="btn btn-primary adopt-more-btn"
+          @click="showAdoptDialog = true"
+        >🐾 领养新宠物</button>
       </div>
       <div v-else class="card empty-pet-card">
         <p class="empty-pet-text">该学生尚未创建宠物</p>
@@ -110,10 +125,11 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { useTeacherStore } from '../../stores/teacher'
-import { PET_SPECIES, PET_SPECIES_LABELS, PET_COLORS } from '../../lib/constants'
+import { useTeacherStore, type TeacherPet } from '../../stores/teacher'
+import { PET_SPECIES, PET_SPECIES_LABELS, PET_COLORS, MAX_LEVEL } from '../../lib/constants'
+import PetAvatar from '../../components/pet/PetAvatar.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -121,7 +137,7 @@ const teacherStore = useTeacherStore()
 
 const loading = ref(true)
 const studentProfile = ref<any>(null)
-const petInfo = ref<any>(null)
+const pets = ref<TeacherPet[]>([])
 const completions = ref<any[]>([])
 
 // 领养宠物状态
@@ -137,9 +153,9 @@ const speciesIcons: Record<string, string> = {
   cat: '🐱', dog: '🐶', rabbit: '🐰', hamster: '🐹', bird: '🐦', turtle: '🐢'
 }
 
-function speciesIcon(species: string) {
-  return speciesIcons[species] || '🐾'
-}
+const canAdoptNew = computed(() => {
+  return pets.value.length === 0 || pets.value.every(p => (p.level || 1) >= MAX_LEVEL)
+})
 
 function formatTime(dateStr: string) {
   const d = new Date(dateStr)
@@ -150,7 +166,7 @@ onMounted(async () => {
   const id = route.params.id as string
   const result = await teacherStore.fetchStudentDetail(id)
   studentProfile.value = result.profile
-  petInfo.value = result.pet
+  pets.value = result.pets || []
   completions.value = result.completions || []
   loading.value = false
 })
@@ -178,7 +194,7 @@ async function handleAdopt() {
     adoptError.value = error.message || '领养失败，请重试'
     return
   }
-  petInfo.value = data
+  if (data) pets.value = [...pets.value, data]
   toast.value = `已为 ${studentProfile.value.username} 领养宠物`
   setTimeout(() => { toast.value = '' }, 2500)
   closeAdoptDialog()
@@ -255,6 +271,27 @@ async function handleAdopt() {
   font-size: 0.95rem;
 }
 
+.pet-item {
+  display: flex;
+  gap: 12px;
+  padding: 10px 0;
+  border-bottom: 1px dashed #eee;
+}
+
+.pet-item:last-of-type {
+  border-bottom: none;
+}
+
+.pet-item-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.adopt-more-btn {
+  margin-top: 10px;
+  width: 100%;
+}
+
 .pet-detail {
   display: flex;
   justify-content: space-between;
@@ -273,6 +310,10 @@ async function handleAdopt() {
   padding: 2px 10px;
   border-radius: 12px;
   font-size: 0.8rem;
+}
+
+.pet-level.maxed {
+  background: linear-gradient(135deg, #A78BFA, #6366F1);
 }
 
 .pet-stats {

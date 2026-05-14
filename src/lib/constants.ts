@@ -28,31 +28,76 @@ export const DIARY_XP = 20
 export const PHOTO_XP = 25
 export const LIKE_XP = 5
 
-// 等级经验值表
+// 等级上限
+export const MAX_LEVEL = 20
+
+// 等级经验值表（1..20）
 export const LEVEL_THRESHOLDS = [
-  0,     // Level 1
-  50,    // Level 2
-  120,   // Level 3
-  220,   // Level 4
-  350,   // Level 5
-  520,   // Level 6
-  730,   // Level 7
-  1000,  // Level 8
-  1350,  // Level 9
-  1800,  // Level 10
+  0,      // Level 1
+  50,     // Level 2
+  120,    // Level 3
+  220,    // Level 4
+  350,    // Level 5
+  520,    // Level 6
+  730,    // Level 7
+  1000,   // Level 8
+  1350,   // Level 9
+  1800,   // Level 10
+  2350,   // Level 11
+  3000,   // Level 12
+  3800,   // Level 13
+  4750,   // Level 14
+  5850,   // Level 15
+  7150,   // Level 16
+  8650,   // Level 17
+  10400,  // Level 18
+  12400,  // Level 19
+  14700,  // Level 20
 ]
+
+// 形态阶段：Lv.1-3 蛋 / Lv.4-8 幼年（蛋壳逐渐破裂）/ Lv.9-13 青年 / Lv.14-19 成年 / Lv.20 完全体
+export const PET_STAGES = ['egg', 'baby', 'teen', 'adult', 'final'] as const
+export type PetStage = typeof PET_STAGES[number]
+
+export const PET_STAGE_LABELS: Record<PetStage, string> = {
+  egg: '蛋',
+  baby: '幼年',
+  teen: '青年',
+  adult: '成年',
+  final: '完全体',
+}
+
+export function getPetStage(level: number): PetStage {
+  if (level >= 20) return 'final'
+  if (level >= 14) return 'adult'
+  if (level >= 9) return 'teen'
+  if (level >= 4) return 'baby'
+  return 'egg'
+}
+
+// 静态图片路径：/assets/pets/{species}_{stage}.png
+export function getPetImage(species: string, level: number): string {
+  return `/assets/pets/${species}_${getPetStage(level)}.png`
+}
+
+export function isPetMaxed(level: number): boolean {
+  return level >= MAX_LEVEL
+}
 
 // 等级解锁内容
 export const LEVEL_UNLOCKS: Record<number, string> = {
   2: '配饰：领结',
   3: '徽章：新手饲养员',
-  4: '配饰：帽子',
+  4: '幼年形态（蛋壳褪去）',
   5: '徽章：成长日记家',
   6: '背景：花园',
   7: '配饰：眼镜',
   8: '徽章：宠物达人',
-  9: '背景：海滩',
+  9: '青年形态',
   10: '徽章：传奇饲养员',
+  14: '成年形态',
+  15: '徽章：守护之星',
+  20: '完全体·可再领养新宠物',
 }
 
 // 徽章定义
@@ -65,6 +110,7 @@ export const BADGES = {
   liked_5: { name: '人气宠物', desc: '累计获得 5 个赞', icon: '⭐' },
   level_5: { name: '成长之星', desc: '宠物达到 5 级', icon: '🌟' },
   level_10: { name: '传奇饲养员', desc: '宠物达到 10 级', icon: '👑' },
+  level_20: { name: '完全体', desc: '宠物进化到最终形态', icon: '✨' },
 } as const
 
 // 状态衰减：每小时衰减 1 点

@@ -3,21 +3,25 @@ import { ref } from 'vue'
 import { supabase } from '../lib/supabase'
 import { hashPassword } from './auth'
 import { usePointsStore } from './points'
-import { ACTIONS, LEVEL_THRESHOLDS } from '../lib/constants'
+import { ACTIONS, LEVEL_THRESHOLDS, MAX_LEVEL } from '../lib/constants'
 import type { Profile } from './auth'
 
+export interface TeacherPet {
+  id: string
+  owner_id?: string
+  name: string
+  species: string
+  level: number
+  xp?: number
+  hunger?: number
+  happiness?: number
+  cleanliness?: number
+  appearance?: any
+  created_at?: string
+}
+
 export interface StudentWithPet extends Profile {
-  pet?: {
-    id?: string
-    name: string
-    species: string
-    level: number
-    xp?: number
-    hunger?: number
-    happiness?: number
-    cleanliness?: number
-    appearance?: any
-  } | null
+  pets: TeacherPet[]
 }
 
 export interface LeaderboardEntry {
@@ -79,13 +83,18 @@ export const useTeacherStore = defineStore('teacher', () => {
         .from('pets')
         .select('*')
         .in('owner_id', ids)
+        .order('created_at', { ascending: true })
       petsData = data || []
     }
-    const petMap = new Map<string, any>()
-    petsData.forEach(p => petMap.set(p.owner_id, p))
+    const petMap = new Map<string, TeacherPet[]>()
+    petsData.forEach(p => {
+      const arr = petMap.get(p.owner_id) || []
+      arr.push(p)
+      petMap.set(p.owner_id, arr)
+    })
     studentsWithPets.value = studentsData.map(s => ({
       ...s,
-      pet: petMap.get(s.id) || null,
+      pets: petMap.get(s.id) || [],
     }))
     totalStudents.value = studentsData.length
     loading.value = false
@@ -93,7 +102,7 @@ export const useTeacherStore = defineStore('teacher', () => {
 
   function calculateLevel(xp: number): number {
     for (let i = LEVEL_THRESHOLDS.length - 1; i >= 0; i--) {
-      if (xp >= LEVEL_THRESHOLDS[i]) return i + 1
+      if (xp >= LEVEL_THRESHOLDS[i]) return Math.min(MAX_LEVEL, i + 1)
     }
     return 1
   }
@@ -149,10 +158,11 @@ export const useTeacherStore = defineStore('teacher', () => {
     const target = studentsWithPets.value.find(s => s.id === studentId)
     if (target) {
       target.points = student.points - cost
-      if (target.pet) {
-        ;(target.pet as any)[statKey] = newStatVal
-        target.pet.xp = newXp
-        target.pet.level = newLevel
+      const targetPet = target.pets?.find(p => p.id === petId)
+      if (targetPet) {
+        ;(targetPet as any)[statKey] = newStatVal
+        targetPet.xp = newXp
+        targetPet.level = newLevel
       }
     }
 
@@ -166,11 +176,11 @@ export const useTeacherStore = defineStore('teacher', () => {
       .eq('id', id)
       .single()
 
-    const { data: pet } = await supabase
+    const { data: pets } = await supabase
       .from('pets')
       .select('*')
       .eq('owner_id', id)
-      .single()
+      .order('created_at', { ascending: true })
 
     const { data: completions } = await supabase
       .from('task_completions')
@@ -179,7 +189,7 @@ export const useTeacherStore = defineStore('teacher', () => {
       .order('created_at', { ascending: false })
       .limit(20)
 
-    return { profile, pet, completions }
+    return { profile, pets: pets || [], completions }
   }
 
   async function fetchLeaderboard() {
@@ -194,17 +204,19 @@ export const useTeacherStore = defineStore('teacher', () => {
     if (studentsData) {
       const entries: LeaderboardEntry[] = []
       for (const s of studentsData) {
-        const { data: pet } = await supabase
+        const { data: pets } = await supabase
           .from('pets')
           .select('name, level')
           .eq('owner_id', s.id)
-          .single()
+          .order('level', { ascending: false })
+          .limit(1)
+        const top = pets && pets[0]
         entries.push({
           id: s.id,
           username: s.username,
           points: s.points,
-          pet_level: pet?.level || 0,
-          pet_name: pet?.name || '未创建',
+          pet_level: top?.level || 0,
+          pet_name: top?.name || '未创建',
         })
       }
       leaderboard.value = entries
@@ -247,11 +259,11 @@ export const useTeacherStore = defineStore('teacher', () => {
     try {
       const { data: existing } = await supabase
         .from('pets')
-        .select('id')
+        .select('id, level')
         .eq('owner_id', studentId)
-        .maybeSingle()
-      if (existing) {
-        throw new Error('该学生已有宠物')
+      const hasUnmaxed = (existing || []).some((p: any) => (p.level || 1) < MAX_LEVEL)
+      if (hasUnmaxed) {
+        throw new Error('该学生已有未满级（Lv.20）的宠物，暂不能领养新宠物')
       }
       const { data, error } = await supabase
         .from('pets')

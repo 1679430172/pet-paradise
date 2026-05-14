@@ -1,11 +1,11 @@
 <template>
   <div class="page">
-    <div v-if="petStore.loading" class="loading">
+    <div v-if="petStore.loading && petStore.pets.length === 0" class="loading">
       <span class="animate-bounce">🐾</span>
       <p>加载中...</p>
     </div>
 
-    <template v-else-if="petStore.pet">
+    <template v-else-if="petStore.currentPet">
       <!-- 积分余额 -->
       <div class="points-banner">
         <span class="points-icon">⭐</span>
@@ -13,19 +13,54 @@
         <span class="points-label">积分</span>
       </div>
 
+      <!-- 宠物切换条 -->
+      <div v-if="petStore.pets.length > 1 || petStore.canAdoptNew" class="pet-switcher">
+        <button
+          v-for="p in petStore.pets"
+          :key="p.id"
+          class="switcher-item"
+          :class="{ active: p.id === petStore.currentPet?.id }"
+          :title="`${p.name} · Lv.${p.level}`"
+          :style="{ background: p.id === petStore.currentPet?.id ? p.appearance?.color : 'white' }"
+          @click="petStore.selectPet(p.id)"
+        >
+          <PetAvatar
+            :species="p.species"
+            :level="p.level"
+            :size="40"
+          />
+          <span class="switcher-lv">Lv.{{ p.level }}</span>
+        </button>
+        <button
+          v-if="petStore.canAdoptNew"
+          class="switcher-item switcher-add"
+          title="领养新宠物"
+          @click="router.push('/pet/create')"
+        >
+          <span class="switcher-add-icon">＋</span>
+        </button>
+      </div>
+
       <!-- 宠物展示 -->
-      <div class="pet-display card">
-        <div class="pet-avatar animate-float" :style="{ background: petStore.pet.appearance.color }">
-          <span class="pet-emoji">{{ speciesIcons[petStore.pet.species] }}</span>
-        </div>
-        <h2 class="pet-name">{{ petStore.pet.name }}</h2>
+      <div class="pet-display card" :style="{ background: petStore.currentPet.appearance.color }">
+        <PetAvatar
+          class="pet-avatar animate-float"
+          :species="petStore.currentPet.species"
+          :level="petStore.currentPet.level"
+          :size="160"
+          show-stage
+        />
+        <h2 class="pet-name">{{ petStore.currentPet.name }}</h2>
         <div class="pet-level">
-          <span class="level-badge">Lv.{{ petStore.pet.level }}</span>
+          <span class="level-badge">Lv.{{ petStore.currentPet.level }}</span>
           <div class="xp-bar">
             <div class="progress-bar">
               <div class="progress-fill" :style="{ width: xpPercent + '%', background: 'linear-gradient(90deg, var(--color-primary), var(--color-secondary))' }"></div>
             </div>
-            <span class="xp-text">{{ petStore.pet.xp }} / {{ nextLevelXp }} XP</span>
+            <span class="xp-text">
+              <template v-if="petStore.currentPet.level >= MAX_LEVEL">已进化为完全体</template>
+              <template v-else>{{ petStore.currentPet.xp }} / {{ nextLevelXp }} XP</template>
+            </span>
           </div>
         </div>
       </div>
@@ -37,30 +72,30 @@
           <div class="stat-info">
             <span class="stat-label">饱食</span>
             <div class="progress-bar">
-              <div class="progress-fill" :style="{ width: petStore.pet.hunger + '%', background: '#4ECDC4' }"></div>
+              <div class="progress-fill" :style="{ width: petStore.currentPet.hunger + '%', background: '#4ECDC4' }"></div>
             </div>
           </div>
-          <span class="stat-val">{{ petStore.pet.hunger }}</span>
+          <span class="stat-val">{{ petStore.currentPet.hunger }}</span>
         </div>
         <div class="stat-item">
           <span class="stat-icon">😊</span>
           <div class="stat-info">
             <span class="stat-label">快乐</span>
             <div class="progress-bar">
-              <div class="progress-fill" :style="{ width: petStore.pet.happiness + '%', background: '#FFE66D' }"></div>
+              <div class="progress-fill" :style="{ width: petStore.currentPet.happiness + '%', background: '#FFE66D' }"></div>
             </div>
           </div>
-          <span class="stat-val">{{ petStore.pet.happiness }}</span>
+          <span class="stat-val">{{ petStore.currentPet.happiness }}</span>
         </div>
         <div class="stat-item">
           <span class="stat-icon">✨</span>
           <div class="stat-info">
             <span class="stat-label">清洁</span>
             <div class="progress-bar">
-              <div class="progress-fill" :style="{ width: petStore.pet.cleanliness + '%', background: '#87CEEB' }"></div>
+              <div class="progress-fill" :style="{ width: petStore.currentPet.cleanliness + '%', background: '#87CEEB' }"></div>
             </div>
           </div>
-          <span class="stat-val">{{ petStore.pet.cleanliness }}</span>
+          <span class="stat-val">{{ petStore.currentPet.cleanliness }}</span>
         </div>
       </div>
 
@@ -107,7 +142,8 @@ import { useRouter } from 'vue-router'
 import { usePetStore } from '../stores/pet'
 import { useAuthStore } from '../stores/auth'
 import { usePointsStore } from '../stores/points'
-import { LEVEL_THRESHOLDS } from '../lib/constants'
+import { LEVEL_THRESHOLDS, MAX_LEVEL } from '../lib/constants'
+import PetAvatar from '../components/pet/PetAvatar.vue'
 
 const router = useRouter()
 const petStore = usePetStore()
@@ -116,22 +152,18 @@ const pointsStore = usePointsStore()
 const message = ref('')
 const isError = ref(false)
 
-const speciesIcons: Record<string, string> = {
-  cat: '🐱', dog: '🐶', rabbit: '🐰',
-  hamster: '🐹', bird: '🐦', turtle: '🐢',
-}
-
 const nextLevelXp = computed(() => {
-  if (!petStore.pet) return 50
-  const level = petStore.pet.level
+  if (!petStore.currentPet) return 50
+  const level = petStore.currentPet.level
   if (level >= LEVEL_THRESHOLDS.length) return LEVEL_THRESHOLDS[LEVEL_THRESHOLDS.length - 1]
   return LEVEL_THRESHOLDS[level]
 })
 
 const xpPercent = computed(() => {
-  if (!petStore.pet) return 0
-  const current = petStore.pet.xp
-  const level = petStore.pet.level
+  if (!petStore.currentPet) return 0
+  const current = petStore.currentPet.xp
+  const level = petStore.currentPet.level
+  if (level >= MAX_LEVEL) return 100
   const prevThreshold = level > 1 ? LEVEL_THRESHOLDS[level - 1] : 0
   const next = nextLevelXp.value
   if (next === prevThreshold) return 100
@@ -153,10 +185,10 @@ async function doAction(action: 'feed' | 'play' | 'clean') {
 
 onMounted(async () => {
   await Promise.all([
-    petStore.fetchPet(),
+    petStore.fetchPets(),
     pointsStore.fetchActionCosts(),
   ])
-  if (!petStore.pet) {
+  if (petStore.pets.length === 0) {
     router.push('/pet/create')
   }
 })
@@ -205,6 +237,59 @@ onMounted(async () => {
   color: #F9A825;
 }
 
+.pet-switcher {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  padding: 4px 2px 12px;
+  margin-bottom: 8px;
+  scrollbar-width: none;
+}
+
+.pet-switcher::-webkit-scrollbar { display: none; }
+
+.switcher-item {
+  background: white;
+  border: 2px solid transparent;
+  border-radius: var(--radius);
+  padding: 6px 8px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  cursor: pointer;
+  transition: all 0.2s;
+  flex-shrink: 0;
+}
+
+.switcher-item:hover {
+  border-color: var(--color-primary-light, #FFC0CB);
+}
+
+.switcher-item.active {
+  border-color: var(--color-primary);
+  background: #FFF0F5;
+}
+
+.switcher-lv {
+  font-size: 0.65rem;
+  color: var(--color-text-muted);
+  font-weight: 600;
+}
+
+.switcher-add {
+  width: 62px;
+  justify-content: center;
+  align-self: stretch;
+  border: 2px dashed #ddd;
+  color: var(--color-primary);
+}
+
+.switcher-add-icon {
+  font-size: 1.4rem;
+  font-weight: 600;
+}
+
 .pet-display {
   text-align: center;
   padding: 28px 20px;
@@ -212,18 +297,7 @@ onMounted(async () => {
 }
 
 .pet-avatar {
-  width: 120px;
-  height: 120px;
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
   margin: 0 auto 16px;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.1);
-}
-
-.pet-emoji {
-  font-size: 3.5rem;
 }
 
 .pet-name {

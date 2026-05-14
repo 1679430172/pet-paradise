@@ -12,9 +12,12 @@
     <div v-else class="feed-list">
       <div v-for="item in feedStore.items" :key="item.id" class="feed-card card">
         <div class="feed-header">
-          <div class="feed-pet-avatar" :style="{ background: item.pets?.appearance?.color || '#FFB6C1' }">
-            <span>{{ speciesIcons[item.pets?.species] || '🐾' }}</span>
-          </div>
+          <PetAvatar
+            class="feed-pet-avatar"
+            :species="item.pets?.species"
+            :level="item.pets?.level || 1"
+            :size="40"
+          />
           <div class="feed-info">
             <span class="feed-username">{{ item.profiles?.username || '匿名' }}</span>
             <span class="feed-pet-name">{{ item.pets?.name }} · Lv.{{ item.pets?.level }}</span>
@@ -44,13 +47,9 @@
 import { onMounted } from 'vue'
 import { useFeedStore } from '../stores/feed'
 import { MOODS } from '../lib/constants'
+import PetAvatar from '../components/pet/PetAvatar.vue'
 
 const feedStore = useFeedStore()
-
-const speciesIcons: Record<string, string> = {
-  cat: '🐱', dog: '🐶', rabbit: '🐰',
-  hamster: '🐹', bird: '🐦', turtle: '🐢',
-}
 
 function getMoodIcon(mood: string) {
   return MOODS.find(m => m.value === mood)?.icon ?? ''

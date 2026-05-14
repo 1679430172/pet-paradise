@@ -19,39 +19,65 @@
         v-for="s in teacherStore.studentsWithPets"
         :key="s.id"
         class="pet-card card"
+        :style="cardStyle(s)"
       >
-        <template v-if="s.pet">
-          <span class="level-badge">Lv.{{ s.pet.level }}</span>
-          <div class="pet-hero" :style="{ background: s.pet.appearance?.color || '#FFB6C1' }">
-            <span class="pet-hero-icon">{{ speciesIcon(s.pet.species) }}</span>
-          </div>
+        <!-- 左上角：积分 -->
+        <span class="points-badge">{{ s.points }}分</span>
+
+        <!-- 左右切换箭头 -->
+        <button
+          v-if="s.pets.length > 1"
+          class="nav-arrow left"
+          title="上一只"
+          @click="prev(s)"
+        >‹</button>
+        <button
+          v-if="s.pets.length > 1"
+          class="nav-arrow right"
+          title="下一只"
+          @click="next(s)"
+        >›</button>
+
+        <!-- 有活跃宠物 -->
+        <template v-if="activePet(s)">
+          <!-- 顶部中间：宠物名字（小字） -->
+          <span class="pet-name-top">{{ activePet(s)!.name }}</span>
+
+          <!-- 右上角：等级 -->
+          <span
+            class="level-badge"
+            :class="{ 'max-badge': activePet(s)!.level >= MAX_LEVEL }"
+          >Lv.{{ activePet(s)!.level }}</span>
+
+          <PetAvatar
+            :species="activePet(s)!.species"
+            :level="activePet(s)!.level"
+            :size="80"
+            show-stage
+          />
+          <!-- 主标题：学生姓名 -->
           <h2 class="pet-name">{{ s.username }}</h2>
-          <div class="pet-sub">
-            <span class="pet-sub-name">{{ s.pet.name }}</span>
-            <span class="pet-sub-dot">·</span>
-            <span class="pet-sub-points">{{ s.points }}分</span>
-          </div>
 
           <div class="pet-stats">
             <div class="pet-stat">
               <span class="stat-label">🍖</span>
-              <div class="stat-bar"><div class="stat-fill" :style="{ width: (s.pet.hunger || 0) + '%' }"></div></div>
+              <div class="stat-bar"><div class="stat-fill" :style="{ width: (activePet(s)!.hunger || 0) + '%' }"></div></div>
             </div>
             <div class="pet-stat">
               <span class="stat-label">🎾</span>
-              <div class="stat-bar"><div class="stat-fill happy" :style="{ width: (s.pet.happiness || 0) + '%' }"></div></div>
+              <div class="stat-bar"><div class="stat-fill happy" :style="{ width: (activePet(s)!.happiness || 0) + '%' }"></div></div>
             </div>
             <div class="pet-stat">
               <span class="stat-label">🛁</span>
-              <div class="stat-bar"><div class="stat-fill clean" :style="{ width: (s.pet.cleanliness || 0) + '%' }"></div></div>
+              <div class="stat-bar"><div class="stat-fill clean" :style="{ width: (activePet(s)!.cleanliness || 0) + '%' }"></div></div>
             </div>
           </div>
 
           <div class="action-row">
             <button
               class="btn-action"
-              :disabled="busyId === s.id || s.points < pointsStore.actionCosts.feed"
-              @click="handleAction(s, 'feed')"
+              :disabled="busyKey === activePet(s)!.id || s.points < pointsStore.actionCosts.feed"
+              @click="handleAction(s, activePet(s)!, 'feed')"
               :title="`喂食 -${pointsStore.actionCosts.feed}`"
             >
               <span class="action-icon">🍖</span>
@@ -59,8 +85,8 @@
             </button>
             <button
               class="btn-action"
-              :disabled="busyId === s.id || s.points < pointsStore.actionCosts.play"
-              @click="handleAction(s, 'play')"
+              :disabled="busyKey === activePet(s)!.id || s.points < pointsStore.actionCosts.play"
+              @click="handleAction(s, activePet(s)!, 'play')"
               :title="`玩耍 -${pointsStore.actionCosts.play}`"
             >
               <span class="action-icon">🎾</span>
@@ -68,25 +94,41 @@
             </button>
             <button
               class="btn-action"
-              :disabled="busyId === s.id || s.points < pointsStore.actionCosts.clean"
-              @click="handleAction(s, 'clean')"
+              :disabled="busyKey === activePet(s)!.id || s.points < pointsStore.actionCosts.clean"
+              @click="handleAction(s, activePet(s)!, 'clean')"
               :title="`清洁 -${pointsStore.actionCosts.clean}`"
             >
               <span class="action-icon">🛁</span>
               <span class="cost">-{{ pointsStore.actionCosts.clean }}</span>
             </button>
           </div>
+
+          <!-- 页码指示点 -->
+          <div v-if="s.pets.length > 1" class="pet-dots">
+            <span
+              v-for="(p, idx) in s.pets"
+              :key="p.id"
+              class="dot"
+              :class="{ active: idx === getIdx(s) }"
+              @click="petIdx[s.id] = idx"
+            />
+          </div>
+
+          <!-- 所有宠物已满级：可领养新宠物 -->
+          <button
+            v-if="canAdoptFor(s)"
+            class="adopt-mini-btn"
+            @click="openAdoptDialog(s)"
+          >➕ 领养新宠物</button>
         </template>
 
+        <!-- 无宠物 -->
         <template v-else>
-          <div class="pet-hero empty-hero">
-            <span class="pet-hero-icon empty">🥚</span>
-          </div>
+          <span class="pet-name-top pet-name-top-muted">未命名</span>
+          <PetAvatar :empty="true" :size="80" />
           <h2 class="pet-name">{{ s.username }}</h2>
           <div class="pet-sub">
             <span class="pet-sub-muted">未领养宠物</span>
-            <span class="pet-sub-dot">·</span>
-            <span class="pet-sub-points">{{ s.points }}分</span>
           </div>
           <button class="btn btn-primary adopt-btn" @click="openAdoptDialog(s)">🐾 领养</button>
         </template>
@@ -150,16 +192,20 @@
 
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
-import { useTeacherStore, type StudentWithPet } from '../../stores/teacher'
+import { useTeacherStore, type StudentWithPet, type TeacherPet } from '../../stores/teacher'
 import { usePointsStore } from '../../stores/points'
-import { PET_SPECIES, PET_SPECIES_LABELS, PET_COLORS } from '../../lib/constants'
+import { PET_SPECIES, PET_SPECIES_LABELS, PET_COLORS, MAX_LEVEL } from '../../lib/constants'
+import PetAvatar from '../../components/pet/PetAvatar.vue'
 
 const teacherStore = useTeacherStore()
 const pointsStore = usePointsStore()
 
 const searchQuery = ref('')
-const busyId = ref<string | null>(null)
+const busyKey = ref<string | null>(null)
 const toast = ref('')
+
+// 每个学生当前展示的宠物索引（student.id -> pet index）
+const petIdx = ref<Record<string, number>>({})
 
 // 领养弹窗
 const showAdoptDialog = ref(false)
@@ -174,8 +220,37 @@ const speciesIcons: Record<string, string> = {
   cat: '🐱', dog: '🐶', rabbit: '🐰', hamster: '🐹', bird: '🐦', turtle: '🐢',
 }
 
-function speciesIcon(sp: string) {
-  return speciesIcons[sp] || '🐾'
+function canAdoptFor(s: StudentWithPet) {
+  return s.pets.length === 0 || s.pets.every(p => (p.level || 1) >= MAX_LEVEL)
+}
+
+function getIdx(s: StudentWithPet): number {
+  const i = petIdx.value[s.id] || 0
+  if (s.pets.length === 0) return 0
+  return Math.min(i, s.pets.length - 1)
+}
+
+function activePet(s: StudentWithPet): TeacherPet | null {
+  if (!s.pets || s.pets.length === 0) return null
+  return s.pets[getIdx(s)] || null
+}
+
+function prev(s: StudentWithPet) {
+  const n = s.pets.length
+  if (n <= 1) return
+  petIdx.value[s.id] = (getIdx(s) - 1 + n) % n
+}
+
+function next(s: StudentWithPet) {
+  const n = s.pets.length
+  if (n <= 1) return
+  petIdx.value[s.id] = (getIdx(s) + 1) % n
+}
+
+function cardStyle(s: StudentWithPet) {
+  const p = activePet(s)
+  if (!p) return { background: '#fafafa' }
+  return { background: p.appearance?.color || '#FFB6C1' }
 }
 
 onMounted(async () => {
@@ -194,18 +269,18 @@ function showToast(msg: string) {
   setTimeout(() => { toast.value = '' }, 2500)
 }
 
-async function handleAction(s: StudentWithPet, action: 'feed' | 'play' | 'clean') {
-  if (!s.pet || !s.pet.id) return
-  busyId.value = s.id
-  const result = await teacherStore.performActionForStudent(s.id, s.pet.id, action)
-  busyId.value = null
+async function handleAction(s: StudentWithPet, p: TeacherPet, action: 'feed' | 'play' | 'clean') {
+  if (!p.id) return
+  busyKey.value = p.id
+  const result = await teacherStore.performActionForStudent(s.id, p.id, action)
+  busyKey.value = null
   if (result.error) {
     showToast(result.error.message || '操作失败')
     return
   }
   const actionLabel = action === 'feed' ? '喂食' : action === 'play' ? '玩耍' : '清洁'
   const levelMsg = result.leveledUp ? `，升到 ${result.newLevel} 级！` : ''
-  showToast(`已为 ${s.username} 的宠物${actionLabel}（-${result.cost} 积分）${levelMsg}`)
+  showToast(`已为 ${s.username} 的 ${p.name} ${actionLabel}（-${result.cost} 积分）${levelMsg}`)
 }
 
 function openAdoptDialog(s: StudentWithPet) {
@@ -240,7 +315,9 @@ async function handleAdopt() {
   // 回填本地列表
   const target = teacherStore.studentsWithPets.find(x => x.id === adoptTarget.value!.id)
   if (target && data) {
-    target.pet = data
+    target.pets = [...(target.pets || []), data]
+    // 自动跳转到新领养的宠物
+    petIdx.value[target.id] = target.pets.length - 1
   }
   showToast(`已为 ${adoptTarget.value.username} 领养宠物`)
   closeAdoptDialog()
@@ -270,19 +347,18 @@ async function handleAdopt() {
 
 .pet-card {
   position: relative;
-  padding: 16px 10px 12px;
+  padding: 30px 10px 12px;
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: 8px;
-  background: linear-gradient(180deg, #fffafc 0%, #ffffff 100%);
-  box-shadow: 0 4px 14px rgba(255, 107, 157, 0.08);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.08);
   transition: transform 0.2s, box-shadow 0.2s;
 }
 
 .pet-card:hover {
   transform: translateY(-2px);
-  box-shadow: 0 6px 20px rgba(255, 107, 157, 0.15);
+  box-shadow: 0 8px 22px rgba(0, 0, 0, 0.14);
 }
 
 .level-badge {
@@ -296,6 +372,124 @@ async function handleAdopt() {
   font-size: 0.68rem;
   font-weight: 700;
   box-shadow: 0 2px 6px rgba(255, 165, 0, 0.3);
+}
+
+.level-badge.max-badge {
+  background: linear-gradient(135deg, #A78BFA, #6366F1);
+  box-shadow: 0 2px 6px rgba(99, 102, 241, 0.35);
+}
+
+.points-badge {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  background: linear-gradient(135deg, #10B981, #059669);
+  color: white;
+  padding: 2px 8px;
+  border-radius: 16px;
+  font-size: 0.68rem;
+  font-weight: 700;
+  box-shadow: 0 2px 6px rgba(16, 185, 129, 0.3);
+  z-index: 1;
+}
+
+.pet-name-muted {
+  color: rgba(0, 0, 0, 0.4);
+  font-style: italic;
+}
+
+.pet-name-top {
+  position: absolute;
+  top: 9px;
+  left: 50%;
+  transform: translateX(-50%);
+  max-width: 50%;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: rgba(0, 0, 0, 0.75);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  z-index: 1;
+  pointer-events: none;
+}
+
+.pet-name-top-muted {
+  color: rgba(0, 0, 0, 0.4);
+  font-style: italic;
+}
+
+.adopt-card {
+  background: #fafafa !important;
+  border: 1.5px dashed #e0e0e0;
+}
+
+.nav-arrow {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  border: none;
+  background: rgba(255, 255, 255, 0.85);
+  color: #333;
+  cursor: pointer;
+  font-size: 1.2rem;
+  line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.18);
+  z-index: 2;
+  transition: background 0.2s, transform 0.15s;
+}
+
+.nav-arrow:hover {
+  background: #fff;
+  transform: translateY(-50%) scale(1.08);
+}
+
+.nav-arrow.left { left: 4px; }
+.nav-arrow.right { right: 4px; }
+
+.pet-dots {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 4px;
+}
+
+.pet-dots .dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.25);
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.pet-dots .dot.active {
+  background: rgba(0, 0, 0, 0.65);
+  width: 14px;
+  border-radius: 3px;
+}
+
+.adopt-mini-btn {
+  margin-top: 4px;
+  padding: 5px 12px;
+  border-radius: 20px;
+  border: 1.5px dashed rgba(0, 0, 0, 0.25);
+  background: rgba(255, 255, 255, 0.7);
+  color: #333;
+  font-size: 0.72rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.adopt-mini-btn:hover {
+  background: #fff;
 }
 
 .pet-hero {
@@ -342,14 +536,14 @@ async function handleAdopt() {
   align-items: center;
   gap: 4px;
   font-size: 0.72rem;
-  color: #888;
+  color: rgba(0, 0, 0, 0.55);
   max-width: 100%;
   overflow: hidden;
   white-space: nowrap;
 }
 
 .pet-sub-name {
-  color: #555;
+  color: rgba(0, 0, 0, 0.75);
   font-weight: 600;
   max-width: 70px;
   overflow: hidden;
@@ -357,16 +551,16 @@ async function handleAdopt() {
 }
 
 .pet-sub-muted {
-  color: #bbb;
+  color: rgba(0, 0, 0, 0.4);
   font-style: italic;
 }
 
 .pet-sub-dot {
-  color: #ccc;
+  color: rgba(0, 0, 0, 0.3);
 }
 
 .pet-sub-points {
-  color: var(--color-success);
+  color: #2f855a;
   font-weight: 600;
 }
 
@@ -376,7 +570,7 @@ async function handleAdopt() {
   flex-direction: column;
   gap: 4px;
   padding: 6px 8px;
-  background: #faf9fb;
+  background: rgba(255, 255, 255, 0.55);
   border-radius: 8px;
   margin-top: 2px;
 }
@@ -397,7 +591,7 @@ async function handleAdopt() {
 .stat-bar {
   flex: 1;
   height: 6px;
-  background: #ececf2;
+  background: rgba(0, 0, 0, 0.15);
   border-radius: 3px;
   overflow: hidden;
 }
@@ -423,8 +617,8 @@ async function handleAdopt() {
   flex: 1;
   padding: 6px 2px;
   border-radius: 8px;
-  border: 1.5px solid #f0e6ea;
-  background: white;
+  border: 1.5px solid rgba(255, 255, 255, 0.8);
+  background: rgba(255, 255, 255, 0.75);
   color: #444;
   cursor: pointer;
   display: flex;
@@ -435,8 +629,8 @@ async function handleAdopt() {
 }
 
 .btn-action:hover:not(:disabled) {
-  background: #fff0f5;
-  border-color: var(--color-primary);
+  background: #fff;
+  border-color: #fff;
   transform: translateY(-1px);
 }
 
