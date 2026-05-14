@@ -47,7 +47,7 @@
           class="pet-avatar animate-float"
           :species="petStore.currentPet.species"
           :level="petStore.currentPet.level"
-          :size="160"
+          :size="200"
           show-stage
         />
         <h2 class="pet-name">{{ petStore.currentPet.name }}</h2>
@@ -77,56 +77,36 @@
           </div>
           <span class="stat-val">{{ petStore.currentPet.hunger }}</span>
         </div>
-        <div class="stat-item">
-          <span class="stat-icon">😊</span>
-          <div class="stat-info">
-            <span class="stat-label">快乐</span>
-            <div class="progress-bar">
-              <div class="progress-fill" :style="{ width: petStore.currentPet.happiness + '%', background: '#FFE66D' }"></div>
-            </div>
-          </div>
-          <span class="stat-val">{{ petStore.currentPet.happiness }}</span>
-        </div>
-        <div class="stat-item">
-          <span class="stat-icon">✨</span>
-          <div class="stat-info">
-            <span class="stat-label">清洁</span>
-            <div class="progress-bar">
-              <div class="progress-fill" :style="{ width: petStore.currentPet.cleanliness + '%', background: '#87CEEB' }"></div>
-            </div>
-          </div>
-          <span class="stat-val">{{ petStore.currentPet.cleanliness }}</span>
-        </div>
       </div>
 
       <!-- 互动按钮 -->
       <div class="actions-grid">
         <button
           class="action-btn"
-          :disabled="!canAfford('feed')"
-          @click="doAction('feed')"
+          :disabled="!canAfford('basic')"
+          @click="doAction('basic')"
         >
           <span class="action-icon">🍖</span>
-          <span class="action-label">喂食</span>
-          <span class="action-cost">{{ pointsStore.actionCosts.feed }} 积分</span>
+          <span class="action-label">普通粮</span>
+          <span class="action-cost">{{ pointsStore.actionCosts.basic }} 积分</span>
         </button>
         <button
           class="action-btn"
-          :disabled="!canAfford('play')"
-          @click="doAction('play')"
+          :disabled="!canAfford('nice')"
+          @click="doAction('nice')"
         >
-          <span class="action-icon">🎾</span>
-          <span class="action-label">玩耍</span>
-          <span class="action-cost">{{ pointsStore.actionCosts.play }} 积分</span>
+          <span class="action-icon">🍗</span>
+          <span class="action-label">营养粮</span>
+          <span class="action-cost">{{ pointsStore.actionCosts.nice }} 积分</span>
         </button>
         <button
           class="action-btn"
-          :disabled="!canAfford('clean')"
-          @click="doAction('clean')"
+          :disabled="!canAfford('luxury')"
+          @click="doAction('luxury')"
         >
-          <span class="action-icon">🛁</span>
-          <span class="action-label">清洁</span>
-          <span class="action-cost">{{ pointsStore.actionCosts.clean }} 积分</span>
+          <span class="action-icon">🥩</span>
+          <span class="action-label">豪华粮</span>
+          <span class="action-cost">{{ pointsStore.actionCosts.luxury }} 积分</span>
         </button>
       </div>
 
@@ -170,11 +150,11 @@ const xpPercent = computed(() => {
   return Math.min(100, ((current - prevThreshold) / (next - prevThreshold)) * 100)
 })
 
-function canAfford(action: 'feed' | 'play' | 'clean') {
+function canAfford(action: 'basic' | 'nice' | 'luxury') {
   return (authStore.user?.points || 0) >= pointsStore.actionCosts[action]
 }
 
-async function doAction(action: 'feed' | 'play' | 'clean') {
+async function doAction(action: 'basic' | 'nice' | 'luxury') {
   const result = await petStore.performAction(action)
   if (result) {
     isError.value = !result.success

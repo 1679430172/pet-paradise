@@ -3,20 +3,20 @@
     <h1 class="page-title">积分设置</h1>
 
     <div class="settings-card card">
-      <h3>宠物操作积分消耗</h3>
-      <p class="settings-desc">设置学生进行宠物操作时需要消耗的积分数量</p>
+      <h3>宠物喂食积分消耗</h3>
+      <p class="settings-desc">设置三档喂食所需的积分（统一作用于饱食度，档位越高恢复越多、获得经验越多）</p>
 
       <div class="form-group">
-        <label class="form-label">🍖 喂食消耗</label>
-        <input v-model.number="costs.feed" type="number" class="form-input" min="0" max="100" />
+        <label class="form-label">🍖 普通粮消耗（hunger +20，xp +5）</label>
+        <input v-model.number="costs.basic" type="number" class="form-input" min="0" max="100" />
       </div>
       <div class="form-group">
-        <label class="form-label">🎾 玩耍消耗</label>
-        <input v-model.number="costs.play" type="number" class="form-input" min="0" max="100" />
+        <label class="form-label">🍗 营养粮消耗（hunger +50，xp +12）</label>
+        <input v-model.number="costs.nice" type="number" class="form-input" min="0" max="100" />
       </div>
       <div class="form-group">
-        <label class="form-label">🛁 清洁消耗</label>
-        <input v-model.number="costs.clean" type="number" class="form-input" min="0" max="100" />
+        <label class="form-label">🥩 豪华粮消耗（hunger +100，xp +25）</label>
+        <input v-model.number="costs.luxury" type="number" class="form-input" min="0" max="100" />
       </div>
 
       <button class="btn btn-primary form-btn" :disabled="loading" @click="handleSaveCosts">
@@ -49,7 +49,7 @@ import { usePointsStore } from '../../stores/points'
 
 const pointsStore = usePointsStore()
 
-const costs = reactive({ feed: 5, play: 8, clean: 3 })
+const costs = reactive({ basic: 3, nice: 8, luxury: 15 })
 const diaryPts = ref(5)
 const loading = ref(false)
 const error = ref('')
@@ -60,9 +60,9 @@ onMounted(async () => {
     pointsStore.fetchActionCosts(),
     pointsStore.fetchDiaryPoints(),
   ])
-  costs.feed = pointsStore.actionCosts.feed
-  costs.play = pointsStore.actionCosts.play
-  costs.clean = pointsStore.actionCosts.clean
+  costs.basic = pointsStore.actionCosts.basic
+  costs.nice = pointsStore.actionCosts.nice
+  costs.luxury = pointsStore.actionCosts.luxury
   diaryPts.value = pointsStore.diaryPoints
 })
 

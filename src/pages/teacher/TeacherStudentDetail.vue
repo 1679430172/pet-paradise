@@ -32,14 +32,6 @@
                 <span>饱食</span>
                 <div class="stat-bar"><div class="stat-fill" :style="{ width: (p.hunger || 0) + '%' }"></div></div>
               </div>
-              <div class="pet-stat">
-                <span>快乐</span>
-                <div class="stat-bar"><div class="stat-fill happy" :style="{ width: (p.happiness || 0) + '%' }"></div></div>
-              </div>
-              <div class="pet-stat">
-                <span>清洁</span>
-                <div class="stat-bar"><div class="stat-fill clean" :style="{ width: (p.cleanliness || 0) + '%' }"></div></div>
-              </div>
             </div>
           </div>
         </div>
@@ -84,7 +76,7 @@
               :class="{ selected: adoptSpecies === s }"
               @click="adoptSpecies = s"
             >
-              <span class="species-icon">{{ speciesIcons[s] }}</span>
+              <span class="species-icon">{{ speciesIcons[s] || '🐾' }}</span>
               <span class="species-name">{{ PET_SPECIES_LABELS[s] }}</span>
             </div>
           </div>
@@ -150,7 +142,7 @@ const adopting = ref(false)
 const toast = ref('')
 
 const speciesIcons: Record<string, string> = {
-  cat: '🐱', dog: '🐶', rabbit: '🐰', hamster: '🐹', bird: '🐦', turtle: '🐢'
+  紫电龙: '🐉',
 }
 
 const canAdoptNew = computed(() => {

@@ -21,7 +21,7 @@
 
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
-import { getPetImage, getPetStage, PET_STAGE_LABELS } from '../../lib/constants'
+import { getPetImage, getPetStage, PET_STAGE_LABELS, PET_SPECIES } from '../../lib/constants'
 
 interface Props {
   species?: string
@@ -47,12 +47,13 @@ const imgError = ref(false)
 
 watch(() => [props.species, props.level], () => { imgError.value = false })
 
-const imgSrc = computed(() => getPetImage(props.species || 'cat', props.level || 1))
+const imgSrc = computed(() => getPetImage(props.species || PET_SPECIES[0], props.level || 1))
 
 const stageLabel = computed(() => PET_STAGE_LABELS[getPetStage(props.level || 1)])
 
+// 各种类 emoji 备选（图片加载失败时展示），未配置的种类统一用 🐾
 const SPECIES_EMOJI: Record<string, string> = {
-  cat: '🐱', dog: '🐶', rabbit: '🐰', hamster: '🐹', bird: '🐦', turtle: '🐢',
+  紫电龙: '🐉',
 }
 const speciesEmoji = computed(() => SPECIES_EMOJI[props.species] || '🐾')
 

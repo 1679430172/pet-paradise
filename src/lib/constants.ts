@@ -1,28 +1,30 @@
-// 宠物种类
-export const PET_SPECIES = ['cat', 'dog', 'rabbit', 'hamster', 'bird', 'turtle'] as const
+// 宠物种类（数组开放扩展，新增宠物只需：
+// 1) 在此数组追加 species key（与 public/assets/pets/{key} 文件夹名一致）
+// 2) 在 PET_SPECIES_LABELS 添加对应展示名
+// 3) 准备 public/assets/pets/{key}/Lv_01.png ~ Lv_20.png 共 20 张图片
+// 4) 可选：在各页面 speciesIcons / PetAvatar SPECIES_EMOJI 添加 emoji 图标
+// 当前仅有「紫电龙」一个种类的素材，但架构支持任意多种）
+export const PET_SPECIES = ['紫电龙'] as const
 export type PetSpecies = typeof PET_SPECIES[number]
 
 export const PET_SPECIES_LABELS: Record<PetSpecies, string> = {
-  cat: '小猫',
-  dog: '小狗',
-  rabbit: '兔子',
-  hamster: '仓鼠',
-  bird: '小鸟',
-  turtle: '乌龟',
+  紫电龙: '紫电龙',
 }
 
 // 宠物颜色
 export const PET_COLORS: string[] = ['#FFB6C1', '#87CEEB', '#98FB98', '#DDA0DD', '#F0E68C', '#FFA07A']
 
-// 动作配置（去掉冷却，改为积分消耗）
+// 动作配置：三档喂食，统一作用于 hunger
 export const ACTIONS = {
-  feed: { xp: 10, statKey: 'hunger' as const, statGain: 30 },
-  play: { xp: 15, statKey: 'happiness' as const, statGain: 25 },
-  clean: { xp: 8, statKey: 'cleanliness' as const, statGain: 40 },
+  basic: { xp: 5, statKey: 'hunger' as const, statGain: 20, label: '普通粮', icon: '🍖' },
+  nice: { xp: 12, statKey: 'hunger' as const, statGain: 50, label: '营养粮', icon: '🍗' },
+  luxury: { xp: 25, statKey: 'hunger' as const, statGain: 100, label: '豪华粮', icon: '🥩' },
 } as const
 
+export type ActionKey = keyof typeof ACTIONS
+
 // 默认积分消耗配置
-export const DEFAULT_ACTION_COSTS = { feed: 5, play: 8, clean: 3 }
+export const DEFAULT_ACTION_COSTS = { basic: 3, nice: 8, luxury: 15 }
 
 export const DIARY_XP = 20
 export const PHOTO_XP = 25
@@ -75,9 +77,16 @@ export function getPetStage(level: number): PetStage {
   return 'egg'
 }
 
-// 静态图片路径：/assets/pets/{species}_{stage}.png
+// 静态图片路径：/assets/pets/{species}/Lv_{level}.png
+// 文件必须放在 public/assets/pets/ 下（Vite 只从 public 目录按绝对路径提供静态资源）
+// 每个宠物种类一个文件夹，内含 Lv_01.png ~ Lv_20.png（两位数补零），每级一张
 export function getPetImage(species: string, level: number): string {
-  return `/assets/pets/${species}_${getPetStage(level)}.png`
+  const lv = Math.max(1, Math.min(MAX_LEVEL, Math.round(level || 1)))
+  const lvStr = String(lv).padStart(2, '0')
+  // 未登记的种类（如旧数据库中的历史 species 值）回退到 PET_SPECIES[0]
+  // 这样后续新增种类时不需要修改 fallback 逻辑
+  const sp = (PET_SPECIES as readonly string[]).includes(species) ? species : PET_SPECIES[0]
+  return `/assets/pets/${sp}/Lv_${lvStr}.png`
 }
 
 export function isPetMaxed(level: number): boolean {

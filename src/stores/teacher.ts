@@ -107,7 +107,7 @@ export const useTeacherStore = defineStore('teacher', () => {
     return 1
   }
 
-  async function performActionForStudent(studentId: string, petId: string, action: 'feed' | 'play' | 'clean') {
+  async function performActionForStudent(studentId: string, petId: string, action: 'basic' | 'nice' | 'luxury') {
     const pointsStore = usePointsStore()
     await pointsStore.fetchActionCosts()
     const cost = pointsStore.actionCosts[action]
@@ -130,18 +130,16 @@ export const useTeacherStore = defineStore('teacher', () => {
     if (!pet) return { error: new Error('宠物不存在') }
 
     const config = ACTIONS[action]
-    const statKey = config.statKey
-    const newStatVal = Math.min(100, (pet[statKey] || 0) + config.statGain)
+    const newStatVal = Math.min(100, (pet.hunger || 0) + config.statGain)
     const newXp = (pet.xp || 0) + config.xp
     const newLevel = calculateLevel(newXp)
     const now = new Date().toISOString()
-    const lastAtKey = action === 'feed' ? 'last_fed_at' : action === 'play' ? 'last_played_at' : 'last_cleaned_at'
 
     const { error: petErr } = await supabase
       .from('pets')
       .update({
-        [statKey]: newStatVal,
-        [lastAtKey]: now,
+        hunger: newStatVal,
+        last_fed_at: now,
         xp: newXp,
         level: newLevel,
       })
@@ -160,7 +158,7 @@ export const useTeacherStore = defineStore('teacher', () => {
       target.points = student.points - cost
       const targetPet = target.pets?.find(p => p.id === petId)
       if (targetPet) {
-        ;(targetPet as any)[statKey] = newStatVal
+        targetPet.hunger = newStatVal
         targetPet.xp = newXp
         targetPet.level = newLevel
       }

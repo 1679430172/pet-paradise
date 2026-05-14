@@ -5,9 +5,9 @@ import { useAuthStore } from './auth'
 import { DEFAULT_ACTION_COSTS } from '../lib/constants'
 
 export interface ActionCosts {
-  feed: number
-  play: number
-  clean: number
+  basic: number
+  nice: number
+  luxury: number
 }
 
 export const usePointsStore = defineStore('points', () => {
@@ -22,7 +22,17 @@ export const usePointsStore = defineStore('points', () => {
       .eq('key', 'action_costs')
       .single()
     if (data?.value) {
-      actionCosts.value = data.value as ActionCosts
+      const v = data.value as any
+      // 兼容旧格式 {feed, play, clean}：检测到旧字段则回退到默认值
+      if (typeof v.basic === 'number' || typeof v.nice === 'number' || typeof v.luxury === 'number') {
+        actionCosts.value = {
+          basic: v.basic ?? DEFAULT_ACTION_COSTS.basic,
+          nice: v.nice ?? DEFAULT_ACTION_COSTS.nice,
+          luxury: v.luxury ?? DEFAULT_ACTION_COSTS.luxury,
+        }
+      } else {
+        actionCosts.value = { ...DEFAULT_ACTION_COSTS }
+      }
     }
   }
 

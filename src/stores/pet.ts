@@ -93,8 +93,6 @@ export const usePetStore = defineStore('pet', () => {
     }
     pets.value.forEach(p => {
       p.hunger = decayField(p.last_fed_at, p.hunger)
-      p.happiness = decayField(p.last_played_at, p.happiness)
-      p.cleanliness = decayField(p.last_cleaned_at, p.cleanliness)
     })
   }
 
@@ -130,7 +128,7 @@ export const usePetStore = defineStore('pet', () => {
     return { data, error }
   }
 
-  async function performAction(action: 'feed' | 'play' | 'clean') {
+  async function performAction(action: 'basic' | 'nice' | 'luxury') {
     const target = currentPet.value
     if (!target) return { success: false, message: '没有宠物' }
     if (target.level >= MAX_LEVEL) {
@@ -152,17 +150,15 @@ export const usePetStore = defineStore('pet', () => {
     }
 
     const config = ACTIONS[action]
-    const statKey = config.statKey
-    const newStatVal = Math.min(100, target[statKey] + config.statGain)
+    const newStatVal = Math.min(100, target.hunger + config.statGain)
     const newXp = target.xp + config.xp
     const oldLevel = target.level
     const newLevel = calculateLevel(newXp)
     const now = new Date().toISOString()
-    const lastAtKey = action === 'feed' ? 'last_fed_at' : action === 'play' ? 'last_played_at' : 'last_cleaned_at'
 
     const updates: any = {
-      [statKey]: newStatVal,
-      [lastAtKey]: now,
+      hunger: newStatVal,
+      last_fed_at: now,
       xp: newXp,
       level: newLevel,
     }

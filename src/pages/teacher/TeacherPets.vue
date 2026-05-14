@@ -52,7 +52,7 @@
           <PetAvatar
             :species="activePet(s)!.species"
             :level="activePet(s)!.level"
-            :size="80"
+            :size="160"
             show-stage
           />
           <!-- 主标题：学生姓名 -->
@@ -63,43 +63,35 @@
               <span class="stat-label">🍖</span>
               <div class="stat-bar"><div class="stat-fill" :style="{ width: (activePet(s)!.hunger || 0) + '%' }"></div></div>
             </div>
-            <div class="pet-stat">
-              <span class="stat-label">🎾</span>
-              <div class="stat-bar"><div class="stat-fill happy" :style="{ width: (activePet(s)!.happiness || 0) + '%' }"></div></div>
-            </div>
-            <div class="pet-stat">
-              <span class="stat-label">🛁</span>
-              <div class="stat-bar"><div class="stat-fill clean" :style="{ width: (activePet(s)!.cleanliness || 0) + '%' }"></div></div>
-            </div>
           </div>
 
           <div class="action-row">
             <button
               class="btn-action"
-              :disabled="busyKey === activePet(s)!.id || s.points < pointsStore.actionCosts.feed"
-              @click="handleAction(s, activePet(s)!, 'feed')"
-              :title="`喂食 -${pointsStore.actionCosts.feed}`"
+              :disabled="busyKey === activePet(s)!.id || s.points < pointsStore.actionCosts.basic"
+              @click="handleAction(s, activePet(s)!, 'basic')"
+              :title="`普通粮 -${pointsStore.actionCosts.basic}`"
             >
               <span class="action-icon">🍖</span>
-              <span class="cost">-{{ pointsStore.actionCosts.feed }}</span>
+              <span class="cost">-{{ pointsStore.actionCosts.basic }}</span>
             </button>
             <button
               class="btn-action"
-              :disabled="busyKey === activePet(s)!.id || s.points < pointsStore.actionCosts.play"
-              @click="handleAction(s, activePet(s)!, 'play')"
-              :title="`玩耍 -${pointsStore.actionCosts.play}`"
+              :disabled="busyKey === activePet(s)!.id || s.points < pointsStore.actionCosts.nice"
+              @click="handleAction(s, activePet(s)!, 'nice')"
+              :title="`营养粮 -${pointsStore.actionCosts.nice}`"
             >
-              <span class="action-icon">🎾</span>
-              <span class="cost">-{{ pointsStore.actionCosts.play }}</span>
+              <span class="action-icon">🍗</span>
+              <span class="cost">-{{ pointsStore.actionCosts.nice }}</span>
             </button>
             <button
               class="btn-action"
-              :disabled="busyKey === activePet(s)!.id || s.points < pointsStore.actionCosts.clean"
-              @click="handleAction(s, activePet(s)!, 'clean')"
-              :title="`清洁 -${pointsStore.actionCosts.clean}`"
+              :disabled="busyKey === activePet(s)!.id || s.points < pointsStore.actionCosts.luxury"
+              @click="handleAction(s, activePet(s)!, 'luxury')"
+              :title="`豪华粮 -${pointsStore.actionCosts.luxury}`"
             >
-              <span class="action-icon">🛁</span>
-              <span class="cost">-{{ pointsStore.actionCosts.clean }}</span>
+              <span class="action-icon">🥩</span>
+              <span class="cost">-{{ pointsStore.actionCosts.luxury }}</span>
             </button>
           </div>
 
@@ -125,7 +117,7 @@
         <!-- 无宠物 -->
         <template v-else>
           <span class="pet-name-top pet-name-top-muted">未命名</span>
-          <PetAvatar :empty="true" :size="80" />
+          <PetAvatar :empty="true" :size="160" />
           <h2 class="pet-name">{{ s.username }}</h2>
           <div class="pet-sub">
             <span class="pet-sub-muted">未领养宠物</span>
@@ -150,7 +142,7 @@
               :class="{ selected: adoptSpecies === sp }"
               @click="adoptSpecies = sp"
             >
-              <span class="species-icon">{{ speciesIcons[sp] }}</span>
+              <span class="species-icon">{{ speciesIcons[sp] || '🐾' }}</span>
               <span class="species-name">{{ PET_SPECIES_LABELS[sp] }}</span>
             </div>
           </div>
@@ -217,7 +209,7 @@ const adoptError = ref('')
 const adopting = ref(false)
 
 const speciesIcons: Record<string, string> = {
-  cat: '🐱', dog: '🐶', rabbit: '🐰', hamster: '🐹', bird: '🐦', turtle: '🐢',
+  紫电龙: '🐉',
 }
 
 function canAdoptFor(s: StudentWithPet) {
@@ -269,7 +261,7 @@ function showToast(msg: string) {
   setTimeout(() => { toast.value = '' }, 2500)
 }
 
-async function handleAction(s: StudentWithPet, p: TeacherPet, action: 'feed' | 'play' | 'clean') {
+async function handleAction(s: StudentWithPet, p: TeacherPet, action: 'basic' | 'nice' | 'luxury') {
   if (!p.id) return
   busyKey.value = p.id
   const result = await teacherStore.performActionForStudent(s.id, p.id, action)
@@ -278,9 +270,9 @@ async function handleAction(s: StudentWithPet, p: TeacherPet, action: 'feed' | '
     showToast(result.error.message || '操作失败')
     return
   }
-  const actionLabel = action === 'feed' ? '喂食' : action === 'play' ? '玩耍' : '清洁'
+  const actionLabel = action === 'basic' ? '普通粮' : action === 'nice' ? '营养粮' : '豪华粮'
   const levelMsg = result.leveledUp ? `，升到 ${result.newLevel} 级！` : ''
-  showToast(`已为 ${s.username} 的 ${p.name} ${actionLabel}（-${result.cost} 积分）${levelMsg}`)
+  showToast(`已为 ${s.username} 的 ${p.name} 投喂${actionLabel}（-${result.cost} 积分）${levelMsg}`)
 }
 
 function openAdoptDialog(s: StudentWithPet) {
@@ -341,8 +333,8 @@ async function handleAdopt() {
 
 .pet-list {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
-  gap: 12px;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 14px;
 }
 
 .pet-card {

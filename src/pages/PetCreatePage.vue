@@ -14,7 +14,7 @@
         :class="{ selected: species === s }"
         @click="species = s"
       >
-        <span class="species-icon">{{ speciesIcons[s] }}</span>
+        <span class="species-icon">{{ speciesIcons[s] || '🐾' }}</span>
         <span class="species-name">{{ PET_SPECIES_LABELS[s] }}</span>
       </div>
     </div>
@@ -88,12 +88,7 @@ const loading = ref(false)
 const errorMsg = ref('')
 
 const speciesIcons: Record<string, string> = {
-  cat: '🐱',
-  dog: '🐶',
-  rabbit: '🐰',
-  hamster: '🐹',
-  bird: '🐦',
-  turtle: '🐢',
+  紫电龙: '🐉',
 }
 
 onMounted(async () => {
