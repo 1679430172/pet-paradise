@@ -86,13 +86,13 @@ export function getPetImage(species: string, level: number): string {
   // 未登记的种类（如旧数据库中的历史 species 值）回退到 PET_SPECIES[0]
   // 这样后续新增种类时不需要修改 fallback 逻辑
   const sp = (PET_SPECIES as readonly string[]).includes(species) ? species : PET_SPECIES[0]
-  return `/assets/pets/${sp}/Stage_${getPetStage(level)}.png`
+  return `${import.meta.env.BASE_URL}assets/pets/${encodeURIComponent(sp)}/Stage_${getPetStage(level)}.png`
 }
 
 // 动态待机素材按成长阶段复用；静态 PNG 仍作为兼容和减少动态效果时的回退。
 export function getPetAnimation(species: string, level: number): string {
   const sp = (PET_SPECIES as readonly string[]).includes(species) ? species : PET_SPECIES[0]
-  return `/assets/pets/${sp}/Stage_${getPetStage(level)}.webp`
+  return `${import.meta.env.BASE_URL}assets/pets/${encodeURIComponent(sp)}/Stage_${getPetStage(level)}.webp`
 }
 
 export function isPetMaxed(level: number): boolean {
