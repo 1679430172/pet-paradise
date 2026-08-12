@@ -5,12 +5,12 @@
     :style="wrapStyle"
   >
     <picture v-if="!empty && !imgError" class="pet-avatar-picture">
-      <source media="(prefers-reduced-motion: reduce)" :srcset="imgSrc" />
-      <source type="image/webp" :srcset="animatedSrc" />
       <img
         :src="imgSrc"
         :alt="species"
         class="pet-avatar-img"
+        loading="lazy"
+        decoding="async"
         @error="imgError = true"
       />
     </picture>
@@ -24,7 +24,7 @@
 
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
-import { getPetAnimation, getPetImage, getPetStage, PET_STAGE_LABELS, PET_SPECIES } from '../../lib/constants'
+import { getPetImage, getPetStage, PET_STAGE_LABELS, PET_SPECIES } from '../../lib/constants'
 
 interface Props {
   species?: string
@@ -51,7 +51,6 @@ const imgError = ref(false)
 watch(() => [props.species, props.level], () => { imgError.value = false })
 
 const imgSrc = computed(() => getPetImage(props.species || PET_SPECIES[0], props.level || 1))
-const animatedSrc = computed(() => getPetAnimation(props.species || PET_SPECIES[0], props.level || 1))
 
 const stageLabel = computed(() => PET_STAGE_LABELS[getPetStage(props.level || 1)])
 const stage = computed(() => getPetStage(props.level || 1))
