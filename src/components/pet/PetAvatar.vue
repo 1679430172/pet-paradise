@@ -122,6 +122,9 @@ const emojiStyle = computed(() => ({
   display: block;
   width: 100%;
   height: 100%;
+  transform-origin: 50% 82%;
+  animation: pet-breathe 2.8s ease-in-out infinite;
+  will-change: transform;
 }
 
 .stage-egg::before { width: 48%; height: 38%; opacity: 0.55; }
@@ -143,6 +146,12 @@ const emojiStyle = computed(() => ({
 
 .pet-avatar-wrap:hover .pet-avatar-img { animation: pet-greet 0.55s ease-in-out; }
 
+/* 独立于动态 WebP 的基础呼吸效果，CDN 或浏览器只显示静态帧时仍然生效。 */
+@keyframes pet-breathe {
+  0%, 100% { transform: translateY(0) scale(1, 1); }
+  50% { transform: translateY(-1.8%) scale(1.025, 1.045); }
+}
+
 @keyframes final-aura {
   0%, 100% { transform: translate(-50%, -50%) scale(0.94); opacity: 0.62; }
   50% { transform: translate(-50%, -50%) scale(1.08); opacity: 0.95; }
@@ -155,6 +164,7 @@ const emojiStyle = computed(() => ({
 }
 
 @media (prefers-reduced-motion: reduce) {
+  .pet-avatar-picture { animation: none !important; }
   .pet-avatar-img { animation: none !important; }
   .pet-avatar-wrap::before { animation: none !important; }
 }

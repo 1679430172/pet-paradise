@@ -64,6 +64,9 @@ export const LEVEL_THRESHOLDS = [
 export const PET_STAGES = ['egg', 'baby', 'teen', 'adult', 'final'] as const
 export type PetStage = typeof PET_STAGES[number]
 
+// public 目录下的素材不会经过 Vite 文件名哈希；更新此值可避免 CDN/浏览器继续使用旧图。
+const PET_ASSET_VERSION = '20260812-breathe'
+
 export const PET_STAGE_LABELS: Record<PetStage, string> = {
   egg: '蛋',
   baby: '幼年',
@@ -86,13 +89,13 @@ export function getPetImage(species: string, level: number): string {
   // 未登记的种类（如旧数据库中的历史 species 值）回退到 PET_SPECIES[0]
   // 这样后续新增种类时不需要修改 fallback 逻辑
   const sp = (PET_SPECIES as readonly string[]).includes(species) ? species : PET_SPECIES[0]
-  return `${import.meta.env.BASE_URL}assets/pets/${encodeURIComponent(sp)}/Stage_${getPetStage(level)}.png`
+  return `${import.meta.env.BASE_URL}assets/pets/${encodeURIComponent(sp)}/Stage_${getPetStage(level)}.png?v=${PET_ASSET_VERSION}`
 }
 
 // 动态待机素材按成长阶段复用；静态 PNG 仍作为兼容和减少动态效果时的回退。
 export function getPetAnimation(species: string, level: number): string {
   const sp = (PET_SPECIES as readonly string[]).includes(species) ? species : PET_SPECIES[0]
-  return `${import.meta.env.BASE_URL}assets/pets/${encodeURIComponent(sp)}/Stage_${getPetStage(level)}.webp`
+  return `${import.meta.env.BASE_URL}assets/pets/${encodeURIComponent(sp)}/Stage_${getPetStage(level)}.webp?v=${PET_ASSET_VERSION}`
 }
 
 export function isPetMaxed(level: number): boolean {
