@@ -4,7 +4,11 @@
 // 3) 准备 public/assets/pets/{key}/Stage_{stage}.png 共 5 张阶段图片
 // 4) 可选：在各页面 speciesIcons / PetAvatar SPECIES_EMOJI 添加 emoji 图标
 // 当前仅有「紫电龙」一个种类的素材，但架构支持任意多种）
-export const PET_SPECIES = ['紫电龙', '星焰狐', '云朵猫', '碧海龟'] as const
+export const PET_SPECIES = [
+  '紫电龙', '星焰狐', '云朵猫', '碧海龟',
+  '小狗', '小兔子', '小羊', '熊猫', '龙', '孔雀', '牛', '马',
+  '凤凰', '仓鼠', '锦鲤', '猴子', '老虎', '猪', '考拉', '松鼠',
+] as const
 export type PetSpecies = typeof PET_SPECIES[number]
 
 export const PET_SPECIES_LABELS: Record<PetSpecies, string> = {
@@ -12,6 +16,22 @@ export const PET_SPECIES_LABELS: Record<PetSpecies, string> = {
   星焰狐: '星焰狐',
   云朵猫: '云朵猫',
   碧海龟: '碧海龟',
+  小狗: '曜金灵犬',
+  小兔子: '月辉灵兔',
+  小羊: '云角灵羊',
+  熊猫: '翠竹武熊',
+  龙: '沧澜云龙',
+  孔雀: '碧翎灵雀',
+  牛: '岩甲蛮牛',
+  马: '赤焰天驹',
+  凤凰: '赤羽神凰',
+  仓鼠: '招财金鼠',
+  锦鲤: '赤霞龙鲤',
+  猴子: '金云灵猴',
+  老虎: '白曜天虎',
+  猪: '福瑞金豚',
+  考拉: '森语灵熊',
+  松鼠: '雷尾灵鼠',
 }
 
 // 宠物颜色

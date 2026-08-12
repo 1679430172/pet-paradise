@@ -61,6 +61,22 @@ const SPECIES_EMOJI: Record<string, string> = {
   星焰狐: '🦊',
   云朵猫: '🐱',
   碧海龟: '🐢',
+  小狗: '🐶',
+  小兔子: '🐰',
+  小羊: '🐑',
+  熊猫: '🐼',
+  龙: '🐉',
+  孔雀: '🦚',
+  牛: '🐂',
+  马: '🐴',
+  凤凰: '🔥',
+  仓鼠: '🐹',
+  锦鲤: '🐟',
+  猴子: '🐒',
+  老虎: '🐯',
+  猪: '🐷',
+  考拉: '🐨',
+  松鼠: '🐿️',
 }
 const speciesEmoji = computed(() => SPECIES_EMOJI[props.species] || '🐾')
 
