@@ -19,6 +19,7 @@
         v-for="s in teacherStore.studentsWithPets"
         :key="s.id"
         class="pet-card card"
+        :class="{ 'empty-adopt-card': !activePet(s) }"
         :style="cardStyle(s)"
       >
         <!-- 左上角：积分 -->
@@ -120,13 +121,18 @@
 
         <!-- 无宠物 -->
         <template v-else>
-          <span class="pet-name-top pet-name-top-muted">未命名</span>
-          <PetAvatar :empty="true" :size="160" />
+          <span class="pet-name-top empty-status">待领养</span>
+          <span class="level-badge empty-level">未开启</span>
+          <div class="pet-stage empty-pet-stage" aria-hidden="true">
+            <div class="egg-halo">
+              <span class="empty-egg">🥚</span>
+            </div>
+          </div>
           <h2 class="pet-name">{{ s.username }}</h2>
           <div class="pet-sub">
-            <span class="pet-sub-muted">未领养宠物</span>
+            <span class="pet-sub-muted">还没有专属宠物</span>
           </div>
-          <button class="btn btn-primary adopt-btn" @click="openAdoptDialog(s)">🐾 领养</button>
+          <button class="adopt-btn" @click="openAdoptDialog(s)"><span>＋</span> 选择宠物</button>
         </template>
       </div>
     </div>
@@ -319,6 +325,89 @@ async function handleAdopt() {
 .pet-card:hover {
   transform: translateY(-2px);
   box-shadow: 0 8px 22px rgba(0, 0, 0, 0.14);
+}
+
+.empty-adopt-card {
+  min-height: 432px;
+  gap: 8px;
+  overflow: hidden;
+  background: linear-gradient(155deg, #fff7fa 0%, #fff 55%, #fff4f9 100%) !important;
+  border: 1px solid rgba(237, 164, 190, 0.38);
+  box-shadow: 0 4px 14px rgba(111, 65, 82, 0.07);
+}
+
+.empty-adopt-card::before {
+  content: '';
+  position: absolute;
+  width: 210px;
+  height: 210px;
+  top: 62px;
+  left: 50%;
+  transform: translateX(-50%);
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(255, 201, 221, 0.28), rgba(255, 231, 239, 0.08) 56%, transparent 72%);
+  pointer-events: none;
+}
+
+.empty-status {
+  color: #a96d83;
+  font-style: normal;
+  letter-spacing: 0.04em;
+}
+
+.empty-level {
+  color: #a96d83;
+  background: rgba(255, 255, 255, .75);
+  border: 1px solid rgba(214, 133, 163, .25);
+  box-shadow: none;
+}
+
+.empty-pet-stage {
+  z-index: 1;
+}
+
+.egg-halo {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 132px;
+  height: 132px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, .7);
+  border: 1px solid rgba(228, 150, 178, .28);
+  box-shadow: inset 0 0 0 9px rgba(255, 238, 244, .62), 0 12px 28px rgba(129, 75, 95, .1);
+}
+
+.egg-halo::after {
+  content: '';
+  position: absolute;
+  left: 31px;
+  right: 31px;
+  bottom: 23px;
+  height: 11px;
+  border-radius: 50%;
+  background: rgba(91, 51, 66, .13);
+  filter: blur(5px);
+  animation: egg-shadow 2.6s ease-in-out infinite;
+}
+
+.empty-egg {
+  position: relative;
+  z-index: 1;
+  font-size: 4.3rem;
+  line-height: 1;
+  filter: drop-shadow(0 8px 7px rgba(104, 57, 74, .18));
+  animation: empty-egg-float 2.6s ease-in-out infinite;
+}
+
+@keyframes empty-egg-float {
+  0%, 100% { transform: translateY(0) rotate(-1deg); }
+  50% { transform: translateY(-5px) rotate(1deg); }
+}
+
+@keyframes egg-shadow {
+  0%, 100% { transform: scaleX(1); opacity: .68; }
+  50% { transform: scaleX(.82); opacity: .42; }
 }
 
 .pet-stage {
@@ -626,9 +715,27 @@ async function handleAdopt() {
 }
 
 .adopt-btn {
-  margin-top: 6px;
-  padding: 8px 18px;
-  font-size: 0.82rem;
+  margin-top: 10px;
+  padding: 8px 17px;
+  border: 1px solid rgba(222, 103, 150, .32);
+  border-radius: 999px;
+  background: rgba(255,255,255,.78);
+  color: #d64f84;
+  font-size: .78rem;
+  font-weight: 700;
+  cursor: pointer;
+  box-shadow: 0 6px 16px rgba(183, 91, 126, .12);
+  transition: transform .2s ease, box-shadow .2s ease, background .2s ease;
+}
+
+.adopt-btn:hover {
+  transform: translateY(-2px);
+  background: #fff;
+  box-shadow: 0 9px 20px rgba(183, 91, 126, .2);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .empty-egg, .egg-halo::after { animation: none; }
 }
 
 /* Adopt dialog */
