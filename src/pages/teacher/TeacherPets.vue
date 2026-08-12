@@ -24,20 +24,6 @@
         <!-- 左上角：积分 -->
         <span class="points-badge">{{ s.points }}分</span>
 
-        <!-- 左右切换箭头 -->
-        <button
-          v-if="s.pets.length > 1"
-          class="nav-arrow left"
-          title="上一只"
-          @click="prev(s)"
-        >‹</button>
-        <button
-          v-if="s.pets.length > 1"
-          class="nav-arrow right"
-          title="下一只"
-          @click="next(s)"
-        >›</button>
-
         <!-- 有活跃宠物 -->
         <template v-if="activePet(s)">
           <!-- 顶部中间：宠物名字（小字） -->
@@ -49,12 +35,30 @@
             :class="{ 'max-badge': activePet(s)!.level >= MAX_LEVEL }"
           >Lv.{{ activePet(s)!.level }}</span>
 
-          <PetAvatar
-            :species="activePet(s)!.species"
-            :level="activePet(s)!.level"
-            :size="160"
-            show-stage
-          />
+          <div class="pet-stage">
+            <button
+              v-if="s.pets.length > 1"
+              class="nav-arrow left"
+              type="button"
+              title="上一只"
+              aria-label="上一只宠物"
+              @click="prev(s)"
+            >‹</button>
+            <PetAvatar
+              :species="activePet(s)!.species"
+              :level="activePet(s)!.level"
+              :size="160"
+              show-stage
+            />
+            <button
+              v-if="s.pets.length > 1"
+              class="nav-arrow right"
+              type="button"
+              title="下一只"
+              aria-label="下一只宠物"
+              @click="next(s)"
+            >›</button>
+          </div>
           <!-- 主标题：学生姓名 -->
           <h2 class="pet-name">{{ s.username }}</h2>
 
@@ -132,40 +136,7 @@
       <div class="dialog card">
         <h3>为 {{ adoptTarget?.username }} 领养宠物</h3>
 
-        <div class="adopt-section">
-          <label class="adopt-label">选择种类</label>
-          <div class="species-grid">
-            <div
-              v-for="sp in PET_SPECIES"
-              :key="sp"
-              class="species-card"
-              :class="{ selected: adoptSpecies === sp }"
-              @click="adoptSpecies = sp"
-            >
-              <span class="species-icon">{{ speciesIcons[sp] || '🐾' }}</span>
-              <span class="species-name">{{ PET_SPECIES_LABELS[sp] }}</span>
-            </div>
-          </div>
-        </div>
-
-        <div class="adopt-section">
-          <label class="adopt-label">选择颜色</label>
-          <div class="color-grid">
-            <div
-              v-for="c in PET_COLORS"
-              :key="c"
-              class="color-dot"
-              :class="{ selected: adoptColor === c }"
-              :style="{ background: c }"
-              @click="adoptColor = c"
-            />
-          </div>
-        </div>
-
-        <div class="adopt-section">
-          <label class="adopt-label">宠物名字</label>
-          <input v-model="adoptName" class="form-input" type="text" placeholder="输入宠物的名字" maxlength="10" />
-        </div>
+        <PetAdoptionFields v-model:species="adoptSpecies" v-model:color="adoptColor" v-model:name="adoptName" />
 
         <p v-if="adoptError" class="form-error">{{ adoptError }}</p>
 
@@ -186,8 +157,9 @@
 import { ref, onMounted } from 'vue'
 import { useTeacherStore, type StudentWithPet, type TeacherPet } from '../../stores/teacher'
 import { usePointsStore } from '../../stores/points'
-import { PET_SPECIES, PET_SPECIES_LABELS, PET_COLORS, MAX_LEVEL } from '../../lib/constants'
+import { PET_COLORS, MAX_LEVEL } from '../../lib/constants'
 import PetAvatar from '../../components/pet/PetAvatar.vue'
+import PetAdoptionFields from '../../components/pet/PetAdoptionFields.vue'
 
 const teacherStore = useTeacherStore()
 const pointsStore = usePointsStore()
@@ -207,10 +179,6 @@ const adoptColor = ref(PET_COLORS[0])
 const adoptName = ref('')
 const adoptError = ref('')
 const adopting = ref(false)
-
-const speciesIcons: Record<string, string> = {
-  紫电龙: '🐉',
-}
 
 function canAdoptFor(s: StudentWithPet) {
   return s.pets.length === 0 || s.pets.every(p => (p.level || 1) >= MAX_LEVEL)
@@ -353,6 +321,15 @@ async function handleAdopt() {
   box-shadow: 0 8px 22px rgba(0, 0, 0, 0.14);
 }
 
+.pet-stage {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 100%;
+  height: 170px;
+  margin: -2px 0 0;
+}
+
 .level-badge {
   position: absolute;
   top: 8px;
@@ -422,28 +399,35 @@ async function handleAdopt() {
   transform: translateY(-50%);
   width: 26px;
   height: 26px;
+  padding: 0;
   border-radius: 50%;
-  border: none;
-  background: rgba(255, 255, 255, 0.85);
-  color: #333;
+  border: 1px solid rgba(255, 255, 255, 0.72);
+  background: rgba(255, 255, 255, 0.68);
+  color: rgba(45, 36, 41, 0.72);
   cursor: pointer;
-  font-size: 1.2rem;
-  line-height: 1;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.18);
+  font-family: Arial, sans-serif;
+  font-size: 1.05rem;
+  line-height: 23px;
+  display: grid;
+  place-items: center;
+  box-shadow: 0 2px 5px rgba(42, 30, 36, 0.12);
   z-index: 2;
   transition: background 0.2s, transform 0.15s;
 }
 
 .nav-arrow:hover {
-  background: #fff;
-  transform: translateY(-50%) scale(1.08);
+  background: rgba(255, 255, 255, 0.92);
+  color: #333;
+  transform: translateY(-50%) scale(1.05);
 }
 
-.nav-arrow.left { left: 4px; }
-.nav-arrow.right { right: 4px; }
+.nav-arrow:focus-visible {
+  outline: 3px solid rgba(255, 255, 255, 0.65);
+  outline-offset: 2px;
+}
+
+.nav-arrow.left { left: -2px; }
+.nav-arrow.right { right: -2px; }
 
 .pet-dots {
   display: flex;

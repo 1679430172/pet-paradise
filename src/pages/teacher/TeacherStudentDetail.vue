@@ -66,40 +66,7 @@
       <div class="dialog card">
         <h3>为 {{ studentProfile?.username }} 领养宠物</h3>
 
-        <div class="adopt-section">
-          <label class="adopt-label">选择种类</label>
-          <div class="species-grid">
-            <div
-              v-for="s in PET_SPECIES"
-              :key="s"
-              class="species-card"
-              :class="{ selected: adoptSpecies === s }"
-              @click="adoptSpecies = s"
-            >
-              <span class="species-icon">{{ speciesIcons[s] || '🐾' }}</span>
-              <span class="species-name">{{ PET_SPECIES_LABELS[s] }}</span>
-            </div>
-          </div>
-        </div>
-
-        <div class="adopt-section">
-          <label class="adopt-label">选择颜色</label>
-          <div class="color-grid">
-            <div
-              v-for="c in PET_COLORS"
-              :key="c"
-              class="color-dot"
-              :class="{ selected: adoptColor === c }"
-              :style="{ background: c }"
-              @click="adoptColor = c"
-            />
-          </div>
-        </div>
-
-        <div class="adopt-section">
-          <label class="adopt-label">宠物名字</label>
-          <input v-model="adoptName" class="form-input" type="text" placeholder="输入宠物的名字" maxlength="10" />
-        </div>
+        <PetAdoptionFields v-model:species="adoptSpecies" v-model:color="adoptColor" v-model:name="adoptName" />
 
         <p v-if="adoptError" class="form-error">{{ adoptError }}</p>
 
@@ -120,8 +87,9 @@
 import { ref, computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useTeacherStore, type TeacherPet } from '../../stores/teacher'
-import { PET_SPECIES, PET_SPECIES_LABELS, PET_COLORS, MAX_LEVEL } from '../../lib/constants'
+import { PET_COLORS, MAX_LEVEL } from '../../lib/constants'
 import PetAvatar from '../../components/pet/PetAvatar.vue'
+import PetAdoptionFields from '../../components/pet/PetAdoptionFields.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -140,10 +108,6 @@ const adoptName = ref('')
 const adoptError = ref('')
 const adopting = ref(false)
 const toast = ref('')
-
-const speciesIcons: Record<string, string> = {
-  紫电龙: '🐉',
-}
 
 const canAdoptNew = computed(() => {
   return pets.value.length === 0 || pets.value.every(p => (p.level || 1) >= MAX_LEVEL)

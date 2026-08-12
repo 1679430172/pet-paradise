@@ -1,16 +1,19 @@
 <template>
   <div
     class="pet-avatar-wrap"
-    :class="{ 'is-empty': empty }"
+    :class="[{ 'is-empty': empty }, `stage-${stage}`]"
     :style="wrapStyle"
   >
-    <img
-      v-if="!empty && !imgError"
-      :src="imgSrc"
-      :alt="species"
-      class="pet-avatar-img"
-      @error="imgError = true"
-    />
+    <picture v-if="!empty && !imgError" class="pet-avatar-picture">
+      <source media="(prefers-reduced-motion: reduce)" :srcset="imgSrc" />
+      <source type="image/webp" :srcset="animatedSrc" />
+      <img
+        :src="imgSrc"
+        :alt="species"
+        class="pet-avatar-img"
+        @error="imgError = true"
+      />
+    </picture>
     <span v-else-if="empty" class="pet-avatar-fallback" :style="emojiStyle">🥚</span>
     <span v-else class="pet-avatar-fallback" :style="emojiStyle">{{ speciesEmoji }}</span>
 
@@ -21,7 +24,7 @@
 
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
-import { getPetImage, getPetStage, PET_STAGE_LABELS, PET_SPECIES } from '../../lib/constants'
+import { getPetAnimation, getPetImage, getPetStage, PET_STAGE_LABELS, PET_SPECIES } from '../../lib/constants'
 
 interface Props {
   species?: string
@@ -48,12 +51,17 @@ const imgError = ref(false)
 watch(() => [props.species, props.level], () => { imgError.value = false })
 
 const imgSrc = computed(() => getPetImage(props.species || PET_SPECIES[0], props.level || 1))
+const animatedSrc = computed(() => getPetAnimation(props.species || PET_SPECIES[0], props.level || 1))
 
 const stageLabel = computed(() => PET_STAGE_LABELS[getPetStage(props.level || 1)])
+const stage = computed(() => getPetStage(props.level || 1))
 
 // 各种类 emoji 备选（图片加载失败时展示），未配置的种类统一用 🐾
 const SPECIES_EMOJI: Record<string, string> = {
   紫电龙: '🐉',
+  星焰狐: '🦊',
+  云朵猫: '🐱',
+  碧海龟: '🐢',
 }
 const speciesEmoji = computed(() => SPECIES_EMOJI[props.species] || '🐾')
 
@@ -80,6 +88,23 @@ const emojiStyle = computed(() => ({
   justify-content: center;
   box-sizing: border-box;
   flex-shrink: 0;
+  isolation: isolate;
+  overflow: visible;
+}
+
+.pet-avatar-wrap::before {
+  content: '';
+  position: absolute;
+  z-index: -1;
+  left: 50%;
+  top: 54%;
+  width: 76%;
+  height: 58%;
+  border-radius: 50%;
+  background: radial-gradient(ellipse, rgba(255, 255, 255, 0.72) 0%, rgba(255, 255, 255, 0.2) 48%, transparent 72%);
+  transform: translate(-50%, -50%);
+  filter: blur(5px);
+  pointer-events: none;
 }
 
 .pet-avatar-img {
@@ -89,6 +114,49 @@ const emojiStyle = computed(() => ({
   display: block;
   pointer-events: none;
   user-select: none;
+  transform-origin: 50% 82%;
+  filter: drop-shadow(0 7px 7px rgba(56, 36, 52, 0.2));
+}
+
+.pet-avatar-picture {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.stage-egg::before { width: 48%; height: 38%; opacity: 0.55; }
+.stage-baby::before { width: 60%; height: 46%; }
+.stage-teen::before { width: 70%; height: 52%; }
+.stage-adult::before { width: 82%; height: 62%; }
+.stage-final::before {
+  width: 104%;
+  height: 88%;
+  opacity: 0.9;
+  background: radial-gradient(ellipse, rgba(224, 201, 255, 0.75) 0%, rgba(164, 112, 238, 0.3) 48%, transparent 74%);
+  animation: final-aura 2.6s ease-in-out infinite;
+}
+
+.stage-egg .pet-avatar-img { filter: drop-shadow(0 4px 4px rgba(56, 36, 52, 0.16)); }
+.stage-teen .pet-avatar-img { filter: drop-shadow(0 8px 8px rgba(56, 36, 52, 0.23)); }
+.stage-adult .pet-avatar-img { filter: drop-shadow(0 9px 9px rgba(56, 36, 52, 0.26)); }
+.stage-final .pet-avatar-img { filter: drop-shadow(0 11px 10px rgba(56, 36, 52, 0.28)) drop-shadow(0 0 7px rgba(139, 92, 246, 0.4)); }
+
+.pet-avatar-wrap:hover .pet-avatar-img { animation: pet-greet 0.55s ease-in-out; }
+
+@keyframes final-aura {
+  0%, 100% { transform: translate(-50%, -50%) scale(0.94); opacity: 0.62; }
+  50% { transform: translate(-50%, -50%) scale(1.08); opacity: 0.95; }
+}
+
+@keyframes pet-greet {
+  0%, 100% { transform: translateY(0) rotate(0); }
+  35% { transform: translateY(-7%) rotate(-3deg) scale(1.04); }
+  70% { transform: translateY(-2%) rotate(3deg) scale(1.02); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pet-avatar-img { animation: none !important; }
+  .pet-avatar-wrap::before { animation: none !important; }
 }
 
 .pet-avatar-fallback {

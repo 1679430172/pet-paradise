@@ -1,14 +1,17 @@
 // 宠物种类（数组开放扩展，新增宠物只需：
 // 1) 在此数组追加 species key（与 public/assets/pets/{key} 文件夹名一致）
 // 2) 在 PET_SPECIES_LABELS 添加对应展示名
-// 3) 准备 public/assets/pets/{key}/Lv_01.png ~ Lv_20.png 共 20 张图片
+// 3) 准备 public/assets/pets/{key}/Stage_{stage}.png 共 5 张阶段图片
 // 4) 可选：在各页面 speciesIcons / PetAvatar SPECIES_EMOJI 添加 emoji 图标
 // 当前仅有「紫电龙」一个种类的素材，但架构支持任意多种）
-export const PET_SPECIES = ['紫电龙'] as const
+export const PET_SPECIES = ['紫电龙', '星焰狐', '云朵猫', '碧海龟'] as const
 export type PetSpecies = typeof PET_SPECIES[number]
 
 export const PET_SPECIES_LABELS: Record<PetSpecies, string> = {
   紫电龙: '紫电龙',
+  星焰狐: '星焰狐',
+  云朵猫: '云朵猫',
+  碧海龟: '碧海龟',
 }
 
 // 宠物颜色
@@ -77,16 +80,19 @@ export function getPetStage(level: number): PetStage {
   return 'egg'
 }
 
-// 静态图片路径：/assets/pets/{species}/Lv_{level}.png
-// 文件必须放在 public/assets/pets/ 下（Vite 只从 public 目录按绝对路径提供静态资源）
-// 每个宠物种类一个文件夹，内含 Lv_01.png ~ Lv_20.png（两位数补零），每级一张
+// 静态图片按成长阶段复用，避免为 20 个等级保存重复文件。
+// 文件路径：/assets/pets/{species}/Stage_{egg|baby|teen|adult|final}.png
 export function getPetImage(species: string, level: number): string {
-  const lv = Math.max(1, Math.min(MAX_LEVEL, Math.round(level || 1)))
-  const lvStr = String(lv).padStart(2, '0')
   // 未登记的种类（如旧数据库中的历史 species 值）回退到 PET_SPECIES[0]
   // 这样后续新增种类时不需要修改 fallback 逻辑
   const sp = (PET_SPECIES as readonly string[]).includes(species) ? species : PET_SPECIES[0]
-  return `/assets/pets/${sp}/Lv_${lvStr}.png`
+  return `/assets/pets/${sp}/Stage_${getPetStage(level)}.png`
+}
+
+// 动态待机素材按成长阶段复用；静态 PNG 仍作为兼容和减少动态效果时的回退。
+export function getPetAnimation(species: string, level: number): string {
+  const sp = (PET_SPECIES as readonly string[]).includes(species) ? species : PET_SPECIES[0]
+  return `/assets/pets/${sp}/Stage_${getPetStage(level)}.webp`
 }
 
 export function isPetMaxed(level: number): boolean {
