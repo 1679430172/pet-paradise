@@ -240,5 +240,60 @@ export const useAuthStore = defineStore('auth', () => {
     return { error }
   }
 
-  return { user, profile, initialized, loading, isTeacher, isStudent, isAdmin, init, signUp, signIn, signOut, refreshProfile, updateClassName, createTeacher, fetchTeachers, deleteTeacher }
+  async function fetchTeacherStudents(teacherId: string) {
+    if (!user.value || !isAdmin.value) return { data: [], error: new Error('仅管理员可查看学生') }
+    const { data, error } = await supabase
+      .from('profiles')
+      .select('id, username, points, class_name, created_at')
+      .eq('role', 'student')
+      .eq('teacher_id', teacherId)
+      .order('created_at', { ascending: false })
+    return { data: data || [], error }
+  }
+
+  async function updateTeacherClass(teacherId: string, className: string) {
+    if (!user.value || !isAdmin.value) return { error: new Error('仅管理员可修改班级') }
+    const normalized = className.trim()
+    if (!normalized) return { error: new Error('班级名称不能为空') }
+    const { error } = await supabase
+      .from('profiles')
+      .update({ class_name: normalized })
+      .eq('id', teacherId)
+      .eq('role', 'teacher')
+      .eq('is_admin', false)
+    if (error) return { error }
+    const { error: studentError } = await supabase
+      .from('profiles')
+      .update({ class_name: normalized })
+      .eq('role', 'student')
+      .eq('teacher_id', teacherId)
+    return { error: studentError }
+  }
+
+  async function resetAccountPassword(accountId: string, password: string, role: 'teacher' | 'student') {
+    if (!user.value || !isAdmin.value) return { error: new Error('仅管理员可重置密码') }
+    if (password.length < 6) return { error: new Error('新密码至少 6 位') }
+    const hashedPwd = await hashPassword(password)
+    let query = supabase
+      .from('profiles')
+      .update({ password: hashedPwd })
+      .eq('id', accountId)
+      .eq('role', role)
+    if (role === 'teacher') query = query.eq('is_admin', false)
+    const { error } = await query
+    return { error }
+  }
+
+  async function deleteManagedStudent(studentId: string, teacherId: string) {
+    if (!user.value || !isAdmin.value) return { error: new Error('仅管理员可删除学生') }
+    const { error } = await supabase
+      .from('profiles')
+      .delete()
+      .eq('id', studentId)
+      .eq('role', 'student')
+      .eq('teacher_id', teacherId)
+    return { error }
+  }
+
+  return { user, profile, initialized, loading, isTeacher, isStudent, isAdmin, init, signUp, signIn, signOut, refreshProfile, updateClassName, createTeacher, fetchTeachers, deleteTeacher, fetchTeacherStudents, updateTeacherClass, resetAccountPassword, deleteManagedStudent }
 })
