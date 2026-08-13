@@ -7,7 +7,15 @@ BEGIN;
 ALTER TABLE profiles
   ADD COLUMN IF NOT EXISTS teacher_id UUID REFERENCES profiles(id) ON DELETE SET NULL;
 
+ALTER TABLE profiles
+  ADD COLUMN IF NOT EXISTS is_admin BOOLEAN NOT NULL DEFAULT false;
+
 CREATE INDEX IF NOT EXISTS profiles_teacher_id_idx ON profiles(teacher_id);
+
+-- 原有 teacher 账号作为系统管理员，可在教师设置页创建其他老师。
+UPDATE profiles
+SET is_admin = true
+WHERE username = 'teacher' AND role = 'teacher';
 
 -- 原有默认教师补充班级名称。
 UPDATE profiles

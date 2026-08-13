@@ -11,6 +11,7 @@ export interface Profile {
   avatar_url: string | null
   class_name: string | null
   teacher_id: string | null
+  is_admin: boolean
   created_at: string
 }
 
@@ -30,6 +31,7 @@ export const useAuthStore = defineStore('auth', () => {
   const profile = computed(() => user.value)
   const isTeacher = computed(() => user.value?.role === 'teacher')
   const isStudent = computed(() => user.value?.role === 'student')
+  const isAdmin = computed(() => user.value?.role === 'teacher' && user.value?.is_admin === true)
 
   async function init() {
     const savedUserId = localStorage.getItem('pet_user_id')
@@ -152,5 +154,46 @@ export const useAuthStore = defineStore('auth', () => {
     return { error }
   }
 
-  return { user, profile, initialized, loading, isTeacher, isStudent, init, signUp, signIn, signOut, refreshProfile, updateClassName }
+  async function createTeacher(username: string, password: string, className: string) {
+    if (!user.value || !isAdmin.value) {
+      return { data: null, error: new Error('仅管理员可添加老师账号') }
+    }
+
+    const normalizedUsername = username.trim()
+    const normalizedClassName = className.trim()
+    if (normalizedUsername.length < 2 || normalizedUsername.length > 20) {
+      return { data: null, error: new Error('老师账号需要 2-20 个字符') }
+    }
+    if (password.length < 6) {
+      return { data: null, error: new Error('初始密码至少 6 位') }
+    }
+    if (!normalizedClassName) {
+      return { data: null, error: new Error('班级名称不能为空') }
+    }
+
+    const { data: existing } = await supabase
+      .from('profiles')
+      .select('id')
+      .eq('username', normalizedUsername)
+      .maybeSingle()
+    if (existing) return { data: null, error: new Error('该账号已被使用') }
+
+    const hashedPwd = await hashPassword(password)
+    const { data, error } = await supabase
+      .from('profiles')
+      .insert({
+        username: normalizedUsername,
+        password: hashedPwd,
+        role: 'teacher',
+        points: 0,
+        class_name: normalizedClassName,
+        teacher_id: null,
+        is_admin: false,
+      })
+      .select('id, username, role, class_name, created_at')
+      .single()
+    return { data, error }
+  }
+
+  return { user, profile, initialized, loading, isTeacher, isStudent, isAdmin, init, signUp, signIn, signOut, refreshProfile, updateClassName, createTeacher }
 })

@@ -19,6 +19,7 @@ CREATE TABLE IF NOT EXISTS profiles (
 -- Multi-teacher migration: students belong to a teacher; class_name remains
 -- the human-readable class label. Safe to run against an existing database.
 ALTER TABLE profiles ADD COLUMN IF NOT EXISTS teacher_id UUID REFERENCES profiles(id) ON DELETE SET NULL;
+ALTER TABLE profiles ADD COLUMN IF NOT EXISTS is_admin BOOLEAN NOT NULL DEFAULT false;
 CREATE INDEX IF NOT EXISTS profiles_teacher_id_idx ON profiles(teacher_id);
 
 -- ============== 2. 宠物表（支持一人多宠物） ==============
@@ -199,6 +200,10 @@ VALUES (
   0
 )
 ON CONFLICT (username) DO UPDATE SET role = 'teacher';
+
+UPDATE profiles
+SET is_admin = true
+WHERE username = 'teacher' AND role = 'teacher';
 
 -- Attach legacy students to the original teacher account.
 UPDATE profiles AS student
