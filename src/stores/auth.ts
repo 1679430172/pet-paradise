@@ -195,5 +195,50 @@ export const useAuthStore = defineStore('auth', () => {
     return { data, error }
   }
 
-  return { user, profile, initialized, loading, isTeacher, isStudent, isAdmin, init, signUp, signIn, signOut, refreshProfile, updateClassName, createTeacher }
+  async function fetchTeachers() {
+    if (!user.value || !isAdmin.value) return { data: [], error: new Error('仅管理员可查看老师账号') }
+    const { data: teachers, error } = await supabase
+      .from('profiles')
+      .select('id, username, class_name, created_at')
+      .eq('role', 'teacher')
+      .eq('is_admin', false)
+      .order('created_at', { ascending: false })
+    if (error || !teachers) return { data: [], error }
+
+    const teacherIds = teachers.map(teacher => teacher.id)
+    const counts = new Map<string, number>()
+    if (teacherIds.length > 0) {
+      const { data: students } = await supabase
+        .from('profiles')
+        .select('teacher_id')
+        .eq('role', 'student')
+        .in('teacher_id', teacherIds)
+      students?.forEach(student => {
+        if (student.teacher_id) counts.set(student.teacher_id, (counts.get(student.teacher_id) || 0) + 1)
+      })
+    }
+    return {
+      data: teachers.map(teacher => ({ ...teacher, student_count: counts.get(teacher.id) || 0 })),
+      error: null,
+    }
+  }
+
+  async function deleteTeacher(teacherId: string) {
+    if (!user.value || !isAdmin.value) return { error: new Error('仅管理员可删除老师账号') }
+    const { count } = await supabase
+      .from('profiles')
+      .select('id', { count: 'exact', head: true })
+      .eq('role', 'student')
+      .eq('teacher_id', teacherId)
+    if ((count || 0) > 0) return { error: new Error('该老师班级中仍有学生，不能删除') }
+    const { error } = await supabase
+      .from('profiles')
+      .delete()
+      .eq('id', teacherId)
+      .eq('role', 'teacher')
+      .eq('is_admin', false)
+    return { error }
+  }
+
+  return { user, profile, initialized, loading, isTeacher, isStudent, isAdmin, init, signUp, signIn, signOut, refreshProfile, updateClassName, createTeacher, fetchTeachers, deleteTeacher }
 })

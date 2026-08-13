@@ -62,7 +62,7 @@ async function handleSubmit() {
   if (err) {
     error.value = '用户名或密码错误'
   } else {
-    router.push(authStore.isTeacher ? '/teacher' : '/')
+    router.push(authStore.isAdmin ? '/admin' : authStore.isTeacher ? '/teacher' : '/')
   }
 }
 </script>

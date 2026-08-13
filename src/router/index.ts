@@ -115,6 +115,12 @@ const router = createRouter({
       component: () => import('../pages/teacher/TeacherStats.vue'),
       meta: { requiresAuth: true, role: 'teacher' },
     },
+    {
+      path: '/admin',
+      name: 'admin-classes',
+      component: () => import('../pages/admin/AdminClasses.vue'),
+      meta: { requiresAuth: true, role: 'admin' },
+    },
   ],
 })
 
@@ -132,7 +138,11 @@ router.beforeEach(async (to) => {
 
   // 已登录访问公开页面 → 根据角色跳转
   if (!to.meta.requiresAuth && authStore.user) {
-    return authStore.isTeacher ? { name: 'teacher-dashboard' } : { name: 'home' }
+    return authStore.isAdmin
+      ? { name: 'admin-classes' }
+      : authStore.isTeacher
+        ? { name: 'teacher-dashboard' }
+        : { name: 'home' }
   }
 
   // 角色权限检查
@@ -140,8 +150,14 @@ router.beforeEach(async (to) => {
     if (to.meta.role === 'teacher' && !authStore.isTeacher) {
       return { name: 'home' }
     }
+    if (to.meta.role === 'teacher' && authStore.isAdmin) {
+      return { name: 'admin-classes' }
+    }
+    if (to.meta.role === 'admin' && !authStore.isAdmin) {
+      return authStore.isTeacher ? { name: 'teacher-dashboard' } : { name: 'home' }
+    }
     if (to.meta.role === 'student' && authStore.isTeacher) {
-      return { name: 'teacher-dashboard' }
+      return authStore.isAdmin ? { name: 'admin-classes' } : { name: 'teacher-dashboard' }
     }
   }
 })

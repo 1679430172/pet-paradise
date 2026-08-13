@@ -188,14 +188,14 @@ CREATE POLICY "允许查看日记图片"
   USING (bucket_id = 'diary-images');
 
 -- ==========================================
--- 预置默认教师账号
--- 用户名：teacher    密码：teacher123
--- 哈希算法：SHA-256('teacher123' + 'pet-paradise-salt')
+-- 预置默认管理员账号（管理员只管理老师与班级）
+-- 用户名：admin    密码：147258369lss
+-- 哈希算法：SHA-256('147258369lss' + 'pet-paradise-salt')
 -- ==========================================
 INSERT INTO profiles (username, password, role, points)
 VALUES (
-  'teacher',
-  'a33adec4a7b141ebd5ee6d40cade33697f7c91962cb4d269eac033ebefce50c9',
+  'admin',
+  'f981251676a58046eaa06c3066551aebbe4e7fb15638f21f45cff439463ef874',
   'teacher',
   0
 )
@@ -203,6 +203,10 @@ ON CONFLICT (username) DO UPDATE SET role = 'teacher';
 
 UPDATE profiles
 SET is_admin = true
+WHERE username = 'admin' AND role = 'teacher';
+
+UPDATE profiles
+SET is_admin = false
 WHERE username = 'teacher' AND role = 'teacher';
 
 -- Attach legacy students to the original teacher account.

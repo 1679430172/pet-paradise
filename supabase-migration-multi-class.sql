@@ -12,9 +12,28 @@ ALTER TABLE profiles
 
 CREATE INDEX IF NOT EXISTS profiles_teacher_id_idx ON profiles(teacher_id);
 
--- 原有 teacher 账号作为系统管理员，可在教师设置页创建其他老师。
+-- 默认管理员：admin / 147258369lss。管理员不承接学生，只管理老师与班级。
+INSERT INTO profiles (username, password, role, points, class_name, teacher_id, is_admin)
+VALUES (
+  'admin',
+  'f981251676a58046eaa06c3066551aebbe4e7fb15638f21f45cff439463ef874',
+  'teacher',
+  0,
+  NULL,
+  NULL,
+  true
+)
+ON CONFLICT (username) DO UPDATE
+SET password = EXCLUDED.password,
+    role = 'teacher',
+    points = 0,
+    class_name = NULL,
+    teacher_id = NULL,
+    is_admin = true;
+
+-- 原 teacher 账号恢复为普通老师，继续承接已有学生。
 UPDATE profiles
-SET is_admin = true
+SET is_admin = false
 WHERE username = 'teacher' AND role = 'teacher';
 
 -- 原有默认教师补充班级名称。

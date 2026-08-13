@@ -108,7 +108,7 @@ supabase-schema.sql                # ← 新部署唯一 SQL
 1. 在 [Supabase](https://supabase.com) 新建项目
 2. 进入 **SQL Editor**，把 [`supabase-schema.sql`](./supabase-schema.sql) 的全部内容粘贴进去并 **Run**
 3. 该脚本会一次性完成：建表、索引、RLS 策略、Storage bucket、预置 settings、预置教师账号
-4. 默认教师账号：用户名 `teacher`，密码 `teacher123`（**首次登录后请立即在系统内修改密码**）
+4. 默认管理员账号：用户名 `admin`，密码 `147258369lss`（管理员只管理老师与班级）
 
 ### 2. 配置环境变量
 
@@ -179,7 +179,7 @@ npm run preview  # 预览构建产物
 
 | 角色 | 用户名 | 密码 |
 |---|---|---|
-| 教师 | `teacher` | `teacher123` |
+| 管理员 | `admin` | `147258369lss` |
 
 学生账号通过教师端"新增学生"或注册页创建。
 
