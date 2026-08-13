@@ -31,6 +31,16 @@
         />
       </div>
       <div class="form-group">
+        <label class="form-label">老师账号</label>
+        <input
+          v-model="teacherUsername"
+          type="text"
+          class="form-input"
+          placeholder="请输入老师提供的账号"
+          required
+        />
+      </div>
+      <div class="form-group">
         <label class="form-label">确认密码</label>
         <input
           v-model="confirmPassword"
@@ -67,6 +77,7 @@ const authStore = useAuthStore()
 const username = ref('')
 const password = ref('')
 const confirmPassword = ref('')
+const teacherUsername = ref('')
 const error = ref('')
 const success = ref('')
 const loading = ref(false)
@@ -88,8 +99,13 @@ async function handleSubmit() {
     return
   }
 
+  if (!teacherUsername.value.trim()) {
+    error.value = '请输入老师账号'
+    return
+  }
+
   loading.value = true
-  const { error: err } = await authStore.signUp(username.value, password.value)
+  const { error: err } = await authStore.signUp(username.value, password.value, teacherUsername.value.trim())
   loading.value = false
 
   if (err) {

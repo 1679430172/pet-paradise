@@ -10,6 +10,7 @@ export interface Profile {
   points: number
   avatar_url: string | null
   class_name: string | null
+  teacher_id: string | null
   created_at: string
 }
 
@@ -47,7 +48,7 @@ export const useAuthStore = defineStore('auth', () => {
     initialized.value = true
   }
 
-  async function signUp(username: string, password: string) {
+  async function signUp(username: string, password: string, teacherUsername: string) {
     loading.value = true
     try {
       const { data: existing } = await supabase
@@ -60,10 +61,27 @@ export const useAuthStore = defineStore('auth', () => {
         throw new Error('用户名已被注册')
       }
 
+      const { data: teacher } = await supabase
+        .from('profiles')
+        .select('id, class_name')
+        .eq('username', teacherUsername)
+        .eq('role', 'teacher')
+        .maybeSingle()
+      if (!teacher) {
+        throw new Error('老师账号不存在，请向老师确认')
+      }
+
       const hashedPwd = await hashPassword(password)
       const { data, error } = await supabase
         .from('profiles')
-        .insert({ username, password: hashedPwd, role: 'student', points: 0 })
+        .insert({
+          username,
+          password: hashedPwd,
+          role: 'student',
+          points: 0,
+          teacher_id: teacher.id,
+          class_name: teacher.class_name || '默认班级',
+        })
         .select()
         .single()
 
@@ -121,5 +139,18 @@ export const useAuthStore = defineStore('auth', () => {
     }
   }
 
-  return { user, profile, initialized, loading, isTeacher, isStudent, init, signUp, signIn, signOut, refreshProfile }
+  async function updateClassName(className: string) {
+    if (!user.value || !isTeacher.value) return { error: new Error('仅老师可修改班级名称') }
+    const normalized = className.trim()
+    if (!normalized) return { error: new Error('班级名称不能为空') }
+    const { error } = await supabase
+      .from('profiles')
+      .update({ class_name: normalized })
+      .eq('id', user.value.id)
+      .eq('role', 'teacher')
+    if (!error) user.value.class_name = normalized
+    return { error }
+  }
+
+  return { user, profile, initialized, loading, isTeacher, isStudent, init, signUp, signIn, signOut, refreshProfile, updateClassName }
 })

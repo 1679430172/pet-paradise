@@ -1,7 +1,10 @@
 <template>
   <div class="page teacher-page">
     <div class="header-row">
-      <h1 class="page-title">学生管理</h1>
+      <div>
+        <h1 class="page-title">学生管理</h1>
+        <p class="class-label">{{ authStore.user?.class_name || '默认班级' }}</p>
+      </div>
       <button class="btn btn-primary btn-sm" @click="showCreateDialog = true">+ 新增学生</button>
     </div>
 
@@ -93,12 +96,14 @@
 import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useTeacherStore } from '../../stores/teacher'
+import { useAuthStore } from '../../stores/auth'
 import { useTasksStore } from '../../stores/tasks'
 import type { Profile } from '../../stores/auth'
 import type { Task } from '../../stores/tasks'
 
 const router = useRouter()
 const teacherStore = useTeacherStore()
+const authStore = useAuthStore()
 const tasksStore = useTasksStore()
 
 const searchQuery = ref('')
@@ -199,6 +204,12 @@ async function handleCreateStudent() {
 
 .header-row .page-title {
   margin: 0;
+}
+
+.class-label {
+  margin: 4px 0 0;
+  color: var(--color-text-muted);
+  font-size: 0.8rem;
 }
 
 .form-field {

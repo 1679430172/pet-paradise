@@ -3,6 +3,17 @@
     <h1 class="page-title">积分设置</h1>
 
     <div class="settings-card card">
+      <h3>班级信息</h3>
+      <p class="settings-desc">学生通过您的老师账号注册后，会自动加入这个班级。</p>
+      <div class="form-group">
+        <label class="form-label">班级名称</label>
+        <input v-model="className" class="form-input" maxlength="30" placeholder="例如：向日葵一班" />
+      </div>
+      <div class="teacher-code">老师账号：<strong>{{ authStore.user?.username }}</strong></div>
+      <button class="btn btn-primary form-btn" :disabled="loading" @click="handleSaveClass">保存班级信息</button>
+    </div>
+
+    <div class="settings-card card">
       <h3>宠物喂食积分消耗</h3>
       <p class="settings-desc">设置三档喂食所需的积分（统一作用于饱食度，档位越高恢复越多、获得经验越多）</p>
 
@@ -46,16 +57,20 @@
 <script setup lang="ts">
 import { ref, reactive, onMounted } from 'vue'
 import { usePointsStore } from '../../stores/points'
+import { useAuthStore } from '../../stores/auth'
 
 const pointsStore = usePointsStore()
+const authStore = useAuthStore()
 
 const costs = reactive({ basic: 3, nice: 8, luxury: 15 })
 const diaryPts = ref(5)
 const loading = ref(false)
 const error = ref('')
 const success = ref('')
+const className = ref('')
 
 onMounted(async () => {
+  className.value = authStore.user?.class_name || '默认班级'
   await Promise.all([
     pointsStore.fetchActionCosts(),
     pointsStore.fetchDiaryPoints(),
@@ -65,6 +80,16 @@ onMounted(async () => {
   costs.luxury = pointsStore.actionCosts.luxury
   diaryPts.value = pointsStore.diaryPoints
 })
+
+async function handleSaveClass() {
+  error.value = ''
+  success.value = ''
+  loading.value = true
+  const { error: err } = await authStore.updateClassName(className.value)
+  loading.value = false
+  if (err) error.value = err.message
+  else success.value = '班级信息已保存，新注册学生会自动加入该班级'
+}
 
 async function handleSaveCosts() {
   error.value = ''
@@ -113,6 +138,12 @@ async function handleSaveDiary() {
   color: #999;
   font-size: 0.8rem;
   margin-bottom: 20px;
+}
+
+.teacher-code {
+  margin: -4px 0 12px;
+  color: var(--color-text-muted);
+  font-size: 0.85rem;
 }
 
 .form-group {

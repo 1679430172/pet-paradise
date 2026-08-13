@@ -16,6 +16,11 @@ CREATE TABLE IF NOT EXISTS profiles (
   created_at TIMESTAMPTZ DEFAULT now()
 );
 
+-- Multi-teacher migration: students belong to a teacher; class_name remains
+-- the human-readable class label. Safe to run against an existing database.
+ALTER TABLE profiles ADD COLUMN IF NOT EXISTS teacher_id UUID REFERENCES profiles(id) ON DELETE SET NULL;
+CREATE INDEX IF NOT EXISTS profiles_teacher_id_idx ON profiles(teacher_id);
+
 -- ============== 2. 宠物表（支持一人多宠物） ==============
 CREATE TABLE IF NOT EXISTS pets (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -102,40 +107,64 @@ CREATE TABLE IF NOT EXISTS task_completions (
 -- ==========================================
 
 ALTER TABLE profiles ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "允许查看资料" ON profiles;
+DROP POLICY IF EXISTS "允许插入资料" ON profiles;
+DROP POLICY IF EXISTS "允许更新资料" ON profiles;
+DROP POLICY IF EXISTS "允许删除学生" ON profiles;
 CREATE POLICY "允许查看资料"     ON profiles FOR SELECT USING (true);
 CREATE POLICY "允许插入资料"     ON profiles FOR INSERT WITH CHECK (true);
 CREATE POLICY "允许更新资料"     ON profiles FOR UPDATE USING (true);
 CREATE POLICY "允许删除学生"     ON profiles FOR DELETE USING (true);
 
 ALTER TABLE pets ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "允许查看宠物" ON pets;
+DROP POLICY IF EXISTS "允许创建宠物" ON pets;
+DROP POLICY IF EXISTS "允许更新宠物" ON pets;
+DROP POLICY IF EXISTS "允许删除宠物" ON pets;
 CREATE POLICY "允许查看宠物"     ON pets FOR SELECT USING (true);
 CREATE POLICY "允许创建宠物"     ON pets FOR INSERT WITH CHECK (true);
 CREATE POLICY "允许更新宠物"     ON pets FOR UPDATE USING (true);
 CREATE POLICY "允许删除宠物"     ON pets FOR DELETE USING (true);
 
 ALTER TABLE diary_entries ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "允许查看日记" ON diary_entries;
+DROP POLICY IF EXISTS "允许创建日记" ON diary_entries;
+DROP POLICY IF EXISTS "允许更新日记" ON diary_entries;
+DROP POLICY IF EXISTS "允许删除日记" ON diary_entries;
 CREATE POLICY "允许查看日记"     ON diary_entries FOR SELECT USING (true);
 CREATE POLICY "允许创建日记"     ON diary_entries FOR INSERT WITH CHECK (true);
 CREATE POLICY "允许更新日记"     ON diary_entries FOR UPDATE USING (true);
 CREATE POLICY "允许删除日记"     ON diary_entries FOR DELETE USING (true);
 
 ALTER TABLE likes ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "允许查看点赞" ON likes;
+DROP POLICY IF EXISTS "允许点赞" ON likes;
+DROP POLICY IF EXISTS "允许取消点赞" ON likes;
 CREATE POLICY "允许查看点赞"     ON likes FOR SELECT USING (true);
 CREATE POLICY "允许点赞"         ON likes FOR INSERT WITH CHECK (true);
 CREATE POLICY "允许取消点赞"     ON likes FOR DELETE USING (true);
 
 ALTER TABLE settings ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "允许读取设置" ON settings;
+DROP POLICY IF EXISTS "允许修改设置" ON settings;
+DROP POLICY IF EXISTS "允许插入设置" ON settings;
 CREATE POLICY "允许读取设置"     ON settings FOR SELECT USING (true);
 CREATE POLICY "允许修改设置"     ON settings FOR UPDATE USING (true);
 CREATE POLICY "允许插入设置"     ON settings FOR INSERT WITH CHECK (true);
 
 ALTER TABLE tasks ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "允许读取任务" ON tasks;
+DROP POLICY IF EXISTS "允许创建任务" ON tasks;
+DROP POLICY IF EXISTS "允许修改任务" ON tasks;
+DROP POLICY IF EXISTS "允许删除任务" ON tasks;
 CREATE POLICY "允许读取任务"     ON tasks FOR SELECT USING (true);
 CREATE POLICY "允许创建任务"     ON tasks FOR INSERT WITH CHECK (true);
 CREATE POLICY "允许修改任务"     ON tasks FOR UPDATE USING (true);
 CREATE POLICY "允许删除任务"     ON tasks FOR DELETE USING (true);
 
 ALTER TABLE task_completions ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "允许读取完成记录" ON task_completions;
+DROP POLICY IF EXISTS "允许插入完成记录" ON task_completions;
 CREATE POLICY "允许读取完成记录" ON task_completions FOR SELECT USING (true);
 CREATE POLICY "允许插入完成记录" ON task_completions FOR INSERT WITH CHECK (true);
 
@@ -145,6 +174,9 @@ CREATE POLICY "允许插入完成记录" ON task_completions FOR INSERT WITH CHE
 INSERT INTO storage.buckets (id, name, public)
 VALUES ('diary-images', 'diary-images', true)
 ON CONFLICT (id) DO NOTHING;
+
+DROP POLICY IF EXISTS "允许上传日记图片" ON storage.objects;
+DROP POLICY IF EXISTS "允许查看日记图片" ON storage.objects;
 
 CREATE POLICY "允许上传日记图片"
   ON storage.objects FOR INSERT
@@ -167,3 +199,17 @@ VALUES (
   0
 )
 ON CONFLICT (username) DO UPDATE SET role = 'teacher';
+
+-- Attach legacy students to the original teacher account.
+UPDATE profiles AS student
+SET teacher_id = teacher.id,
+    class_name = COALESCE(student.class_name, teacher.class_name, '默认班级')
+FROM profiles AS teacher
+WHERE student.role = 'student'
+  AND student.teacher_id IS NULL
+  AND teacher.username = 'teacher'
+  AND teacher.role = 'teacher';
+
+UPDATE profiles
+SET class_name = '默认班级'
+WHERE role = 'teacher' AND class_name IS NULL;

@@ -5,6 +5,7 @@ import { hashPassword } from './auth'
 import { usePointsStore } from './points'
 import { ACTIONS, LEVEL_THRESHOLDS, MAX_LEVEL } from '../lib/constants'
 import type { Profile } from './auth'
+import { useAuthStore } from './auth'
 
 export interface TeacherPet {
   id: string
@@ -40,12 +41,19 @@ export const useTeacherStore = defineStore('teacher', () => {
   const totalStudents = ref(0)
   const totalPointsGiven = ref(0)
 
+  function teacherId(): string | null {
+    return useAuthStore().user?.id || null
+  }
+
   async function fetchStudents(search?: string) {
+    const currentTeacherId = teacherId()
+    if (!currentTeacherId) return
     loading.value = true
     let query = supabase
       .from('profiles')
       .select('*')
       .eq('role', 'student')
+      .eq('teacher_id', currentTeacherId)
       .order('created_at', { ascending: false })
 
     if (search) {
@@ -61,11 +69,14 @@ export const useTeacherStore = defineStore('teacher', () => {
   }
 
   async function fetchStudentsWithPets(search?: string) {
+    const currentTeacherId = teacherId()
+    if (!currentTeacherId) return
     loading.value = true
     let query = supabase
       .from('profiles')
       .select('*')
       .eq('role', 'student')
+      .eq('teacher_id', currentTeacherId)
       .order('created_at', { ascending: false })
     if (search) {
       query = query.ilike('username', `%${search}%`)
@@ -108,6 +119,8 @@ export const useTeacherStore = defineStore('teacher', () => {
   }
 
   async function performActionForStudent(studentId: string, petId: string, action: 'basic' | 'nice' | 'luxury') {
+    const currentTeacherId = teacherId()
+    if (!currentTeacherId) return { error: new Error('未登录') }
     const pointsStore = usePointsStore()
     await pointsStore.fetchActionCosts()
     const cost = pointsStore.actionCosts[action]
@@ -116,6 +129,7 @@ export const useTeacherStore = defineStore('teacher', () => {
       .from('profiles')
       .select('points')
       .eq('id', studentId)
+      .eq('teacher_id', currentTeacherId)
       .single()
     if (!student) return { error: new Error('学生不存在') }
     if (student.points < cost) {
@@ -168,11 +182,16 @@ export const useTeacherStore = defineStore('teacher', () => {
   }
 
   async function fetchStudentDetail(id: string) {
+    const currentTeacherId = teacherId()
+    if (!currentTeacherId) return { profile: null, pets: [], completions: [] }
     const { data: profile } = await supabase
       .from('profiles')
       .select('*')
       .eq('id', id)
+      .eq('teacher_id', currentTeacherId)
       .single()
+
+    if (!profile) return { profile: null, pets: [], completions: [] }
 
     const { data: pets } = await supabase
       .from('pets')
@@ -191,11 +210,14 @@ export const useTeacherStore = defineStore('teacher', () => {
   }
 
   async function fetchLeaderboard() {
+    const currentTeacherId = teacherId()
+    if (!currentTeacherId) return
     loading.value = true
     const { data: studentsData } = await supabase
       .from('profiles')
       .select('id, username, points')
       .eq('role', 'student')
+      .eq('teacher_id', currentTeacherId)
       .order('points', { ascending: false })
       .limit(50)
 
@@ -223,6 +245,8 @@ export const useTeacherStore = defineStore('teacher', () => {
   }
 
   async function createStudent(username: string, password: string) {
+    const authStore = useAuthStore()
+    if (!authStore.user) return { data: null, error: new Error('未登录') }
     loading.value = true
     try {
       const { data: existing } = await supabase
@@ -236,7 +260,14 @@ export const useTeacherStore = defineStore('teacher', () => {
       const hashedPwd = await hashPassword(password)
       const { data, error } = await supabase
         .from('profiles')
-        .insert({ username, password: hashedPwd, role: 'student', points: 0 })
+        .insert({
+          username,
+          password: hashedPwd,
+          role: 'student',
+          points: 0,
+          teacher_id: authStore.user.id,
+          class_name: authStore.user.class_name || '默认班级',
+        })
         .select()
         .single()
       if (error) throw error
@@ -253,8 +284,17 @@ export const useTeacherStore = defineStore('teacher', () => {
   }
 
   async function adoptPetForStudent(studentId: string, name: string, species: string, color: string) {
+    const currentTeacherId = teacherId()
+    if (!currentTeacherId) return { data: null, error: new Error('未登录') }
     loading.value = true
     try {
+      const { data: ownedStudent } = await supabase
+        .from('profiles')
+        .select('id')
+        .eq('id', studentId)
+        .eq('teacher_id', currentTeacherId)
+        .maybeSingle()
+      if (!ownedStudent) throw new Error('该学生不属于当前老师')
       const { data: existing } = await supabase
         .from('pets')
         .select('id, level')
@@ -289,11 +329,14 @@ export const useTeacherStore = defineStore('teacher', () => {
   }
 
   async function deleteStudent(id: string) {
+    const currentTeacherId = teacherId()
+    if (!currentTeacherId) return { error: new Error('未登录') }
     const { error } = await supabase
       .from('profiles')
       .delete()
       .eq('id', id)
       .eq('role', 'student')
+      .eq('teacher_id', currentTeacherId)
     if (!error) {
       students.value = students.value.filter(s => s.id !== id)
       totalStudents.value = students.value.length
@@ -302,15 +345,19 @@ export const useTeacherStore = defineStore('teacher', () => {
   }
 
   async function fetchStats() {
+    const currentTeacherId = teacherId()
+    if (!currentTeacherId) return
     const { data: studentsData } = await supabase
       .from('profiles')
       .select('id')
       .eq('role', 'student')
+      .eq('teacher_id', currentTeacherId)
     totalStudents.value = studentsData?.length || 0
 
     const { data: completionsData } = await supabase
       .from('task_completions')
       .select('points')
+      .eq('awarded_by', currentTeacherId)
     totalPointsGiven.value = completionsData?.reduce((sum, c) => sum + c.points, 0) || 0
   }
 

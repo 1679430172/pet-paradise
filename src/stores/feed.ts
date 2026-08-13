@@ -24,16 +24,23 @@ export const useFeedStore = defineStore('feed', () => {
 
   async function fetchFeed() {
     const authStore = useAuthStore()
+    if (!authStore.user) return
+    const currentTeacherId = authStore.isTeacher ? authStore.user.id : authStore.user.teacher_id
+    if (!currentTeacherId) {
+      items.value = []
+      return
+    }
     loading.value = true
 
     const { data } = await supabase
       .from('diary_entries')
       .select(`
         *,
-        profiles:owner_id(username, avatar_url),
+        profiles:owner_id!inner(username, avatar_url, teacher_id),
         pets:pet_id(name, species, appearance, level)
       `)
       .eq('is_public', true)
+      .eq('profiles.teacher_id', currentTeacherId)
       .order('created_at', { ascending: false })
       .limit(50)
 

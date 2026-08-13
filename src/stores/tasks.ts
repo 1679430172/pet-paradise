@@ -30,18 +30,24 @@ export const useTasksStore = defineStore('tasks', () => {
   const loading = ref(false)
 
   async function fetchTasks() {
+    const authStore = useAuthStore()
+    if (!authStore.user) return
     const { data } = await supabase
       .from('tasks')
       .select('*')
       .eq('is_active', true)
+      .eq('created_by', authStore.isTeacher ? authStore.user.id : authStore.user.teacher_id)
       .order('created_at', { ascending: false })
     if (data) tasks.value = data
   }
 
   async function fetchAllTasks() {
+    const authStore = useAuthStore()
+    if (!authStore.user) return
     const { data } = await supabase
       .from('tasks')
       .select('*')
+      .eq('created_by', authStore.user.id)
       .order('created_at', { ascending: false })
     if (data) tasks.value = data
   }
@@ -73,6 +79,7 @@ export const useTasksStore = defineStore('tasks', () => {
         .from('tasks')
         .update(updates)
         .eq('id', id)
+        .eq('created_by', useAuthStore().user?.id)
       if (error) throw error
       const idx = tasks.value.findIndex(t => t.id === id)
       if (idx >= 0) Object.assign(tasks.value[idx], updates)
@@ -91,6 +98,7 @@ export const useTasksStore = defineStore('tasks', () => {
         .from('tasks')
         .update({ is_active: false })
         .eq('id', id)
+        .eq('created_by', useAuthStore().user?.id)
       if (error) throw error
       tasks.value = tasks.value.filter(t => t.id !== id)
       return { error: null }
@@ -110,6 +118,16 @@ export const useTasksStore = defineStore('tasks', () => {
 
     loading.value = true
     try {
+      const { data: ownedStudent } = await supabase
+        .from('profiles')
+        .select('id')
+        .eq('id', studentId)
+        .eq('teacher_id', authStore.user.id)
+        .maybeSingle()
+      if (!ownedStudent || task.created_by !== authStore.user.id) {
+        throw new Error('只能给自己班级的学生发放本班任务积分')
+      }
+
       // 插入完成记录
       const { error: insertErr } = await supabase
         .from('task_completions')

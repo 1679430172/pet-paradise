@@ -70,9 +70,11 @@ onMounted(async () => {
 })
 
 async function fetchRecentCompletions() {
+  if (!authStore.user) return
   const { data } = await supabase
     .from('task_completions')
     .select('id, points, created_at, student:profiles!task_completions_student_id_fkey(username), task:tasks(name)')
+    .eq('awarded_by', authStore.user.id)
     .order('created_at', { ascending: false })
     .limit(10)
 
