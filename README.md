@@ -36,13 +36,13 @@
 cp .env.example .env
 ```
 
-默认使用宿主机 `3000` 端口启动：
+默认使用宿主机 `80` 端口启动：
 
 ```bash
 docker compose up -d --build
 ```
 
-访问 `http://服务器IP:3000`。如需修改端口，在 `.env` 中设置 `APP_PORT=8080` 后重新启动。
+访问 `http://服务器IP`。如需修改端口，在 `.env` 中设置 `APP_PORT=8080` 后重新启动。
 
 常用维护命令：
 
