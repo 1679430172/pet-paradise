@@ -1,0 +1,16 @@
+.git
+.github
+.idea
+.vscode
+node_modules
+dist
+tmp
+scripts
+*.log
+tmp-*.jpg
+tmp-*.mjs
+check-result.txt
+console.log('ERR'
+.env
+.env.*
+!.env.example

@@ -26,7 +26,34 @@
 
 - 前端：Vue 3.5 `<script setup>` + TypeScript + Vite + Pinia + Vue Router
 - 后端：Supabase（PostgreSQL + Row Level Security + Storage）
-- 部署：Cloudflare Pages（[`wrangler.jsonc`](./wrangler.jsonc)）/ 任意静态托管均可
+- 部署：Docker + Nginx / Cloudflare Pages / 任意静态托管
+
+### Docker + Nginx 部署
+
+复制环境变量并填写 Supabase 配置：
+
+```bash
+cp .env.example .env
+```
+
+默认使用宿主机 `3000` 端口启动：
+
+```bash
+docker compose up -d --build
+```
+
+访问 `http://服务器IP:3000`。如需修改端口，在 `.env` 中设置 `APP_PORT=8080` 后重新启动。
+
+常用维护命令：
+
+```bash
+docker compose ps
+docker compose logs -f
+docker compose up -d --build
+docker compose down
+```
+
+`VITE_SUPABASE_URL` 和 `VITE_SUPABASE_ANON_KEY` 会在前端构建阶段写入静态文件，修改后必须重新构建镜像。
 
 ---
 
