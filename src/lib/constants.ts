@@ -16,22 +16,22 @@ export const PET_SPECIES_LABELS: Record<PetSpecies, string> = {
   星焰狐: '星焰狐',
   云朵猫: '云朵猫',
   碧海龟: '碧海龟',
-  小狗: '曜金灵犬',
-  小兔子: '月辉灵兔',
-  小羊: '云角灵羊',
-  熊猫: '翠竹武熊',
-  龙: '沧澜云龙',
-  孔雀: '碧翎灵雀',
-  牛: '岩甲蛮牛',
-  马: '赤焰天驹',
-  凤凰: '赤羽神凰',
-  仓鼠: '招财金鼠',
-  锦鲤: '赤霞龙鲤',
-  猴子: '金云灵猴',
-  老虎: '白曜天虎',
-  猪: '福瑞金豚',
-  考拉: '森语灵熊',
-  松鼠: '雷尾灵鼠',
+  小狗: '阳光旺旺',
+  小兔子: '月光兔兔',
+  小羊: '彩云绵绵',
+  熊猫: '竹叶团团',
+  龙: '蓝云萌龙',
+  孔雀: '彩羽雀雀',
+  牛: '花铃牛牛',
+  马: '星梦小马',
+  凤凰: '暖羽凰凰',
+  仓鼠: '金豆仓仓',
+  锦鲤: '锦云泡泡',
+  猴子: '桃桃灵猴',
+  老虎: '雪团虎宝',
+  猪: '福气圆圆',
+  考拉: '桉叶困困',
+  松鼠: '果果松鼠',
 }
 
 // 宠物颜色
@@ -85,7 +85,7 @@ export const PET_STAGES = ['egg', 'baby', 'teen', 'adult', 'final'] as const
 export type PetStage = typeof PET_STAGES[number]
 
 // public 目录下的素材不会经过 Vite 文件名哈希；更新此值可避免 CDN/浏览器继续使用旧图。
-const PET_ASSET_VERSION = '20260812-fast'
+const PET_ASSET_VERSION = '20260813-cute'
 
 export const PET_STAGE_LABELS: Record<PetStage, string> = {
   egg: '蛋',
