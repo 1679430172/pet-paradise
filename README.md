@@ -36,13 +36,24 @@
 cp .env.example .env
 ```
 
-默认使用宿主机 `80` 端口启动：
+从腾讯云下载 Nginx 格式证书，并复制到以下固定路径：
+
+```text
+certs/fullchain.crt
+certs/private.key
+```
+
+其中 `fullchain.crt` 对应证书包中的 `*_bundle.crt`，`private.key` 对应 `*.key`。证书文件已被 Git 忽略，后续执行 `git pull` 不会覆盖。
+
+设置私钥权限并启动：
 
 ```bash
+chmod 600 certs/private.key
+chmod 644 certs/fullchain.crt
 docker compose up -d --build
 ```
 
-访问 `http://服务器IP`。如需修改端口，在 `.env` 中设置 `APP_PORT=8080` 后重新启动。
+默认开放宿主机 `80` 和 `443` 端口，HTTP 会自动跳转到 `https://宠物.我爱你`。如需自定义端口，可在 `.env` 中修改 `APP_PORT` 和 `HTTPS_PORT`。
 
 常用维护命令：
 

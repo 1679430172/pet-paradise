@@ -10,6 +10,10 @@ services:
     restart: unless-stopped
     ports:
       - "${APP_PORT:-80}:80"
+      - "${HTTPS_PORT:-443}:443"
+    volumes:
+      - ./certs/fullchain.crt:/etc/nginx/certs/fullchain.crt:ro
+      - ./certs/private.key:/etc/nginx/certs/private.key:ro
     healthcheck:
       test: ["CMD", "wget", "-qO-", "http://127.0.0.1/healthz"]
       interval: 30s

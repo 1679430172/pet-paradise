@@ -12,6 +12,8 @@ dist
 dist-ssr
 *.local
 .env
+certs/*
+!certs/README.md
 
 # Editor directories and files
 .vscode/*

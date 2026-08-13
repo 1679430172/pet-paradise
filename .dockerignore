@@ -14,3 +14,5 @@ console.log('ERR'
 .env
 .env.*
 !.env.example
+certs/*
+!certs/README.md
