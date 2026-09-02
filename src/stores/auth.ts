@@ -50,7 +50,17 @@ export const useAuthStore = defineStore('auth', () => {
     initialized.value = true
   }
 
-  async function signUp(username: string, password: string, teacherUsername: string) {
+  async function fetchRegistrationClasses() {
+    return await supabase
+      .from('profiles')
+      .select('id, username, class_name')
+      .eq('role', 'teacher')
+      .eq('is_admin', false)
+      .order('class_name')
+      .order('username')
+  }
+
+  async function signUp(username: string, password: string, teacherId: string) {
     loading.value = true
     try {
       const { data: existing } = await supabase
@@ -63,14 +73,16 @@ export const useAuthStore = defineStore('auth', () => {
         throw new Error('用户名已被注册')
       }
 
-      const { data: teacher } = await supabase
+      const { data: teacher, error: classError } = await supabase
         .from('profiles')
         .select('id, class_name')
-        .eq('username', teacherUsername)
+        .eq('id', teacherId)
         .eq('role', 'teacher')
+        .eq('is_admin', false)
         .maybeSingle()
+      if (classError) throw new Error('班级校验失败，请稍后重试')
       if (!teacher) {
-        throw new Error('老师账号不存在，请向老师确认')
+        throw new Error('所选班级已不可用，请刷新后重新选择')
       }
 
       const hashedPwd = await hashPassword(password)
@@ -295,5 +307,5 @@ export const useAuthStore = defineStore('auth', () => {
     return { error }
   }
 
-  return { user, profile, initialized, loading, isTeacher, isStudent, isAdmin, init, signUp, signIn, signOut, refreshProfile, updateClassName, createTeacher, fetchTeachers, deleteTeacher, fetchTeacherStudents, updateTeacherClass, resetAccountPassword, deleteManagedStudent }
+  return { user, profile, initialized, loading, isTeacher, isStudent, isAdmin, init, signUp, fetchRegistrationClasses, signIn, signOut, refreshProfile, updateClassName, createTeacher, fetchTeachers, deleteTeacher, fetchTeacherStudents, updateTeacherClass, resetAccountPassword, deleteManagedStudent }
 })

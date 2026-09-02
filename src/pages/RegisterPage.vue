@@ -31,16 +31,6 @@
         />
       </div>
       <div class="form-group">
-        <label class="form-label">老师账号</label>
-        <input
-          v-model="teacherUsername"
-          type="text"
-          class="form-input"
-          placeholder="请输入老师提供的账号"
-          required
-        />
-      </div>
-      <div class="form-group">
         <label class="form-label">确认密码</label>
         <input
           v-model="confirmPassword"
@@ -51,11 +41,29 @@
           required
         />
       </div>
-
+      <div class="form-group">
+        <label for="registration-class" class="form-label">选择班级</label>
+        <select
+          id="registration-class"
+          v-model="teacherId"
+          class="form-input"
+          :disabled="classesLoading || loading || classes.length === 0"
+          required
+        >
+          <option disabled value="">{{ classesLoading ? '正在加载班级...' : '请选择所在班级' }}</option>
+          <option v-for="item in classes" :key="item.id" :value="item.id">
+            {{ classLabel(item) }}
+          </option>
+        </select>
+        <p v-if="classesError" class="class-hint">
+          {{ classesError }} <button type="button" class="retry-classes" @click="loadClasses">重新加载</button>
+        </p>
+        <p v-else-if="!classesLoading && classes.length === 0" class="class-hint">暂无可选班级，请联系老师创建班级。</p>
+      </div>
       <p v-if="error" class="auth-error">{{ error }}</p>
       <p v-if="success" class="auth-success">{{ success }}</p>
 
-      <button type="submit" class="btn btn-primary auth-btn" :disabled="loading">
+      <button type="submit" class="btn btn-primary auth-btn" :disabled="loading || classesLoading || !teacherId || !!classesError">
         {{ loading ? '注册中...' : '注册' }}
       </button>
 
@@ -67,7 +75,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '../stores/auth'
 
@@ -77,12 +85,42 @@ const authStore = useAuthStore()
 const username = ref('')
 const password = ref('')
 const confirmPassword = ref('')
-const teacherUsername = ref('')
+interface RegistrationClass { id: string; username: string; class_name: string | null }
+const teacherId = ref('')
+const classes = ref<RegistrationClass[]>([])
+const classesLoading = ref(true)
+const classesError = ref('')
 const error = ref('')
 const success = ref('')
 const loading = ref(false)
 
+onMounted(loadClasses)
+
+function classLabel(item: RegistrationClass) {
+  const name = item.class_name || '默认班级'
+  const duplicated = classes.value.some(other => other.id !== item.id && (other.class_name || '默认班级') === name)
+  return duplicated ? `${name}（${item.username}）` : name
+}
+
+async function loadClasses() {
+  classesLoading.value = true
+  classesError.value = ''
+  try {
+    const { data, error: fetchError } = await authStore.fetchRegistrationClasses()
+    if (fetchError) throw fetchError
+    classes.value = data || []
+    if (!classes.value.some(item => item.id === teacherId.value)) teacherId.value = ''
+  } catch {
+    classes.value = []
+    teacherId.value = ''
+    classesError.value = '班级加载失败，请重试。'
+  } finally {
+    classesLoading.value = false
+  }
+}
+
 async function handleSubmit() {
+  if (loading.value || classesLoading.value) return
   error.value = ''
   success.value = ''
 
@@ -99,13 +137,13 @@ async function handleSubmit() {
     return
   }
 
-  if (!teacherUsername.value.trim()) {
-    error.value = '请输入老师账号'
+  if (!classes.value.some(item => item.id === teacherId.value)) {
+    error.value = '请选择所在班级'
     return
   }
 
   loading.value = true
-  const { error: err } = await authStore.signUp(username.value, password.value, teacherUsername.value.trim())
+  const { error: err } = await authStore.signUp(username.value, password.value, teacherId.value)
   loading.value = false
 
   if (err) {
@@ -159,6 +197,21 @@ async function handleSubmit() {
   margin-top: 8px;
   padding: 14px;
   font-size: 1rem;
+}
+
+.class-hint {
+  margin-top: 6px;
+  font-size: .8rem;
+  color: var(--color-text-muted);
+}
+
+.retry-classes {
+  border: 0;
+  background: none;
+  color: var(--color-primary);
+  cursor: pointer;
+  font: inherit;
+  text-decoration: underline;
 }
 
 .auth-error {
