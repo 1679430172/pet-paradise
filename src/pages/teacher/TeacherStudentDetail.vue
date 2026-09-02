@@ -9,7 +9,10 @@
     <template v-else-if="studentProfile">
       <div class="profile-section card">
         <div class="student-avatar-lg">{{ studentProfile.username.charAt(0) }}</div>
-        <h2>{{ studentProfile.username }}</h2>
+        <div class="student-name-row">
+          <h2>{{ studentProfile.username }}</h2>
+          <button class="rename-student-btn" type="button" title="修改学生名字" @click="openRenameDialog">✎</button>
+        </div>
         <div class="points-badge">{{ studentProfile.points }} 积分</div>
       </div>
 
@@ -61,6 +64,35 @@
       </div>
     </template>
 
+    <!-- 修改学生名字弹窗 -->
+    <div v-if="showRenameDialog" class="dialog-overlay" @click.self="closeRenameDialog">
+      <div class="dialog card">
+        <h3>修改学生名字</h3>
+        <p class="rename-hint">修改后，学生需要使用新名字登录。</p>
+        <div class="rename-field">
+          <label for="rename-student-input">新名字</label>
+          <input
+            id="rename-student-input"
+            ref="renameInput"
+            v-model="renameUsername"
+            class="form-input"
+            type="text"
+            maxlength="12"
+            placeholder="输入学生的新名字"
+            @keyup.enter="handleRename"
+          />
+          <span class="name-count">{{ renameUsername.trim().length }}/12</span>
+        </div>
+        <p v-if="renameError" class="form-error">{{ renameError }}</p>
+        <div class="dialog-actions">
+          <button class="btn-cancel" :disabled="renaming" @click="closeRenameDialog">取消</button>
+          <button class="btn btn-primary" :disabled="!renameUsername.trim() || renaming" @click="handleRename">
+            {{ renaming ? '保存中...' : '保存名字' }}
+          </button>
+        </div>
+      </div>
+    </div>
+
     <!-- 领养宠物弹窗 -->
     <div v-if="showAdoptDialog" class="dialog-overlay" @click.self="closeAdoptDialog">
       <div class="dialog card">
@@ -84,7 +116,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, nextTick, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useTeacherStore, type TeacherPet } from '../../stores/teacher'
 import { PET_COLORS, MAX_LEVEL } from '../../lib/constants'
@@ -109,6 +141,13 @@ const adoptError = ref('')
 const adopting = ref(false)
 const toast = ref('')
 
+// 修改学生名字状态
+const showRenameDialog = ref(false)
+const renameUsername = ref('')
+const renameError = ref('')
+const renaming = ref(false)
+const renameInput = ref<HTMLInputElement | null>(null)
+
 const canAdoptNew = computed(() => {
   return pets.value.length === 0 || pets.value.every(p => (p.level || 1) >= MAX_LEVEL)
 })
@@ -126,6 +165,50 @@ onMounted(async () => {
   completions.value = result.completions || []
   loading.value = false
 })
+
+function openRenameDialog() {
+  if (!studentProfile.value) return
+  renameUsername.value = studentProfile.value.username
+  renameError.value = ''
+  showRenameDialog.value = true
+  nextTick(() => {
+    renameInput.value?.focus()
+    renameInput.value?.select()
+  })
+}
+
+function closeRenameDialog() {
+  if (renaming.value) return
+  showRenameDialog.value = false
+  renameUsername.value = ''
+  renameError.value = ''
+}
+
+async function handleRename() {
+  if (!studentProfile.value || renaming.value) return
+  const newUsername = renameUsername.value.trim()
+  if (newUsername.length < 2 || newUsername.length > 12) {
+    renameError.value = '用户名需要 2-12 个字符'
+    return
+  }
+  if (newUsername === studentProfile.value.username) {
+    closeRenameDialog()
+    return
+  }
+
+  renaming.value = true
+  renameError.value = ''
+  const { error, username } = await teacherStore.renameStudent(studentProfile.value.id, newUsername)
+  renaming.value = false
+  if (error) {
+    renameError.value = error.message || '修改失败，请重试'
+    return
+  }
+  studentProfile.value.username = username
+  toast.value = `学生名字已修改为「${username}」`
+  setTimeout(() => { toast.value = '' }, 2500)
+  closeRenameDialog()
+}
 
 function closeAdoptDialog() {
   showAdoptDialog.value = false
@@ -204,7 +287,32 @@ async function handleAdopt() {
 }
 
 .profile-section h2 {
+  margin: 0;
+}
+
+.student-name-row {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 6px;
   margin-bottom: 8px;
+}
+
+.rename-student-btn {
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: #fff0f5;
+  color: var(--color-primary);
+  cursor: pointer;
+  font-size: 0.82rem;
+}
+
+.rename-student-btn:hover,
+.rename-student-btn:focus-visible {
+  background: #ffe0ec;
 }
 
 .points-badge {
@@ -393,6 +501,37 @@ async function handleAdopt() {
 .dialog h3 {
   font-size: 1.1rem;
   margin-bottom: 12px;
+}
+
+.rename-hint {
+  margin: -4px 0 14px;
+  color: var(--color-text-muted);
+  font-size: 0.82rem;
+}
+
+.rename-field {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  margin-bottom: 10px;
+}
+
+.rename-field label {
+  color: #666;
+  font-size: 0.85rem;
+}
+
+.rename-field .form-input {
+  padding-right: 54px;
+}
+
+.name-count {
+  position: absolute;
+  right: 12px;
+  bottom: 12px;
+  color: var(--color-text-muted);
+  font-size: 0.72rem;
 }
 
 .adopt-section {

@@ -3,7 +3,7 @@ import { ref } from 'vue'
 import { supabase } from '../lib/supabase'
 import { hashPassword } from './auth'
 import { usePointsStore } from './points'
-import { ACTIONS, LEVEL_THRESHOLDS, MAX_LEVEL } from '../lib/constants'
+import { ACTIONS, LEVEL_THRESHOLDS, MAX_LEVEL, STAT_DECAY_PER_HOUR } from '../lib/constants'
 import type { Profile } from './auth'
 import { useAuthStore } from './auth'
 
@@ -17,6 +17,7 @@ export interface TeacherPet {
   hunger?: number
   happiness?: number
   cleanliness?: number
+  last_fed_at?: string | null
   appearance?: any
   created_at?: string
 }
@@ -43,6 +44,20 @@ export const useTeacherStore = defineStore('teacher', () => {
 
   function teacherId(): string | null {
     return useAuthStore().user?.id || null
+  }
+
+  function hungerWithDecay(pet: TeacherPet): number {
+    const hunger = pet.hunger ?? 0
+    const referenceAt = pet.last_fed_at || pet.created_at
+    if (!referenceAt) return hunger
+    const elapsed = Date.now() - new Date(referenceAt).getTime()
+    const hours = Math.max(0, Math.floor(elapsed / (60 * 60 * 1000)))
+    const decay = Math.floor(hours * STAT_DECAY_PER_HOUR)
+    return Math.max(0, hunger - decay)
+  }
+
+  function applyHungerDecay<T extends TeacherPet>(pet: T): T {
+    return { ...pet, hunger: hungerWithDecay(pet) }
   }
 
   async function fetchStudents(search?: string) {
@@ -95,7 +110,7 @@ export const useTeacherStore = defineStore('teacher', () => {
         .select('*')
         .in('owner_id', ids)
         .order('created_at', { ascending: true })
-      petsData = data || []
+      petsData = (data || []).map(applyHungerDecay)
     }
     const petMap = new Map<string, TeacherPet[]>()
     petsData.forEach(p => {
@@ -140,11 +155,13 @@ export const useTeacherStore = defineStore('teacher', () => {
       .from('pets')
       .select('*')
       .eq('id', petId)
+      .eq('owner_id', studentId)
       .single()
     if (!pet) return { error: new Error('宠物不存在') }
 
     const config = ACTIONS[action]
-    const newStatVal = Math.min(100, (pet.hunger || 0) + config.statGain)
+    const currentHunger = hungerWithDecay(pet)
+    const newStatVal = Math.min(100, currentHunger + config.statGain)
     const newXp = (pet.xp || 0) + config.xp
     const newLevel = calculateLevel(newXp)
     const now = new Date().toISOString()
@@ -206,7 +223,7 @@ export const useTeacherStore = defineStore('teacher', () => {
       .order('created_at', { ascending: false })
       .limit(20)
 
-    return { profile, pets: pets || [], completions }
+    return { profile, pets: (pets || []).map(applyHungerDecay), completions }
   }
 
   async function fetchLeaderboard() {
@@ -328,6 +345,81 @@ export const useTeacherStore = defineStore('teacher', () => {
     }
   }
 
+  async function renameStudent(studentId: string, username: string) {
+    const currentTeacherId = teacherId()
+    if (!currentTeacherId) return { error: new Error('未登录') }
+
+    const normalizedUsername = username.trim()
+    if (normalizedUsername.length < 2 || normalizedUsername.length > 12) {
+      return { error: new Error('用户名需要 2-12 个字符') }
+    }
+
+    try {
+      const { data: existing, error: existingError } = await supabase
+        .from('profiles')
+        .select('id')
+        .eq('username', normalizedUsername)
+        .neq('id', studentId)
+        .maybeSingle()
+      if (existingError) throw existingError
+      if (existing) throw new Error('用户名已被使用')
+
+      const { data, error } = await supabase
+        .from('profiles')
+        .update({ username: normalizedUsername })
+        .eq('id', studentId)
+        .eq('role', 'student')
+        .eq('teacher_id', currentTeacherId)
+        .select('id, username')
+        .maybeSingle()
+      if (error) throw error
+      if (!data) throw new Error('学生不存在或不属于当前班级')
+
+      const student = students.value.find(item => item.id === studentId)
+      if (student) student.username = data.username
+      const studentWithPets = studentsWithPets.value.find(item => item.id === studentId)
+      if (studentWithPets) studentWithPets.username = data.username
+      return { error: null, username: data.username }
+    } catch (error: any) {
+      return { error }
+    }
+  }
+
+  async function renamePetForStudent(studentId: string, petId: string, name: string) {
+    const currentTeacherId = teacherId()
+    if (!currentTeacherId) return { error: new Error('未登录') }
+
+    const normalizedName = name.trim()
+    if (!normalizedName || normalizedName.length > 10) {
+      return { error: new Error('宠物名字需要 1-10 个字符') }
+    }
+
+    const { data: ownedStudent, error: studentError } = await supabase
+      .from('profiles')
+      .select('id')
+      .eq('id', studentId)
+      .eq('role', 'student')
+      .eq('teacher_id', currentTeacherId)
+      .maybeSingle()
+    if (studentError) return { error: studentError }
+    if (!ownedStudent) return { error: new Error('该学生不属于当前老师') }
+
+    const { data, error } = await supabase
+      .from('pets')
+      .update({ name: normalizedName })
+      .eq('id', petId)
+      .eq('owner_id', studentId)
+      .select('id, name')
+      .maybeSingle()
+    if (error) return { error }
+    if (!data) return { error: new Error('宠物不存在或不属于该学生') }
+
+    const targetStudent = studentsWithPets.value.find(student => student.id === studentId)
+    const targetPet = targetStudent?.pets.find(pet => pet.id === petId)
+    if (targetPet) targetPet.name = data.name
+    return { error: null, name: data.name }
+  }
+
   async function deleteStudent(id: string) {
     const currentTeacherId = teacherId()
     if (!currentTeacherId) return { error: new Error('未登录') }
@@ -361,5 +453,5 @@ export const useTeacherStore = defineStore('teacher', () => {
     totalPointsGiven.value = completionsData?.reduce((sum, c) => sum + c.points, 0) || 0
   }
 
-  return { students, studentsWithPets, leaderboard, loading, totalStudents, totalPointsGiven, fetchStudents, fetchStudentsWithPets, performActionForStudent, fetchStudentDetail, fetchLeaderboard, fetchStats, createStudent, adoptPetForStudent, deleteStudent }
+  return { students, studentsWithPets, leaderboard, loading, totalStudents, totalPointsGiven, fetchStudents, fetchStudentsWithPets, performActionForStudent, fetchStudentDetail, fetchLeaderboard, fetchStats, createStudent, renameStudent, adoptPetForStudent, renamePetForStudent, deleteStudent }
 })

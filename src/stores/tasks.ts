@@ -162,6 +162,63 @@ export const useTasksStore = defineStore('tasks', () => {
     }
   }
 
+  async function awardPointsToStudents(studentIds: string[], taskId: string) {
+    const authStore = useAuthStore()
+    if (!authStore.user) return { error: new Error('未登录'), awardedCount: 0 }
+
+    const uniqueStudentIds = [...new Set(studentIds)]
+    if (uniqueStudentIds.length === 0) {
+      return { error: new Error('请至少选择一名学生'), awardedCount: 0 }
+    }
+
+    const task = tasks.value.find(t => t.id === taskId)
+    if (!task) return { error: new Error('任务不存在'), awardedCount: 0 }
+    if (task.created_by !== authStore.user.id) {
+      return { error: new Error('只能发放自己创建的班级任务积分'), awardedCount: 0 }
+    }
+
+    loading.value = true
+    let awardedCount = 0
+    try {
+      const { data: ownedStudents, error: studentsError } = await supabase
+        .from('profiles')
+        .select('id, points')
+        .in('id', uniqueStudentIds)
+        .eq('role', 'student')
+        .eq('teacher_id', authStore.user.id)
+      if (studentsError) throw studentsError
+      if (!ownedStudents || ownedStudents.length !== uniqueStudentIds.length) {
+        throw new Error('所选学生中包含不属于当前班级的学生')
+      }
+
+      for (const student of ownedStudents) {
+        const { error: insertErr } = await supabase
+          .from('task_completions')
+          .insert({
+            task_id: taskId,
+            student_id: student.id,
+            awarded_by: authStore.user.id,
+            points: task.points,
+          })
+        if (insertErr) throw insertErr
+
+        const { error: updateErr } = await supabase
+          .from('profiles')
+          .update({ points: student.points + task.points })
+          .eq('id', student.id)
+          .eq('teacher_id', authStore.user.id)
+        if (updateErr) throw updateErr
+        awardedCount += 1
+      }
+
+      return { error: null, points: task.points, awardedCount }
+    } catch (error: any) {
+      return { error, awardedCount }
+    } finally {
+      loading.value = false
+    }
+  }
+
   async function fetchCompletions(studentId?: string) {
     let query = supabase
       .from('task_completions')
@@ -177,5 +234,5 @@ export const useTasksStore = defineStore('tasks', () => {
     if (data) completions.value = data
   }
 
-  return { tasks, completions, loading, fetchTasks, fetchAllTasks, createTask, updateTask, deleteTask, awardPoints, fetchCompletions }
+  return { tasks, completions, loading, fetchTasks, fetchAllTasks, createTask, updateTask, deleteTask, awardPoints, awardPointsToStudents, fetchCompletions }
 })

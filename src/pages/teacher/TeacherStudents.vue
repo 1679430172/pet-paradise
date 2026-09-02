@@ -18,6 +18,26 @@
       />
     </div>
 
+    <div v-if="teacherStore.students.length > 0" class="batch-toolbar card">
+      <label class="select-all">
+        <input
+          type="checkbox"
+          :checked="allVisibleSelected"
+          :indeterminate="someVisibleSelected"
+          @change="toggleSelectAll"
+        />
+        <span>{{ allVisibleSelected ? '取消全选' : '全选当前学生' }}</span>
+      </label>
+      <span class="selected-count">已选 {{ selectedStudentIds.length }} 人</span>
+      <button
+        class="btn btn-primary btn-sm"
+        :disabled="selectedStudentIds.length === 0"
+        @click="openBatchAwardDialog"
+      >
+        批量发积分
+      </button>
+    </div>
+
     <div v-if="teacherStore.loading" class="loading-state">加载中...</div>
     <div v-else-if="teacherStore.students.length === 0" class="empty-state">暂无学生</div>
     <div v-else class="student-list">
@@ -26,6 +46,14 @@
         :key="student.id"
         class="student-card card"
       >
+        <label class="student-selector" @click.stop>
+          <input
+            type="checkbox"
+            :checked="selectedStudentIds.includes(student.id)"
+            :aria-label="`选择学生 ${student.username}`"
+            @change="toggleStudent(student.id)"
+          />
+        </label>
         <div class="student-info" @click="goDetail(student.id)">
           <div class="student-avatar">{{ student.username.charAt(0) }}</div>
           <div class="student-meta">
@@ -43,7 +71,7 @@
     <!-- 发积分弹窗 -->
     <div v-if="showDialog" class="dialog-overlay" @click.self="showDialog = false">
       <div class="dialog card">
-        <h3>给 {{ selectedStudent?.username }} 发积分</h3>
+        <h3>{{ awardDialogTitle }}</h3>
         <p class="dialog-hint">选择已完成的任务：</p>
         <div v-if="tasksStore.tasks.length === 0" class="empty-state">暂无任务，请先创建任务</div>
         <div v-else class="task-select-list">
@@ -51,6 +79,7 @@
             v-for="task in tasksStore.tasks"
             :key="task.id"
             class="task-select-item"
+            :class="{ disabled: awarding }"
             @click="confirmAward(task)"
           >
             <div class="task-select-info">
@@ -60,7 +89,9 @@
             <span class="task-points">+{{ task.points }}</span>
           </div>
         </div>
-        <button class="btn btn-cancel" @click="showDialog = false">取消</button>
+        <button class="btn btn-cancel" :disabled="awarding" @click="showDialog = false">
+          {{ awarding ? '发放中...' : '取消' }}
+        </button>
       </div>
     </div>
 
@@ -93,7 +124,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useTeacherStore } from '../../stores/teacher'
 import { useAuthStore } from '../../stores/auth'
@@ -109,7 +140,22 @@ const tasksStore = useTasksStore()
 const searchQuery = ref('')
 const showDialog = ref(false)
 const selectedStudent = ref<Profile | null>(null)
+const selectedStudentIds = ref<string[]>([])
+const awarding = ref(false)
 const toast = ref('')
+
+const visibleStudentIds = computed(() => teacherStore.students.map(student => student.id))
+const allVisibleSelected = computed(() => (
+  visibleStudentIds.value.length > 0
+  && visibleStudentIds.value.every(id => selectedStudentIds.value.includes(id))
+))
+const someVisibleSelected = computed(() => (
+  !allVisibleSelected.value
+  && visibleStudentIds.value.some(id => selectedStudentIds.value.includes(id))
+))
+const awardDialogTitle = computed(() => selectedStudent.value
+  ? `给 ${selectedStudent.value.username} 发积分`
+  : `给已选 ${selectedStudentIds.value.length} 名学生发积分`)
 
 // 新增学生状态
 const showCreateDialog = ref(false)
@@ -138,14 +184,48 @@ function openAwardDialog(student: Profile) {
   showDialog.value = true
 }
 
+function toggleStudent(studentId: string) {
+  selectedStudentIds.value = selectedStudentIds.value.includes(studentId)
+    ? selectedStudentIds.value.filter(id => id !== studentId)
+    : [...selectedStudentIds.value, studentId]
+}
+
+function toggleSelectAll() {
+  if (allVisibleSelected.value) {
+    const visibleIds = new Set(visibleStudentIds.value)
+    selectedStudentIds.value = selectedStudentIds.value.filter(id => !visibleIds.has(id))
+  } else {
+    selectedStudentIds.value = [...new Set([...selectedStudentIds.value, ...visibleStudentIds.value])]
+  }
+}
+
+function openBatchAwardDialog() {
+  if (selectedStudentIds.value.length === 0) return
+  selectedStudent.value = null
+  showDialog.value = true
+}
+
 async function confirmAward(task: Task) {
-  if (!selectedStudent.value) return
-  const { error } = await tasksStore.awardPoints(selectedStudent.value.id, task.id)
-  showDialog.value = false
+  const targetIds = selectedStudent.value ? [selectedStudent.value.id] : selectedStudentIds.value
+  if (targetIds.length === 0 || awarding.value) return
+  awarding.value = true
+  const { error, awardedCount } = await tasksStore.awardPointsToStudents(targetIds, task.id)
+  awarding.value = false
   if (!error) {
-    toast.value = `已给 ${selectedStudent.value.username} 发放 ${task.points} 积分`
-    teacherStore.fetchStudents(searchQuery.value || undefined)
+    showDialog.value = false
+    const targetLabel = selectedStudent.value?.username || `${awardedCount} 名学生`
+    toast.value = `已给 ${targetLabel} 发放 ${task.points} 积分`
+    selectedStudentIds.value = selectedStudent.value
+      ? selectedStudentIds.value
+      : []
+    selectedStudent.value = null
+    await teacherStore.fetchStudents(searchQuery.value || undefined)
     setTimeout(() => { toast.value = '' }, 2500)
+  } else {
+    toast.value = awardedCount > 0
+      ? `已发放 ${awardedCount} 人，后续发放失败：${error.message}`
+      : `发放失败：${error.message}`
+    setTimeout(() => { toast.value = '' }, 3500)
   }
 }
 
@@ -246,6 +326,41 @@ async function handleCreateStudent() {
   margin-bottom: 16px;
 }
 
+.batch-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 14px;
+  margin-bottom: 12px;
+}
+
+.select-all {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  font-size: 0.85rem;
+}
+
+.select-all input,
+.student-selector input {
+  width: 17px;
+  height: 17px;
+  accent-color: var(--color-primary);
+  cursor: pointer;
+}
+
+.selected-count {
+  margin-left: auto;
+  color: var(--color-text-muted);
+  font-size: 0.82rem;
+}
+
+.batch-toolbar .btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
 .loading-state, .empty-state {
   text-align: center;
   color: #999;
@@ -263,6 +378,12 @@ async function handleCreateStudent() {
   justify-content: space-between;
   align-items: center;
   padding: 14px 16px;
+}
+
+.student-selector {
+  display: flex;
+  align-items: center;
+  margin-right: 12px;
 }
 
 .student-info {
@@ -375,6 +496,11 @@ async function handleCreateStudent() {
 .task-select-item:hover {
   background: #f8f8ff;
   border-color: var(--color-primary);
+}
+
+.task-select-item.disabled {
+  opacity: 0.55;
+  pointer-events: none;
 }
 
 .task-select-info {

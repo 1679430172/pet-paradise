@@ -3,7 +3,7 @@ import { ref, computed } from 'vue'
 import { supabase } from '../lib/supabase'
 import { useAuthStore } from './auth'
 import { usePointsStore } from './points'
-import { ACTIONS, LEVEL_THRESHOLDS, STAT_DECAY_PER_HOUR, MAX_LEVEL } from '../lib/constants'
+import { ACTIONS, LEVEL_THRESHOLDS, STAT_DECAY_PER_HOUR, MAX_LEVEL, getFeedingReply } from '../lib/constants'
 
 export interface Pet {
   id: string
@@ -85,14 +85,15 @@ export const usePetStore = defineStore('pet', () => {
 
   function applyStatDecayAll() {
     const now = Date.now()
-    const decayField = (lastAt: string | null, currentVal: number) => {
-      if (!lastAt) return currentVal
-      const elapsed = now - new Date(lastAt).getTime()
+    const decayField = (referenceAt: string | null, currentVal: number) => {
+      if (!referenceAt) return currentVal
+      const elapsed = now - new Date(referenceAt).getTime()
       const hours = Math.floor(elapsed / (60 * 60 * 1000))
-      return Math.max(0, currentVal - hours * STAT_DECAY_PER_HOUR)
+      const decay = Math.floor(Math.max(0, hours) * STAT_DECAY_PER_HOUR)
+      return Math.max(0, currentVal - decay)
     }
     pets.value.forEach(p => {
-      p.hunger = decayField(p.last_fed_at, p.hunger)
+      p.hunger = decayField(p.last_fed_at || p.created_at, p.hunger)
     })
   }
 
@@ -170,7 +171,8 @@ export const usePetStore = defineStore('pet', () => {
 
     if (!error) {
       Object.assign(target, updates)
-      return { success: true, message: getLevelUpMessage(oldLevel, newLevel) }
+      const levelMessage = getLevelUpMessage(oldLevel, newLevel)
+      return { success: true, message: levelMessage || '投喂成功', reply: getFeedingReply(action), leveledUp: newLevel > oldLevel }
     }
     return { success: false, message: '操作失败' }
   }
@@ -187,7 +189,7 @@ export const usePetStore = defineStore('pet', () => {
       if (newLevel >= MAX_LEVEL) return '进化为完全体！可领养新宠物了'
       return `升级了！宠物达到 ${newLevel} 级！`
     }
-    return '操作成功！'
+    return ''
   }
 
   async function addXp(amount: number) {

@@ -44,6 +44,17 @@ export const ACTIONS = {
   luxury: { xp: 25, statKey: 'hunger' as const, statGain: 100, label: '豪华粮', icon: '🥩' },
 } as const
 
+const FEEDING_REPLIES = {
+  basic: ['谢谢你，我吃饱一点啦！', '普通粮也很香，谢谢！', '嗷呜，好吃！'],
+  nice: ['营养餐真不错，我更有精神了！', '好香呀，我很喜欢！', '吃得好满足，谢谢你！'],
+  luxury: ['哇，是豪华大餐！太幸福啦！', '这是我吃过最好吃的！', '大餐时间，我要全部吃光！'],
+} as const
+
+export function getFeedingReply(action: keyof typeof FEEDING_REPLIES): string {
+  const replies = FEEDING_REPLIES[action]
+  return replies[Math.floor(Math.random() * replies.length)]
+}
+
 export type ActionKey = keyof typeof ACTIONS
 
 // 默认积分消耗配置
@@ -151,8 +162,8 @@ export const BADGES = {
   level_20: { name: '完全体', desc: '宠物进化到最终形态', icon: '✨' },
 } as const
 
-// 状态衰减：每小时衰减 1 点
-export const STAT_DECAY_PER_HOUR = 1
+// 饱食度从 100 到 0 共持续 72 小时（三天）
+export const STAT_DECAY_PER_HOUR = 100 / 72
 
 // 心情选项
 export const MOODS = [
