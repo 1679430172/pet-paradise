@@ -2,6 +2,7 @@ import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import { supabase } from '../lib/supabase'
 import { useAuthStore } from './auth'
+import { runBatch } from '../lib/runBatch'
 
 export interface Task {
   id: string
@@ -162,7 +163,11 @@ export const useTasksStore = defineStore('tasks', () => {
     }
   }
 
-  async function awardPointsToStudents(studentIds: string[], taskId: string) {
+  async function awardPointsToStudents(
+    studentIds: string[],
+    taskId: string,
+    onProgress?: (completed: number, total: number) => void,
+  ) {
     const authStore = useAuthStore()
     if (!authStore.user) return { error: new Error('未登录'), awardedCount: 0 }
 
@@ -178,7 +183,9 @@ export const useTasksStore = defineStore('tasks', () => {
     }
 
     loading.value = true
-    let awardedCount = 0
+    const awardedStudentIds: string[] = []
+    const teacherId = authStore.user.id
+    const taskPoints = task.points
     try {
       const { data: ownedStudents, error: studentsError } = await supabase
         .from('profiles')
@@ -191,29 +198,33 @@ export const useTasksStore = defineStore('tasks', () => {
         throw new Error('所选学生中包含不属于当前班级的学生')
       }
 
-      for (const student of ownedStudents) {
+      const { failed } = await runBatch(ownedStudents, async (student) => {
         const { error: insertErr } = await supabase
           .from('task_completions')
           .insert({
             task_id: taskId,
             student_id: student.id,
-            awarded_by: authStore.user.id,
-            points: task.points,
+            awarded_by: teacherId,
+            points: taskPoints,
           })
         if (insertErr) throw insertErr
 
-        const { error: updateErr } = await supabase
+        const { data: updatedStudent, error: updateErr } = await supabase
           .from('profiles')
-          .update({ points: student.points + task.points })
+          .update({ points: student.points + taskPoints })
           .eq('id', student.id)
-          .eq('teacher_id', authStore.user.id)
+          .eq('teacher_id', teacherId)
+          .select('id')
+          .single()
         if (updateErr) throw updateErr
-        awardedCount += 1
-      }
+        if (!updatedStudent) throw new Error('学生已不存在或已转班')
+        awardedStudentIds.push(student.id)
+      }, onProgress)
+      if (failed.length > 0) throw failed[0]!.error
 
-      return { error: null, points: task.points, awardedCount }
+      return { error: null, points: task.points, awardedCount: awardedStudentIds.length, awardedStudentIds }
     } catch (error: any) {
-      return { error, awardedCount }
+      return { error, awardedCount: awardedStudentIds.length, awardedStudentIds }
     } finally {
       loading.value = false
     }

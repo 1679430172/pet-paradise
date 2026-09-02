@@ -69,7 +69,7 @@
     </div>
 
     <!-- 发积分弹窗 -->
-    <div v-if="showDialog" class="dialog-overlay" @click.self="showDialog = false">
+    <div v-if="showDialog" class="dialog-overlay" @click.self="closeAwardDialog">
       <div class="dialog card">
         <h3>{{ awardDialogTitle }}</h3>
         <p class="dialog-hint">选择已完成的任务：</p>
@@ -90,7 +90,7 @@
           </div>
         </div>
         <button class="btn btn-cancel" :disabled="awarding" @click="showDialog = false">
-          {{ awarding ? '发放中...' : '取消' }}
+          {{ awarding ? `发放中 ${awardProgress.completed}/${awardProgress.total} 人...` : '取消' }}
         </button>
       </div>
     </div>
@@ -142,6 +142,7 @@ const showDialog = ref(false)
 const selectedStudent = ref<Profile | null>(null)
 const selectedStudentIds = ref<string[]>([])
 const awarding = ref(false)
+const awardProgress = ref({ completed: 0, total: 0 })
 const toast = ref('')
 
 const visibleStudentIds = computed(() => teacherStore.students.map(student => student.id))
@@ -205,27 +206,37 @@ function openBatchAwardDialog() {
   showDialog.value = true
 }
 
+function closeAwardDialog() {
+  if (!awarding.value) showDialog.value = false
+}
+
 async function confirmAward(task: Task) {
-  const targetIds = selectedStudent.value ? [selectedStudent.value.id] : selectedStudentIds.value
+  const targetIds = selectedStudent.value ? [selectedStudent.value.id] : [...selectedStudentIds.value]
   if (targetIds.length === 0 || awarding.value) return
   awarding.value = true
-  const { error, awardedCount } = await tasksStore.awardPointsToStudents(targetIds, task.id)
-  awarding.value = false
-  if (!error) {
-    showDialog.value = false
-    const targetLabel = selectedStudent.value?.username || `${awardedCount} 名学生`
-    toast.value = `已给 ${targetLabel} 发放 ${task.points} 积分`
-    selectedStudentIds.value = selectedStudent.value
-      ? selectedStudentIds.value
-      : []
-    selectedStudent.value = null
-    await teacherStore.fetchStudents(searchQuery.value || undefined)
-    setTimeout(() => { toast.value = '' }, 2500)
-  } else {
-    toast.value = awardedCount > 0
-      ? `已发放 ${awardedCount} 人，后续发放失败：${error.message}`
-      : `发放失败：${error.message}`
-    setTimeout(() => { toast.value = '' }, 3500)
+  awardProgress.value = { completed: 0, total: targetIds.length }
+  try {
+    const { error, awardedCount, awardedStudentIds = [] } = await tasksStore.awardPointsToStudents(
+      targetIds, task.id,
+      (completed, total) => { awardProgress.value = { completed, total } },
+    )
+    const awardedIds = new Set(awardedStudentIds)
+    selectedStudentIds.value = selectedStudentIds.value.filter(id => !awardedIds.has(id))
+    if (!error) {
+      showDialog.value = false
+      const targetLabel = selectedStudent.value?.username || `${awardedCount} 名学生`
+      toast.value = `已给 ${targetLabel} 发放 ${task.points} 积分`
+      selectedStudent.value = null
+      setTimeout(() => { toast.value = '' }, 2500)
+    } else {
+      toast.value = awardedCount > 0
+        ? `已发放 ${awardedCount} 人，${targetIds.length - awardedCount} 人未确认成功：${error.message}`
+        : `发放失败：${error.message}`
+      setTimeout(() => { toast.value = '' }, 3500)
+    }
+    if (awardedCount > 0) await teacherStore.fetchStudents(searchQuery.value || undefined)
+  } finally {
+    awarding.value = false
   }
 }
 
