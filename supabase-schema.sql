@@ -74,7 +74,7 @@ CREATE TABLE IF NOT EXISTS settings (
 
 -- 三档喂食的默认积分消耗
 INSERT INTO settings (key, value)
-VALUES ('action_costs', '{"basic": 3, "nice": 8, "luxury": 15}')
+VALUES ('action_costs', '{"basic": 5, "nice": 10, "luxury": 20}')
 ON CONFLICT (key) DO NOTHING;
 
 -- 每日首篇日记的积分奖励

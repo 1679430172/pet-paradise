@@ -39,9 +39,9 @@ export const PET_COLORS: string[] = ['#FFB6C1', '#87CEEB', '#98FB98', '#DDA0DD',
 
 // 动作配置：三档喂食，统一作用于 hunger
 export const ACTIONS = {
-  basic: { xp: 5, statKey: 'hunger' as const, statGain: 20, label: '普通粮', icon: '🍖' },
-  nice: { xp: 12, statKey: 'hunger' as const, statGain: 50, label: '营养粮', icon: '🍗' },
-  luxury: { xp: 25, statKey: 'hunger' as const, statGain: 100, label: '豪华粮', icon: '🥩' },
+  basic: { xp: 8, statKey: 'hunger' as const, statGain: 25, label: '普通粮', icon: '🍖' },
+  nice: { xp: 18, statKey: 'hunger' as const, statGain: 55, label: '营养粮', icon: '🍗' },
+  luxury: { xp: 40, statKey: 'hunger' as const, statGain: 100, label: '豪华粮', icon: '🥩' },
 } as const
 
 const FEEDING_REPLIES = {
@@ -58,37 +58,38 @@ export function getFeedingReply(action: keyof typeof FEEDING_REPLIES): string {
 export type ActionKey = keyof typeof ACTIONS
 
 // 默认积分消耗配置
-export const DEFAULT_ACTION_COSTS = { basic: 3, nice: 8, luxury: 15 }
+export const DEFAULT_ACTION_COSTS = { basic: 5, nice: 10, luxury: 20 }
 
-export const DIARY_XP = 20
-export const PHOTO_XP = 25
-export const LIKE_XP = 5
+// 日记、图片和点赞暂不参与宠物成长，保留常量便于后续重新启用。
+export const DIARY_XP = 0
+export const PHOTO_XP = 0
+export const LIKE_XP = 0
 
 // 等级上限
 export const MAX_LEVEL = 20
 
 // 等级经验值表（1..20）
 export const LEVEL_THRESHOLDS = [
-  0,      // Level 1
-  50,     // Level 2
-  120,    // Level 3
-  220,    // Level 4
-  350,    // Level 5
-  520,    // Level 6
-  730,    // Level 7
-  1000,   // Level 8
-  1350,   // Level 9
-  1800,   // Level 10
-  2350,   // Level 11
-  3000,   // Level 12
-  3800,   // Level 13
-  4750,   // Level 14
-  5850,   // Level 15
-  7150,   // Level 16
-  8650,   // Level 17
-  10400,  // Level 18
-  12400,  // Level 19
-  14700,  // Level 20
+  0,     // Level 1
+  15,    // Level 2
+  35,    // Level 3
+  60,    // Level 4
+  90,    // Level 5
+  125,   // Level 6
+  165,   // Level 7
+  210,   // Level 8
+  260,   // Level 9
+  320,   // Level 10
+  390,   // Level 11
+  470,   // Level 12
+  560,   // Level 13
+  660,   // Level 14
+  770,   // Level 15
+  890,   // Level 16
+  1020,  // Level 17
+  1160,  // Level 18
+  1320,  // Level 19
+  1500,  // Level 20
 ]
 
 // 形态阶段：Lv.1-3 蛋 / Lv.4-8 幼年（蛋壳逐渐破裂）/ Lv.9-13 青年 / Lv.14-19 成年 / Lv.20 完全体
@@ -162,8 +163,8 @@ export const BADGES = {
   level_20: { name: '完全体', desc: '宠物进化到最终形态', icon: '✨' },
 } as const
 
-// 饱食度从 100 到 0 共持续 72 小时（三天）
-export const STAT_DECAY_PER_HOUR = 100 / 72
+// 饱食度每小时衰减 1.5 点，约 67 小时从 100 降至 0。
+export const STAT_DECAY_PER_HOUR = 1.5
 
 // 心情选项
 export const MOODS = [

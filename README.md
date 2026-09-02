@@ -8,17 +8,18 @@
 
 ## 一、功能概览
 
-- **角色**：学生 / 教师，单库共存，登录时区分入口
+- **角色**：学生 / 教师 / 管理员，单库共存，登录后按身份进入对应工作台
 - **宠物**：每只 1~20 级，5 个形态阶段（蛋 / 幼年 / 青年 / 成年 / 完全体），满 20 级后可领养下一只
 - **喂食**：仅一个状态（饱食度 hunger），通过三档"食物"消耗不同积分
   | 档位 | icon | 默认积分 | hunger+ | xp+ |
   |---|---|---|---|---|
-  | 普通粮 | 🍖 | 3 | 20 | 5 |
-  | 营养粮 | 🍗 | 8 | 50 | 12 |
-  | 豪华粮 | 🥩 | 15 | 100 | 25 |
+  | 普通粮 | 🍖 | 5 | 25 | 8 |
+  | 营养粮 | 🍗 | 10 | 55 | 18 |
+  | 豪华粮 | 🥩 | 20 | 100 | 40 |
 - **日记 / 点赞**：学生可发成长日记并互相点赞，每日首篇日记奖励积分
 - **任务系统**：教师创建任务并定义奖励积分；可记录学生完成情况
 - **教师端**：学生列表、单学生详情、宠物卡片视图（横向 Grid + 卡内左右切换多宠物）、任务管理、积分消耗设置
+- **管理员端**：创建和删除老师账号、修改班级名称、查看各班学生，以及重置老师/学生密码和删除学生
 
 ---
 
@@ -85,6 +86,7 @@ src/
 │   ├── PetCreatePage.vue          # 领养新宠物
 │   ├── DiaryPage.vue / DiaryEditorPage.vue / DiaryDetailPage.vue
 │   ├── FeedPage.vue / ProfilePage.vue
+│   ├── admin/AdminClasses.vue      # 管理员工作台：老师、班级与学生账号管理
 │   └── teacher/
 │       ├── TeacherDashboard.vue
 │       ├── TeacherStudents.vue / TeacherStudentDetail.vue
@@ -108,7 +110,7 @@ supabase-schema.sql                # ← 新部署唯一 SQL
 1. 在 [Supabase](https://supabase.com) 新建项目
 2. 进入 **SQL Editor**，把 [`supabase-schema.sql`](./supabase-schema.sql) 的全部内容粘贴进去并 **Run**
 3. 该脚本会一次性完成：建表、索引、RLS 策略、Storage bucket、预置 settings、预置教师账号
-4. 默认管理员账号：用户名 `admin`，密码 `147258369lss`（管理员只管理老师与班级）
+4. 默认管理员账号：用户名 `admin`，密码 `147258369lss`（用于管理老师账号、班级和各班学生账号）
 
 ### 2. 配置环境变量
 
@@ -169,6 +171,8 @@ npm run preview  # 预览构建产物
 - **数据模型保留字段**：`pets.happiness / cleanliness / last_played_at / last_cleaned_at` 为历史字段，前端不再读写但保留以兼容旧数据；如需清理可手动 DROP
 - **统一 fallback**：`getPetImage` 对未知 species（旧数据库历史值）自动回退到 `PET_SPECIES[0]`；图片加载失败则在 `PetAvatar` 内回退到对应 emoji
 - **多宠物**：`pets.owner_id` 无 UNIQUE 约束；满 20 级才能继续领养下一只
+- **成长机制**：当前仅喂食增加宠物 XP；日记、图片和点赞暂不增加 XP；Lv.20 累计需要 1500 XP
+- **饱食度**：每小时衰减 1.5 点，最低为 0；三档粮食均不设置饱食度使用门槛
 - **形态阶段**：Lv.1-3 蛋 / 4-8 幼年 / 9-13 青年 / 14-19 成年 / 20 完全体（详见 `getPetStage`）
 - **积分配置可在线修改**：教师端 → 积分设置；保存到 `settings` 表，前端读取做了"旧 `{feed,play,clean}` 格式自动回退默认值"的兼容
 - **认证**：自定义实现，密码使用 `SHA-256(password + 'pet-paradise-salt')`；不依赖 Supabase Auth
@@ -181,7 +185,7 @@ npm run preview  # 预览构建产物
 |---|---|---|
 | 管理员 | `admin` | `147258369lss` |
 
-学生账号通过教师端"新增学生"或注册页创建。
+学生账号通过教师端“新增学生”或注册页创建；管理员可在班级管理页查看、重置密码或删除学生。
 
 ---
 
