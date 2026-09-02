@@ -1,5 +1,5 @@
 <template>
-  <div class="page">
+  <div class="page diary-page">
     <h1 class="page-title">成长日记</h1>
 
     <router-link to="/diary/new" class="new-diary-btn btn btn-primary">

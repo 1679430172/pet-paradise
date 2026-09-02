@@ -1,5 +1,5 @@
 <template>
-  <div class="page">
+  <div class="page home-page">
     <div v-if="petStore.loading && petStore.pets.length === 0" class="loading">
       <span class="animate-bounce">🐾</span>
       <p>加载中...</p>

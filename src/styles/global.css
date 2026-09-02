@@ -19,7 +19,7 @@
   --shadow: 0 4px 16px rgba(255, 107, 157, 0.15);
   --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.06);
   --font-fun: 'ZCOOL KuaiLe', cursive;
-  --font-body: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --font-body: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', 'Noto Sans CJK SC', sans-serif;
 }
 
 * {
@@ -40,7 +40,8 @@ body {
 }
 
 h1, h2, h3 {
-  font-family: var(--font-fun);
+  font-family: var(--font-body);
+  font-weight: 600;
 }
 
 a {

@@ -1,5 +1,5 @@
 <template>
-  <div class="page teacher-page">
+  <div class="page teacher-page pets-page">
     <div class="page-title-row">
       <h1 class="page-title">学生宠物</h1>
       <button class="btn btn-primary batch-entry-btn" :disabled="batchPetOptions.length === 0" @click="openBatchFeedDialog">批量投喂</button>
@@ -984,8 +984,11 @@ async function handleAdopt() {
 }
 
 .pet-name {
-  font-size: 1.05rem;
-  font-weight: 700;
+  font-family: var(--font-body);
+  font-size: 1.125rem;
+  font-weight: 600;
+  line-height: 1.6;
+  letter-spacing: 0.06em;
   color: var(--color-text);
   margin: 0;
   text-align: center;

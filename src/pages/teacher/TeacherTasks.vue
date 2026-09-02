@@ -1,5 +1,5 @@
 <template>
-  <div class="page teacher-page">
+  <div class="page teacher-page tasks-page">
     <div class="page-header">
       <h1 class="page-title">任务管理</h1>
       <router-link to="/teacher/tasks/new" class="btn btn-primary btn-sm">+ 新建</router-link>

@@ -1,5 +1,5 @@
 <template>
-  <div class="page teacher-page">
+  <div class="page teacher-page stats-page">
     <h1 class="page-title">排行榜</h1>
 
     <div v-if="teacherStore.loading" class="loading-state">加载中...</div>

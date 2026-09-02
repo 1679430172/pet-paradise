@@ -1,5 +1,5 @@
 <template>
-  <div class="page">
+  <div class="page feed-page">
     <h1 class="page-title">班级广场</h1>
 
     <div v-if="feedStore.loading" class="loading">加载中...</div>

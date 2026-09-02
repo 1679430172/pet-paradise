@@ -1,5 +1,5 @@
 <template>
-  <div class="page">
+  <div class="page diary-detail-page">
     <div v-if="loading" class="loading">加载中...</div>
     <div v-else-if="entry" class="detail">
       <div class="detail-header">

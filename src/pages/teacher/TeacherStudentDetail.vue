@@ -1,5 +1,5 @@
 <template>
-  <div class="page teacher-page">
+  <div class="page teacher-page student-detail-page">
     <div class="page-header">
       <button class="btn-back" @click="router.back()">← 返回</button>
       <h1 class="page-title">学生详情</h1>

@@ -1,5 +1,5 @@
 <template>
-  <div id="app">
+  <div class="app-shell" :class="{ 'has-navigation': showStudentNav || showTeacherNav }">
     <router-view />
     <BottomNav v-if="showStudentNav" />
     <TeacherNav v-if="showTeacherNav" />

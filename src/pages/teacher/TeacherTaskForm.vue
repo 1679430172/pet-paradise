@@ -1,5 +1,5 @@
 <template>
-  <div class="page teacher-page">
+  <div class="page teacher-page task-form-page">
     <div class="page-header">
       <button class="btn-back" @click="router.back()">← 返回</button>
       <h1 class="page-title">{{ isEdit ? '编辑任务' : '新建任务' }}</h1>

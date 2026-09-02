@@ -1,5 +1,5 @@
 <template>
-  <div class="page teacher-page">
+  <div class="page teacher-page settings-page">
     <h1 class="page-title">积分设置</h1>
 
     <div class="settings-card card">

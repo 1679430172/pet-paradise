@@ -1,5 +1,5 @@
 <template>
-  <div class="page teacher-page">
+  <div class="page teacher-page students-page">
     <div class="header-row">
       <div>
         <h1 class="page-title">学生管理</h1>

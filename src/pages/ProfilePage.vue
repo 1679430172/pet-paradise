@@ -1,5 +1,5 @@
 <template>
-  <div class="page">
+  <div class="page profile-page">
     <h1 class="page-title">我的</h1>
 
     <div class="profile-card card">

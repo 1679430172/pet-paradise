@@ -1,0 +1,148 @@
+/* Shared responsive layout. The shell prefix keeps these rules above lazy-loaded scoped styles. */
+:root {
+  --page-width: 1600px;
+  --page-gutter: clamp(16px, 3vw, 48px);
+  --sidebar-width: 208px;
+}
+
+#app .app-shell { min-height: 100dvh; }
+#app .app-shell .page,
+#app .app-shell .create-page,
+#app .app-shell .admin-page {
+  width: 100%;
+  max-width: var(--page-width);
+  min-height: 100dvh;
+  margin-inline: auto;
+  padding: 24px var(--page-gutter) calc(96px + env(safe-area-inset-bottom));
+  overflow-wrap: anywhere;
+}
+#app .app-shell .create-page { padding-bottom: 32px; }
+#app .app-shell .admin-page > :is(.admin-header, .create-card, .classes-section) { max-width: none; }
+#app .app-shell :is(.form-input, .card, .form-group, .task-info, .rank-info, .student-meta, .feed-info, .completion-info) { min-width: 0; }
+#app .app-shell :is(.header-row, .page-header, .page-title-row, .teacher-header, .admin-header) { flex-wrap: wrap; gap: 12px; }
+#app .app-shell :is(.student-card, .task-card, .rank-item) { gap: 12px; }
+#app .app-shell :is(.student-info, .pet-item-info) { min-width: 0; }
+#app .app-shell :is(.student-avatar, .rank-badge, .class-icon) { flex-shrink: 0; }
+#app .app-shell .toast { max-width: calc(100vw - 32px); overflow-wrap: anywhere; }
+#app .app-shell .teacher-nav { padding-bottom: max(8px, env(safe-area-inset-bottom)); }
+#app .app-shell :is(.bottom-nav, .teacher-nav) a { min-height: 44px; justify-content: center; }
+#app .app-shell :is(.bottom-nav, .teacher-nav) a:focus-visible { outline: 3px solid var(--color-secondary); outline-offset: -3px; }
+#app .app-shell .dialog-overlay { padding: 16px; overflow-y: auto; }
+#app .app-shell .dialog-overlay > :is(.dialog, .password-dialog) {
+  max-height: calc(100dvh - 32px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  overflow-wrap: anywhere;
+}
+#app .app-shell .dialog-overlay .pet-preview { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+#app .app-shell .dialog-overlay .preview-pet { max-width: 100%; }
+#app .app-shell .pets-page .pet-list { grid-template-columns: repeat(auto-fill, minmax(min(100%, 230px), 1fr)); }
+#app .app-shell .settings-page { display: grid; gap: 20px; align-content: start; }
+#app .app-shell .settings-page > .page-title { margin-bottom: 0; }
+#app .app-shell .create-page .preview-pet { max-width: 100%; }
+#app .app-shell .detail-content { overflow-wrap: anywhere; }
+#app .app-shell .detail-image { max-height: 60vh; object-fit: contain; }
+
+/* Tablets: fill the available width and let collections grow by column. */
+@media (min-width: 768px) {
+  #app .app-shell .page-title { text-align: left; font-size: 1.8rem; }
+  #app .app-shell :is(.diary-list, .feed-list, .task-list, .completion-list, .leaderboard) {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    gap: 20px;
+    align-items: start;
+  }
+  #app .app-shell .students-page .student-list {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(420px, 1fr));
+    gap: 16px;
+  }
+  #app .app-shell :is(.diary-card, .feed-card) { height: 100%; margin-bottom: 0; }
+  #app .app-shell .diary-page .new-diary-btn { width: auto; padding-inline: 28px; }
+  #app .app-shell .feed-image { width: 100%; height: 220px; object-fit: cover; }
+  #app .app-shell .settings-page { grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: start; }
+  #app .app-shell .settings-page > :is(.page-title, .form-error, .form-success) { grid-column: 1 / -1; }
+  #app .app-shell .dashboard-page .stat-card { padding: 28px; }
+  #app .app-shell .dashboard-page .stat-value { font-size: 2rem; }
+  #app .app-shell .dashboard-page .stat-label { font-size: .95rem; }
+  #app .app-shell .profile-page,
+  #app .app-shell .student-detail-page { display: grid; grid-template-columns: minmax(240px, 1fr) minmax(0, 2fr); gap: 24px; align-content: start; align-items: start; }
+  #app .app-shell :is(.profile-page, .student-detail-page) > :is(.page-title, .page-header, .loading-state) { grid-column: 1 / -1; }
+  #app .app-shell .profile-page .profile-card { grid-column: 1; grid-row: 2 / span 2; margin: 0; }
+  #app .app-shell .profile-page :is(.badges-section, .pet-info) { grid-column: 2; margin: 0; }
+  #app .app-shell .profile-page .logout-btn { grid-column: 1; }
+  #app .app-shell .student-detail-page .history-section { grid-column: 1 / -1; }
+  #app .app-shell .home-page { display: grid; grid-template-columns: minmax(0, 3fr) minmax(280px, 2fr); gap: 24px; align-content: start; align-items: start; }
+  #app .app-shell .home-page > :is(.points-banner, .pet-switcher, .loading) { grid-column: 1 / -1; margin-bottom: 0; }
+  #app .app-shell .home-page .pet-display { grid-column: 1; grid-row: span 2; min-height: 400px; margin: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+  #app .app-shell .home-page :is(.stats-grid, .actions-grid) { grid-column: 2; margin: 0; }
+  #app .app-shell .home-page .actions-grid { gap: 12px; }
+  #app .app-shell .home-page .action-btn { min-height: 132px; }
+  #app .app-shell .auth-page { display: grid; grid-template-columns: minmax(0, 480px) minmax(0, 440px); gap: clamp(32px, 6vw, 100px); justify-content: center; padding: 48px var(--page-gutter); min-height: 100dvh; }
+  #app .app-shell .auth-header { margin: 0; }
+  #app .app-shell .auth-header h1 { font-size: clamp(2.4rem, 4vw, 4rem); }
+  #app .app-shell .auth-icon { font-size: clamp(5rem, 8vw, 8rem); }
+  #app .app-shell .auth-form { max-width: none; padding: 32px; }
+  #app .app-shell .create-page { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 24px 32px; align-content: start; align-items: start; }
+  #app .app-shell .create-page .create-header { grid-column: 1 / -1; }
+  #app .app-shell .create-page > :is(.species-grid, .section, .form-error, .create-btn) { grid-column: 1; margin: 0; }
+  #app .app-shell .create-page .preview { grid-column: 2; grid-row: 2 / span 5; margin: 0; position: sticky; top: 24px; }
+  #app .app-shell .create-page .species-grid { grid-template-columns: repeat(auto-fill, minmax(135px, 1fr)); }
+  #app .app-shell .diary-editor-page .editor-form { display: grid; grid-template-columns: minmax(0, 3fr) minmax(240px, 2fr); gap: 24px; align-items: start; }
+  #app .app-shell .editor-form .form-group { margin: 0; }
+  #app .app-shell .editor-form .form-group:nth-child(1) { grid-column: 1 / -1; }
+  #app .app-shell .editor-form .form-group:nth-child(2) { grid-column: 1; grid-row: 2 / span 2; }
+  #app .app-shell .editor-form .form-group:nth-child(3),
+  #app .app-shell .editor-form .form-group:nth-child(4) { grid-column: 2; }
+  #app .app-shell .editor-form .form-textarea { min-height: 360px; }
+  #app .app-shell .editor-form .submit-btn { grid-column: 1 / -1; width: auto; justify-self: end; min-width: 180px; }
+  #app .app-shell .task-form-page { max-width: 1000px; }
+  #app .app-shell .task-form { padding: 32px; }
+  #app .app-shell .diary-detail-page { max-width: 1100px; }
+  #app .app-shell .detail-card { padding: clamp(24px, 4vw, 56px); }
+  #app .app-shell .dialog-overlay > .dialog { max-width: 560px; }
+  #app .app-shell .dialog-overlay > .batch-feed-dialog { max-width: 720px; }
+  #app .app-shell .batch-pet-list { grid-template-columns: repeat(3, minmax(0, 1fr)); max-height: 40dvh; }
+  #app .app-shell .search-bar { max-width: 560px; }
+}
+
+/* Computers: a persistent sidebar replaces the bottom bar. */
+@media (min-width: 1024px) {
+  #app .app-shell.has-navigation { padding-left: var(--sidebar-width); }
+  #app .app-shell :is(.page, .admin-page) { padding-top: 36px; padding-bottom: 40px; }
+  #app .app-shell :is(.bottom-nav, .teacher-nav) {
+    inset: 0 auto 0 0;
+    width: var(--sidebar-width);
+    flex-direction: column;
+    justify-content: flex-start;
+    gap: 8px;
+    padding: 32px 16px;
+    border-top: 0;
+    border-right: 2px solid var(--color-border);
+    box-shadow: none;
+    overflow-y: auto;
+  }
+  #app .app-shell :is(.bottom-nav, .teacher-nav)::before { content: '🐾 宠物乐园'; font-family: var(--font-fun); font-size: 1.4rem; color: var(--color-primary); padding: 8px 4px 28px; text-align: center; }
+  #app .app-shell :is(.bottom-nav, .teacher-nav) a { flex: 0 0 auto; flex-direction: row; justify-content: flex-start; gap: 14px; padding: 14px 18px; font-size: 1rem; border-radius: var(--radius-sm); }
+  #app .app-shell :is(.bottom-nav, .teacher-nav) a.active { background: #fff0f5; color: var(--color-primary); }
+  #app .app-shell :is(.bottom-nav, .teacher-nav) a:hover { background: #fff8fb; }
+  #app .app-shell .admin-page .class-grid { grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); }
+}
+
+/* Large monitors: more content per row, with a readable centered maximum. */
+@media (min-width: 1600px) {
+  :root { --sidebar-width: 240px; }
+  #app .app-shell .settings-page { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  #app .app-shell .create-page .species-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+  #app .app-shell .home-page .pet-display { min-height: 520px; }
+}
+
+@media (max-width: 767px) {
+  #app .app-shell .student-card { flex-wrap: wrap; }
+  #app .app-shell .student-card .student-info { flex-basis: 160px; }
+  #app .app-shell .student-card .student-actions { margin-left: auto; }
+  #app .app-shell .admin-page :is(.form-grid, .class-grid, .manage-grid) { grid-template-columns: minmax(0, 1fr); }
+  #app .app-shell .admin-page .student-row { flex-wrap: wrap; }
+  #app .app-shell .auth-page { padding: 24px 16px; }
+  #app .app-shell .batch-pet-list { grid-template-columns: minmax(0, 1fr); }
+}

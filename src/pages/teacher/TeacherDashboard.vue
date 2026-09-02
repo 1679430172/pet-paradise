@@ -1,5 +1,5 @@
 <template>
-  <div class="page teacher-page">
+  <div class="page teacher-page dashboard-page">
     <div class="teacher-header">
       <h1>教师后台</h1>
       <button class="btn-logout" @click="handleLogout">退出</button>

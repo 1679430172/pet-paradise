@@ -1,5 +1,5 @@
 <template>
-  <div class="page">
+  <div class="page diary-editor-page">
     <h1 class="page-title">写日记</h1>
 
     <form class="editor-form" @submit.prevent="handleSubmit">
