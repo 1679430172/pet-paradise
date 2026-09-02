@@ -24,8 +24,13 @@
     </div>
 
     <div class="section">
-      <h3>近期发放记录</h3>
-      <div v-if="recentCompletions.length === 0" class="empty-state">暂无记录</div>
+      <h3>积分发放记录</h3>
+      <div v-if="recordsLoading" class="empty-state" role="status">加载中...</div>
+      <div v-else-if="recordsError" class="empty-state" role="alert">
+        {{ recordsError }}
+        <button class="page-button" @click="fetchRecentCompletions(requestedPage)">重试</button>
+      </div>
+      <div v-else-if="recentCompletions.length === 0" class="empty-state">暂无记录</div>
       <div v-else class="completion-list">
         <div v-for="c in recentCompletions" :key="c.id" class="completion-item card">
           <div class="completion-info">
@@ -35,12 +40,20 @@
           <span class="completion-points">+{{ c.points }}</span>
         </div>
       </div>
+      <nav class="pagination" aria-label="发放记录分页">
+        <span>共 {{ totalRecords }} 条 · 每页 {{ pageSize }} 条</span>
+        <div class="page-actions">
+          <button class="page-button" :disabled="recordsLoading || currentPage <= 1" @click="fetchRecentCompletions(currentPage - 1)">上一页</button>
+          <span aria-live="polite">第 {{ currentPage }} / {{ totalPages }} 页</span>
+          <button class="page-button" :disabled="recordsLoading || currentPage >= totalPages" @click="fetchRecentCompletions(currentPage + 1)">下一页</button>
+        </div>
+      </nav>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '../../stores/auth'
 import { useTeacherStore } from '../../stores/teacher'
@@ -60,6 +73,13 @@ interface RecentCompletion {
   created_at: string
 }
 const recentCompletions = ref<RecentCompletion[]>([])
+const pageSize = 10
+const currentPage = ref(1)
+const requestedPage = ref(1)
+const totalRecords = ref(0)
+const totalPages = computed(() => Math.max(1, Math.ceil(totalRecords.value / pageSize)))
+const recordsLoading = ref(false)
+const recordsError = ref('')
 
 onMounted(async () => {
   await Promise.all([
@@ -69,23 +89,44 @@ onMounted(async () => {
   ])
 })
 
-async function fetchRecentCompletions() {
-  if (!authStore.user) return
-  const { data } = await supabase
-    .from('task_completions')
-    .select('id, points, created_at, student:profiles!task_completions_student_id_fkey(username), task:tasks(name)')
-    .eq('awarded_by', authStore.user.id)
-    .order('created_at', { ascending: false })
-    .limit(10)
-
-  if (data) {
-    recentCompletions.value = data.map((d: any) => ({
-      id: d.id,
-      points: d.points,
-      student_username: d.student?.username || '未知',
-      task_name: d.task?.name || '未知任务',
-      created_at: d.created_at,
-    }))
+async function fetchRecentCompletions(page = 1) {
+  if (!authStore.user || recordsLoading.value) return
+  const teacherId = authStore.user.id
+  requestedPage.value = Math.max(1, page)
+  recordsLoading.value = true
+  recordsError.value = ''
+  try {
+    // If records were deleted since the previous request, fall back to the last page.
+    while (true) {
+      const from = (requestedPage.value - 1) * pageSize
+      const { data, count, error } = await supabase
+        .from('task_completions')
+        .select('id, points, created_at, student:profiles!task_completions_student_id_fkey(username), task:tasks(name)', { count: 'exact' })
+        .eq('awarded_by', teacherId)
+        .order('created_at', { ascending: false })
+        .order('id', { ascending: false })
+        .range(from, from + pageSize - 1)
+      if (error) throw error
+      const lastPage = Math.max(1, Math.ceil((count ?? 0) / pageSize))
+      if (requestedPage.value > lastPage) {
+        requestedPage.value = lastPage
+        continue
+      }
+      recentCompletions.value = (data || []).map((d: any) => ({
+        id: d.id,
+        points: d.points,
+        student_username: d.student?.username || '未知',
+        task_name: d.task?.name || '未知任务',
+        created_at: d.created_at,
+      }))
+      totalRecords.value = count ?? 0
+      currentPage.value = requestedPage.value
+      break
+    }
+  } catch {
+    recordsError.value = '记录加载失败，请重试。'
+  } finally {
+    recordsLoading.value = false
   }
 }
 
@@ -202,5 +243,33 @@ async function handleLogout() {
   font-weight: 700;
   color: var(--color-success);
   font-size: 1.1rem;
+}
+
+.pagination, .page-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.pagination {
+  margin-top: 16px;
+  color: var(--color-text-muted);
+  font-size: .85rem;
+}
+
+.page-button {
+  padding: 7px 12px;
+  border: 1px solid #eadfD3;
+  border-radius: 8px;
+  background: white;
+  color: var(--color-primary);
+  cursor: pointer;
+}
+
+.page-button:disabled {
+  opacity: .45;
+  cursor: not-allowed;
 }
 </style>
