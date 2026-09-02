@@ -13,13 +13,28 @@
         placeholder="搜索学生..."
         @input="handleSearch"
       />
+      <label class="sort-control">
+        <span>排序</span>
+        <select v-model="sortBy" class="form-input sort-select">
+          <option value="default">默认排序</option>
+          <option value="name-asc">学生姓名：正序</option>
+          <option value="name-desc">学生姓名：倒序</option>
+          <option value="level-desc">宠物等级：从高到低</option>
+          <option value="level-asc">宠物等级：从低到高</option>
+          <option value="hunger-asc">饥饿值：最饿优先</option>
+          <option value="hunger-desc">饥饿值：最饱优先</option>
+        </select>
+      </label>
     </div>
+    <p v-if="sortBy.startsWith('level') || sortBy.startsWith('hunger')" class="sort-hint">
+      按当前显示的宠物排序，未领养的学生排在最后。饱食度越低，宠物越饿。
+    </p>
 
     <div v-if="teacherStore.loading" class="loading-state">加载中...</div>
     <div v-else-if="teacherStore.studentsWithPets.length === 0" class="empty-state">暂无学生</div>
     <div v-else class="pet-list">
       <div
-        v-for="s in teacherStore.studentsWithPets"
+        v-for="s in sortedStudents"
         :key="s.id"
         class="pet-card card"
         :class="{ 'empty-adopt-card': !activePet(s) }"
@@ -267,6 +282,9 @@ const teacherStore = useTeacherStore()
 const pointsStore = usePointsStore()
 
 const searchQuery = ref('')
+type PetSort = 'default' | 'name-asc' | 'name-desc' | 'level-asc' | 'level-desc' | 'hunger-asc' | 'hunger-desc'
+const sortBy = ref<PetSort>('default')
+const nameCollator = new Intl.Collator('zh-CN', { numeric: true, sensitivity: 'base' })
 const busyKey = ref<string | null>(null)
 const toast = ref('')
 const petReplies = ref<Record<string, string>>({})
@@ -283,6 +301,27 @@ const batchFoods = [
 
 // 每个学生当前展示的宠物索引（student.id -> pet index）
 const petIdx = ref<Record<string, number>>({})
+
+const sortedStudents = computed(() => {
+  const students = [...teacherStore.studentsWithPets]
+  const sort = sortBy.value
+  if (sort === 'default') return students
+  const direction = sort.endsWith('asc') ? 1 : -1
+  return students.sort((a, b) => {
+    const nameOrder = nameCollator.compare(a.username, b.username)
+    if (sort.startsWith('name')) return direction * nameOrder
+    const petA = activePet(a)
+    const petB = activePet(b)
+    if (!petA || !petB) {
+      if (!petA && !petB) return nameOrder
+      return petA ? -1 : 1
+    }
+    const valueOrder = sort.startsWith('level')
+      ? petA.level - petB.level
+      : (petA.hunger ?? 0) - (petB.hunger ?? 0)
+    return direction * valueOrder || nameOrder
+  })
+})
 
 // 领养弹窗
 const showAdoptDialog = ref(false)
@@ -577,7 +616,36 @@ async function handleAdopt() {
 }
 
 .search-bar {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
   margin-bottom: 16px;
+}
+
+.search-bar > .form-input {
+  flex: 1 1 240px;
+  min-width: 0;
+}
+
+.sort-control {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--color-text-muted);
+  font-size: .85rem;
+}
+
+.sort-select {
+  width: auto;
+  min-width: 190px;
+  cursor: pointer;
+}
+
+.sort-hint {
+  margin: -6px 0 14px;
+  color: var(--color-text-muted);
+  font-size: .78rem;
 }
 
 .page-title-row { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 16px; }
