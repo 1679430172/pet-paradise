@@ -83,47 +83,47 @@ export const useTeacherStore = defineStore('teacher', () => {
     loading.value = false
   }
 
-  async function fetchStudentsWithPets(search?: string) {
+  async function fetchStudentsWithPets(search?: string, background = false) {
     const currentTeacherId = teacherId()
     if (!currentTeacherId) return
-    loading.value = true
-    let query = supabase
-      .from('profiles')
-      .select('*')
-      .eq('role', 'student')
-      .eq('teacher_id', currentTeacherId)
-      .order('created_at', { ascending: false })
-    if (search) {
-      query = query.ilike('username', `%${search}%`)
-    }
-    const { data: studentsData } = await query
-    if (!studentsData) {
-      studentsWithPets.value = []
-      loading.value = false
-      return
-    }
-    const ids = studentsData.map(s => s.id)
-    let petsData: any[] = []
-    if (ids.length > 0) {
-      const { data } = await supabase
-        .from('pets')
+    if (!background) loading.value = true
+    try {
+      let query = supabase
+        .from('profiles')
         .select('*')
-        .in('owner_id', ids)
-        .order('created_at', { ascending: true })
-      petsData = (data || []).map(applyHungerDecay)
+        .eq('role', 'student')
+        .eq('teacher_id', currentTeacherId)
+        .order('created_at', { ascending: false })
+      if (search) {
+        query = query.ilike('username', `%${search}%`)
+      }
+      const { data: studentsData } = await query
+      if (!studentsData) return
+      const ids = studentsData.map(s => s.id)
+      let petsData: any[] = []
+      if (ids.length > 0) {
+        const { data, error } = await supabase
+          .from('pets')
+          .select('*')
+          .in('owner_id', ids)
+          .order('created_at', { ascending: true })
+        if (error) return
+        petsData = (data || []).map(applyHungerDecay)
+      }
+      const petMap = new Map<string, TeacherPet[]>()
+      petsData.forEach(p => {
+        const arr = petMap.get(p.owner_id) || []
+        arr.push(p)
+        petMap.set(p.owner_id, arr)
+      })
+      studentsWithPets.value = studentsData.map(s => ({
+        ...s,
+        pets: petMap.get(s.id) || [],
+      }))
+      totalStudents.value = studentsData.length
+    } finally {
+      if (!background) loading.value = false
     }
-    const petMap = new Map<string, TeacherPet[]>()
-    petsData.forEach(p => {
-      const arr = petMap.get(p.owner_id) || []
-      arr.push(p)
-      petMap.set(p.owner_id, arr)
-    })
-    studentsWithPets.value = studentsData.map(s => ({
-      ...s,
-      pets: petMap.get(s.id) || [],
-    }))
-    totalStudents.value = studentsData.length
-    loading.value = false
   }
 
   function calculateLevel(xp: number): number {

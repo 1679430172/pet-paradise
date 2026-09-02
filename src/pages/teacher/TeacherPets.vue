@@ -30,7 +30,7 @@
       按当前显示的宠物排序，未领养的学生排在最后。饱食度越低，宠物越饿。
     </p>
 
-    <div v-if="teacherStore.loading" class="loading-state">加载中...</div>
+    <div v-if="initialLoading" class="loading-state">加载中...</div>
     <div v-else-if="teacherStore.studentsWithPets.length === 0" class="empty-state">暂无学生</div>
     <div v-else class="pet-list">
       <div
@@ -280,6 +280,7 @@ import PetAdoptionFields from '../../components/pet/PetAdoptionFields.vue'
 
 const teacherStore = useTeacherStore()
 const pointsStore = usePointsStore()
+const initialLoading = ref(true)
 
 const searchQuery = ref('')
 type PetSort = 'default' | 'name-asc' | 'name-desc' | 'level-asc' | 'level-desc' | 'hunger-asc' | 'hunger-desc'
@@ -340,7 +341,6 @@ const renameName = ref('')
 const renameError = ref('')
 const renaming = ref(false)
 const renameInput = ref<HTMLInputElement | null>(null)
-let hungerRefreshTimer: ReturnType<typeof setInterval> | undefined
 const replyTimers = new Map<string, ReturnType<typeof setTimeout>>()
 const levelUpQueue: TeacherPet[] = []
 let levelUpTimer: ReturnType<typeof setTimeout> | undefined
@@ -452,23 +452,23 @@ function cardStyle(s: StudentWithPet) {
 }
 
 onMounted(async () => {
-  await Promise.all([
-    teacherStore.fetchStudentsWithPets(),
-    pointsStore.fetchActionCosts(),
-  ])
-  hungerRefreshTimer = setInterval(() => {
-    teacherStore.fetchStudentsWithPets(searchQuery.value || undefined)
-  }, 60 * 1000)
+  try {
+    await Promise.all([
+      teacherStore.fetchStudentsWithPets(undefined, true),
+      pointsStore.fetchActionCosts(),
+    ])
+  } finally {
+    initialLoading.value = false
+  }
 })
 
 onUnmounted(() => {
-  if (hungerRefreshTimer) clearInterval(hungerRefreshTimer)
   replyTimers.forEach(timer => clearTimeout(timer))
   if (levelUpTimer) clearTimeout(levelUpTimer)
 })
 
 function handleSearch() {
-  teacherStore.fetchStudentsWithPets(searchQuery.value || undefined)
+  teacherStore.fetchStudentsWithPets(searchQuery.value || undefined, true)
 }
 
 function showToast(msg: string) {
