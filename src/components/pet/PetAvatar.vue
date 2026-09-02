@@ -9,6 +9,7 @@
         :src="imgSrc"
         :alt="species"
         class="pet-avatar-img"
+        :style="eggImageStyle"
         loading="lazy"
         decoding="async"
         @error="imgError = true"
@@ -25,6 +26,7 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
 import { getPetImage, getPetStage, PET_STAGE_LABELS, PET_SPECIES } from '../../lib/constants'
+import eggLayouts from '../../lib/egg-layout.json'
 
 interface Props {
   species?: string
@@ -54,6 +56,22 @@ const imgSrc = computed(() => getPetImage(props.species || PET_SPECIES[0], props
 
 const stageLabel = computed(() => PET_STAGE_LABELS[getPetStage(props.level || 1)])
 const stage = computed(() => getPetStage(props.level || 1))
+
+// Normalize visible egg silhouettes, not their differently padded source canvases.
+// Regenerate bounds with scripts/measure-egg-layout.py after changing egg assets.
+const eggImageStyle = computed(() => {
+  if (stage.value !== 'egg') return undefined
+  const species = props.species as keyof typeof eggLayouts
+  const bounds = eggLayouts[species] ?? eggLayouts[PET_SPECIES[0]]
+  const scale = 0.52 / (bounds.bottom - bounds.top)
+  return {
+    position: 'absolute' as const,
+    width: `${scale * 100}%`,
+    height: `${scale * 100}%`,
+    left: `${(0.5 - (bounds.left + bounds.right) / 2 * scale) * 100}%`,
+    top: `${(0.84 - bounds.bottom * scale) * 100}%`,
+  }
+})
 
 // 各种类 emoji 备选（图片加载失败时展示），未配置的种类统一用 🐾
 const SPECIES_EMOJI: Record<string, string> = {
@@ -134,6 +152,7 @@ const emojiStyle = computed(() => ({
 }
 
 .pet-avatar-picture {
+  position: relative;
   display: block;
   width: 100%;
   height: 100%;
@@ -143,6 +162,10 @@ const emojiStyle = computed(() => ({
 }
 
 .stage-egg::before { width: 48%; height: 38%; opacity: 0.55; }
+.stage-egg .pet-avatar-picture {
+  transform-origin: 50% 84%;
+  animation-name: egg-breathe;
+}
 .stage-baby::before { width: 60%; height: 46%; }
 .stage-teen::before { width: 70%; height: 52%; }
 .stage-adult::before { width: 82%; height: 62%; }
@@ -165,6 +188,11 @@ const emojiStyle = computed(() => ({
 @keyframes pet-breathe {
   0%, 100% { transform: translateY(0) scale(1, 1); }
   50% { transform: translateY(-1.8%) scale(1.025, 1.045); }
+}
+
+@keyframes egg-breathe {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.025, 1.045); }
 }
 
 @keyframes final-aura {
