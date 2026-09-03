@@ -1,5 +1,6 @@
 <template>
   <div class="page teacher-page pets-page" :class="{ 'classroom-mode': classroomMode, 'classroom-compact': classroomMode && classroomDensity === 180 }" :style="classroomMode ? { '--classroom-card-width': classroomDensity + 'px' } : {}">
+    <header class="pets-toolbar">
     <div class="page-title-row">
       <div><p v-if="classroomMode" class="classroom-eyebrow">{{ authStore.user?.class_name || '我们的班级' }} · {{ teacherStore.studentsWithPets.length }} 位同学</p>
         <h1 class="page-title">{{ classroomMode ? '今天，也在一起长大' : '学生宠物' }}</h1></div>
@@ -10,7 +11,7 @@
           <button class="btn btn-secondary" @click="toggleFullscreen">{{ fullscreen ? '退出全屏' : '全屏显示' }}</button>
           <button class="btn btn-secondary" @click="exitClassroom">返回普通视图</button>
         </template>
-      <button class="btn btn-primary batch-entry-btn" :disabled="batchPetOptions.length === 0 || awarding || !!busyKey || batchFeeding" @click="openBatchFeedDialog">批量投喂</button>
+      <button v-if="!classroomMode" class="btn btn-primary batch-entry-btn" :disabled="batchPetOptions.length === 0 || awarding || !!busyKey || batchFeeding" @click="openBatchFeedDialog">批量投喂</button>
       </div>
     </div>
 
@@ -40,16 +41,18 @@
       按当前显示的宠物排序，未领养的学生排在最后。饱食度越低，宠物越饿。
     </p>
 
-    <section v-if="classroomMode" class="classroom-award-bar" aria-label="课堂快捷奖励">
-      <label class="classroom-select-all"><input type="checkbox" :checked="allAwardSelected" :disabled="awarding" @change="toggleAwardAll" />全选当前学生</label>
-      <span>已选 <strong>{{ awardStudentIds.length }}</strong> 人</span>
+    <section v-if="classroomMode" :class="{ 'has-selection': awardStudentIds.length > 0 }" class="classroom-award-bar" aria-label="课堂快捷奖励">
+      <label class="classroom-select-all"><input type="checkbox" :checked="allAwardSelected" :disabled="awarding" @change="toggleAwardAll" />全选筛选结果</label>
+      <span class="award-count">已选 <strong>{{ awardStudentIds.length }}</strong> 人</span>
       <select v-model="awardTaskId" class="form-input classroom-task" :disabled="awarding" aria-label="选择奖励任务">
         <option value="">选择奖励任务</option><option v-for="task in tasksStore.tasks" :key="task.id" :value="task.id">{{ task.name }} +{{ task.points }}分</option>
       </select>
       <button class="btn btn-primary" :disabled="!awardTaskId || !awardStudentIds.length || awarding || !!busyKey || batchFeeding" @click="awardSelected">{{ awarding ? '正在发放...' : '发放奖励' }}</button>
-      <button v-if="awardStudentIds.length" class="btn btn-secondary" :disabled="awarding" @click="awardStudentIds = []">清空选择</button>
+      <button v-if="awardStudentIds.length" class="clear-selection" :disabled="awarding" @click="awardStudentIds = []">清空</button>
       <p v-if="!tasksStore.tasks.length" class="classroom-task-hint">请先在任务管理中创建奖励任务。</p>
     </section>
+    </header>
+    <div class="pets-content">
     <div v-if="classroomNotice && classroomMode" class="classroom-notice" role="status">{{ classroomNotice }}</div>
     <ul v-if="classroomMode && awardFailures.length" class="classroom-failures"><li v-for="failure in awardFailures" :key="failure.studentId">{{ teacherStore.studentsWithPets.find(s => s.id === failure.studentId)?.username || '学生' }}：{{ failure.message }}</li></ul>
     <div v-if="initialLoading" class="loading-state">加载中...</div>
@@ -62,7 +65,7 @@
         :class="{ 'empty-adopt-card': !activePet(s), 'award-selected': classroomMode && awardStudentIds.includes(s.id), 'award-bounce': !!awardBubbles[s.id] }"
         :style="cardStyle(s)"
       >
-        <label v-if="classroomMode" class="classroom-student-select"><input type="checkbox" :checked="awardStudentIds.includes(s.id)" :disabled="awarding" @change="toggleAwardStudent(s.id)" :aria-label="`选择 ${s.username}`" />选择</label>
+        <label v-if="classroomMode" class="classroom-student-select"><input type="checkbox" :checked="awardStudentIds.includes(s.id)" :disabled="awarding" @change="toggleAwardStudent(s.id)" :aria-label="`选择 ${s.username}`" /><span class="card-selection-mark" aria-hidden="true">{{ awardStudentIds.includes(s.id) ? '✓' : '' }}</span></label>
         <Transition name="speech-pop"><div v-if="awardBubbles[s.id]" class="award-bubble" role="status">{{ awardBubbles[s.id] }}</div></Transition>
         <!-- 左上角：积分 -->
         <span class="points-badge">{{ s.points }}分</span>
@@ -196,6 +199,8 @@
       </div>
     </div>
 
+    </div>
+
     <!-- 批量投喂弹窗 -->
     <div v-if="showBatchFeedDialog" class="dialog-overlay" @click.self="closeBatchFeedDialog">
       <div class="dialog batch-feed-dialog card">
@@ -303,6 +308,7 @@ import { useTasksStore } from '../../stores/tasks'
 import { useTeacherStore, type StudentWithPet, type TeacherPet } from '../../stores/teacher'
 import { usePointsStore } from '../../stores/points'
 import { PET_COLORS, MAX_LEVEL, LEVEL_THRESHOLDS, getFeedingReply } from '../../lib/constants'
+import { getPetThemeStyle } from '../../lib/petTheme'
 import PetAvatar from '../../components/pet/PetAvatar.vue'
 import PetAdoptionFields from '../../components/pet/PetAdoptionFields.vue'
 
@@ -540,8 +546,7 @@ async function handleBatchFeed(action: 'basic' | 'nice' | 'luxury') {
 
 function cardStyle(s: StudentWithPet) {
   const p = activePet(s)
-  if (!p) return { background: '#fafafa' }
-  return { background: p.appearance?.color || '#FFB6C1' }
+  return getPetThemeStyle(p?.appearance?.color, classroomMode.value && awardStudentIds.value.includes(s.id))
 }
 
 onMounted(async () => {
@@ -711,33 +716,79 @@ async function handleAdopt() {
 </script>
 
 <style scoped>
+.pets-toolbar, .pets-content { display: contents; }
+.classroom-mode .pets-toolbar { flex: 0 0 auto; display: grid; grid-template-columns: minmax(380px, .9fr) minmax(0, 1.4fr); align-items: center; gap: 12px 24px; padding: 18px 24px; background: #f8fcf8; border-bottom: 1px solid #d4e4d9; box-shadow: 0 3px 12px #24473508; }
+.classroom-mode .pets-toolbar .page-title-row { grid-column: 1 / -1; margin: 0; }
+:global(#app .app-shell .classroom-mode .search-bar) { max-width: none; margin: 0; gap: 10px; }
+.classroom-mode .search-bar > .form-input { flex-basis: 140px; }
+.classroom-mode .sort-select { min-width: 150px; max-width: 220px; }
+.classroom-mode .sort-hint { grid-column: 1 / -1; margin: 0; order: 1; }
+.classroom-mode .pets-content { display: block; flex: 1 1 0; min-height: 0; overflow-y: auto; overscroll-behavior: contain; scrollbar-gutter: stable; padding: 20px 24px 32px; }
 .page-actions { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
-:global(#app .app-shell .page.classroom-mode) { position: fixed; inset: 0; z-index: 100; width: 100%; max-width: none; overflow-y: auto; padding: 30px 36px 50px; background: radial-gradient(ellipse at 10% 0%, #e0f4e9, transparent 55%), #f5f7ef; }
+:global(#app .app-shell .page.classroom-mode) { position: fixed; inset: 0; z-index: 100; width: 100%; max-width: none; height: 100dvh; min-height: 0; display: flex; flex-direction: column; overflow: hidden; padding: 0; background: radial-gradient(ellipse at 10% 0%, #e0f4e9, transparent 55%), #f5f7ef; }
 .classroom-mode .page-title { font-size: clamp(24px, 2.4vw, 38px); color: #254d42; }
 .classroom-eyebrow { color: #53736a; margin: 0 0 8px; font-size: 16px; }
 .density-select { width: auto; }
-.classroom-award-bar { position: sticky; top: 0; z-index: 40; display: flex; align-items: center; flex-wrap: wrap; gap: 14px; background: #ffffffed; border: 1px solid #d4e4d9; border-radius: 18px; padding: 16px; margin-bottom: 20px; box-shadow: 0 8px 25px #24473510; backdrop-filter: blur(12px); }
-.classroom-select-all { display: flex; align-items: center; gap: 8px; }
-.classroom-task { flex: 1 1 200px; width: auto; max-width: 400px; }
+.classroom-award-bar { padding: 8px 10px; border-radius: 12px; background: #eef3ef; border: 1px solid transparent; transition: background .2s, border-color .2s; font-size: 13px; display: flex; align-items: center; flex-wrap: wrap; gap: 10px; margin: 0; min-width: 0; }
+.classroom-select-all { white-space: nowrap; display: flex; align-items: center; gap: 8px; }
+.classroom-task { flex: 1 1 150px; width: auto; max-width: 320px; }
 .classroom-task-hint { width: 100%; color: #6c766a; }
 .classroom-notice { padding: 12px 18px; color: #285b43; background: #e3f3e7; border-radius: 12px; margin-bottom: 18px; }
 .classroom-failures { padding: 14px 34px; color: #a33441; background: #fff0ef; border-radius: 12px; }
 :global(#app .app-shell .classroom-mode .pet-list) { grid-template-columns: repeat(auto-fill, minmax(min(100%, var(--classroom-card-width)), 1fr)); gap: 20px; }
-.classroom-mode .pet-card { border: 3px solid transparent; border-radius: 24px; padding-top: 56px; }
+.pets-page .pet-card { border: 2px solid #ffffff; border-radius: 22px; box-shadow: 0 4px 18px #233d3210; }
+.classroom-mode .pet-card { padding-top: 48px; }
+.pets-page .pet-card.empty-adopt-card::before { display: none; }
+.classroom-mode .pet-card:hover { box-shadow: 0 8px 24px #233d321c; }
+.classroom-mode .pet-card:has(.classroom-student-select input:focus-visible) { outline: 3px solid #297d60; outline-offset: 3px; }
+.classroom-mode .pet-card.award-selected { background: linear-gradient(160deg, color-mix(in srgb, var(--pet-tone) 30%, white), #f8fcf9 78%); }
+.pets-page .pet-card .points-badge { background: #fff; color: #436655; box-shadow: none; font-size: 12px; }
+.pets-page .pet-card .level-badge { background: #fff; color: #807044; box-shadow: none; }
+.classroom-mode .pet-card .level-badge { right: 46px; }
+.pets-page .pet-card .pet-stats { background: #f1f5f2; opacity: .85; }
+.pets-page .pet-card .stat-fill { background: #9abaad; }
+.pets-page .pet-card .xp-fill { background: #b6abd0; }
+.classroom-mode .pet-card .action-row { gap: 6px; }
+.pets-page .pet-card .btn-action { background: #ffffffb3; border: 1px solid #e6ece7; border-radius: 12px; }
+.pets-page .pet-card .cost { color: #668070; }
+.classroom-mode .pet-card .action-row, .classroom-mode .pet-card .pet-dots, .classroom-mode .pet-card .adopt-btn { position: relative; z-index: 3; }
+.classroom-mode .pet-card .nav-arrow { z-index: 3; }
+.classroom-award-bar.has-selection { background: #e7f2eb; border-color: #bfd8c8; }
+.award-count { white-space: nowrap; color: #698075; }
+.award-count strong { color: #28684c; }
+.clear-selection { border: 0; padding: 7px 3px; color: #61776b; background: none; cursor: pointer; white-space: nowrap; }
+:global(#app .app-shell .classroom-mode .btn-primary) { background: #36795c; box-shadow: none; color: white; }
+:global(#app .app-shell .classroom-mode .btn-secondary) { border: 1px solid #d7e2da; color: #536c5e; background: #fff; box-shadow: none; }
+:global(#app .app-shell .classroom-mode .form-input) { border: 1px solid #dce6df; border-radius: 10px; background: #fff; font-size: 13px; }
+.classroom-award-bar .btn { padding: 10px 16px; font-size: 13px; border-radius: 10px; white-space: nowrap; }
+
 .classroom-mode .pet-card.award-selected { border-color: #297d60; box-shadow: 0 0 0 3px #297d6022; }
 .classroom-mode .pet-stage { height: 150px; }
 .classroom-compact .pet-stage { height: 120px; }
 .classroom-compact .pet-card { gap: 5px; }
 .classroom-mode .pet-name { font-size: 25px; overflow-wrap: anywhere; }
-.classroom-mode .pet-name-top { top: 32px; }
+.classroom-mode .pet-name-top { top: 39px; color: #7d8d83; font-weight: 400; }
 .classroom-mode .rename-pet-btn, .classroom-mode .adopt-mini-btn { display: none; }
-.classroom-student-select { display: flex; gap: 5px; align-items: center; position: absolute; top: 8px; left: 50%; transform: translateX(-50%); font-size: 13px; cursor: pointer; }
-.classroom-student-select input, .classroom-select-all input { accent-color: #297d60; width: 18px; height: 18px; }
+.classroom-student-select { position: absolute; inset: 0; z-index: 2; border-radius: inherit; cursor: pointer; }
+.classroom-student-select input { position: absolute; inset: 0; width: 100%; height: 100%; margin: 0; opacity: 0; cursor: pointer; }
+.classroom-student-select input:disabled { cursor: wait; }
+.card-selection-mark { position: absolute; right: 12px; top: 12px; display: grid; place-items: center; width: 22px; height: 22px; border: 1.5px solid #c5d4c9; border-radius: 50%; background: #ffffffb3; color: transparent; font-size: 14px; pointer-events: none; }
+.award-selected .card-selection-mark { background: #36795c; border-color: #36795c; color: #fff; }
+.classroom-select-all input { accent-color: #36795c; width: 16px; height: 16px; }
 .award-bubble { position: absolute; z-index: 35; top: 80px; left: 8px; right: 8px; background: #fff9d9; color: #77510a; padding: 12px; border-radius: 15px; font-weight: 800; text-align: center; box-shadow: 0 6px 18px #55400025; overflow-wrap: anywhere; }
 .award-bounce .pet-stage { animation: reward-hop .7s ease 2; }
 .upgrade-student-name { font-size: 30px; font-weight: 800; color: #fff; text-shadow: 0 2px 10px #444; }
 @keyframes reward-hop { 0%,100% { transform: translateY(0); } 45% { transform: translateY(-18px) rotate(-4deg); } 70% { transform: translateY(-5px) rotate(3deg); } }
-@media (max-width: 700px) { :global(#app .app-shell .page.classroom-mode) { padding: 18px 12px 40px; } .classroom-mode .page-title-row { align-items: flex-start; flex-direction: column; } .classroom-award-bar { gap: 10px; } }
+@media (max-width: 1100px) {
+  .classroom-mode .pets-toolbar { grid-template-columns: minmax(0, 1fr); }
+}
+@media (max-width: 700px) {
+  .classroom-mode .pets-toolbar { padding: 12px; gap: 10px; max-height: 50dvh; overflow-y: auto; }
+  .classroom-mode .pets-content { padding: 14px 12px 28px; }
+  .classroom-mode .page-title-row { align-items: flex-start; flex-direction: column; }
+  .classroom-mode .classroom-eyebrow { margin-bottom: 4px; font-size: 13px; }
+  .classroom-mode .page-title { font-size: 22px; }
+}
 @media (prefers-reduced-motion: reduce) { .award-bounce .pet-stage { animation: none; } }
 
 .teacher-page {
@@ -820,7 +871,6 @@ async function handleAdopt() {
   min-height: 432px;
   gap: 8px;
   overflow: hidden;
-  background: linear-gradient(155deg, #fff7fa 0%, #fff 55%, #fff4f9 100%) !important;
   border: 1px solid rgba(237, 164, 190, 0.38);
   box-shadow: 0 4px 14px rgba(111, 65, 82, 0.07);
 }

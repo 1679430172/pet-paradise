@@ -26,16 +26,7 @@
     <!-- 颜色选择 -->
     <div class="section">
       <h3>选择颜色</h3>
-      <div class="color-grid">
-        <div
-          v-for="c in PET_COLORS"
-          :key="c"
-          class="color-dot"
-          :class="{ selected: color === c }"
-          :style="{ background: c }"
-          @click="color = c"
-        />
-      </div>
+      <PetColorPicker v-model="color" />
     </div>
 
     <!-- 取名 -->
@@ -51,7 +42,7 @@
     </div>
 
     <!-- 预览 -->
-    <div class="preview card" v-if="species" :class="`growth-stage-${growthIndex}`" :style="{ background: color }">
+    <div class="preview card" v-if="species" :class="`growth-stage-${growthIndex}`" :style="getPetThemeStyle(color)">
       <div class="growth-player">
         <PetAvatar
           :key="`${species}-${growthLevel}`"
@@ -100,6 +91,8 @@ import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { usePetStore } from '../stores/pet'
 import { getPetImage, PET_SPECIES, PET_SPECIES_LABELS, PET_COLORS } from '../lib/constants'
+import PetColorPicker from '../components/pet/PetColorPicker.vue'
+import { getPetThemeStyle } from '../lib/petTheme'
 import PetAvatar from '../components/pet/PetAvatar.vue'
 
 const router = useRouter()
@@ -307,26 +300,6 @@ async function handleCreate() {
   font-size: 1rem;
   margin-bottom: 12px;
   color: var(--color-text);
-}
-
-.color-grid {
-  display: flex;
-  gap: 12px;
-  flex-wrap: wrap;
-}
-
-.color-dot {
-  width: 36px;
-  height: 36px;
-  border-radius: 50%;
-  cursor: pointer;
-  border: 3px solid transparent;
-  transition: all 0.2s;
-}
-
-.color-dot.selected {
-  border-color: var(--color-text);
-  transform: scale(1.2);
 }
 
 .preview {

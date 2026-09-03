@@ -20,18 +20,7 @@
 
     <div class="adopt-section">
       <label class="adopt-label">选择颜色</label>
-      <div class="color-grid">
-        <button
-          v-for="c in PET_COLORS"
-          :key="c"
-          type="button"
-          class="color-dot"
-          :class="{ selected: color === c }"
-          :style="{ background: c }"
-          :aria-label="`选择颜色 ${c}`"
-          @click="color = c"
-        />
-      </div>
+      <PetColorPicker v-model="color" />
     </div>
 
     <div class="adopt-section">
@@ -39,7 +28,7 @@
       <input v-model="name" class="form-input" type="text" placeholder="输入宠物的名字" maxlength="10" />
     </div>
 
-    <div v-if="species" class="pet-preview" :style="{ background: color }">
+    <div v-if="species" class="pet-preview" :style="getPetThemeStyle(color)">
       <PetAvatar
         :key="`${species}-${previewLevel}`"
         class="preview-pet"
@@ -62,7 +51,9 @@
 
 <script setup lang="ts">
 import { computed, onBeforeUnmount, ref } from 'vue'
-import { getPetImage, PET_COLORS, PET_SPECIES, PET_SPECIES_LABELS } from '../../lib/constants'
+import { getPetImage, PET_SPECIES, PET_SPECIES_LABELS } from '../../lib/constants'
+import PetColorPicker from './PetColorPicker.vue'
+import { getPetThemeStyle } from '../../lib/petTheme'
 import PetAvatar from './PetAvatar.vue'
 
 const species = defineModel<string>('species', { required: true })
@@ -124,9 +115,6 @@ onBeforeUnmount(stopTimer)
 .species-card.selected .species-icon { transform: scale(1.08); }
 .species-name { font-size: .74rem; color: var(--color-text); white-space: nowrap; }
 .selected-mark { position: absolute; top: 4px; right: 4px; display: grid; place-items: center; width: 18px; height: 18px; border-radius: 50%; background: var(--color-primary); color: white; font-size: .65rem; }
-.color-grid { display: flex; flex-wrap: wrap; gap: 10px; }
-.color-dot { width: 36px; height: 36px; padding: 0; border: 3px solid transparent; border-radius: 50%; cursor: pointer; transition: .2s; }
-.color-dot.selected { border-color: var(--color-text); transform: scale(1.12); box-shadow: 0 3px 8px rgba(0,0,0,.14); }
 .pet-preview { position: relative; display: grid; grid-template-columns: 190px 1fr; align-items: center; min-height: 205px; margin-top: 16px; padding: 10px 18px; overflow: hidden; border: 1px solid rgba(255,255,255,.75); border-radius: 18px; box-shadow: inset 0 1px white, 0 10px 24px rgba(64,43,54,.14); }
 .preview-pet { justify-self: center; animation: preview-arrive .4s ease-out; }
 .preview-copy { display: flex; flex-direction: column; align-items: flex-start; gap: 7px; }

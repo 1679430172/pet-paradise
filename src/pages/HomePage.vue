@@ -21,7 +21,7 @@
           class="switcher-item"
           :class="{ active: p.id === petStore.currentPet?.id }"
           :title="`${p.name} · Lv.${p.level}`"
-          :style="{ background: p.id === petStore.currentPet?.id ? p.appearance?.color : 'white' }"
+          :style="p.id === petStore.currentPet?.id ? getPetThemeStyle(p.appearance?.color) : {}"
           @click="petStore.selectPet(p.id)"
         >
           <PetAvatar
@@ -42,7 +42,7 @@
       </div>
 
       <!-- 宠物展示 -->
-      <div class="pet-display card" :style="{ background: petStore.currentPet.appearance.color }">
+      <div class="pet-display card" :style="getPetThemeStyle(petStore.currentPet.appearance.color)">
         <PetAvatar
           class="pet-avatar animate-float"
           :species="petStore.currentPet.species"
@@ -141,6 +141,7 @@ import { usePetStore } from '../stores/pet'
 import { useAuthStore } from '../stores/auth'
 import { usePointsStore } from '../stores/points'
 import { LEVEL_THRESHOLDS, MAX_LEVEL } from '../lib/constants'
+import { getPetThemeStyle } from '../lib/petTheme'
 import PetAvatar from '../components/pet/PetAvatar.vue'
 
 const router = useRouter()
