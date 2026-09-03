@@ -6,6 +6,8 @@
 
 已有部署升级本次课堂功能：先执行 [`supabase-migration-classroom.sql`](./supabase-migration-classroom.sql)，再构建和发布前端，通知已打开页面的使用者刷新。不要重新执行初始化脚本。详细口径和验证方法见 [`docs/classroom-upgrade.md`](./docs/classroom-upgrade.md)。
 
+已启用课堂功能后升级「奖励撤销」：执行 [`supabase-migration-revoke-awards.sql`](./supabase-migration-revoke-awards.sql)，再发布前端。老师在「总览 → 积分发放记录」点击「撤销」。
+
 ---
 
 ## 一、功能概览

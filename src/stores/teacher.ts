@@ -384,11 +384,8 @@ export const useTeacherStore = defineStore('teacher', () => {
       .eq('teacher_id', currentTeacherId)
     totalStudents.value = studentsData?.length || 0
 
-    const { data: completionsData } = await supabase
-      .from('task_completions')
-      .select('points')
-      .eq('awarded_by', currentTeacherId)
-    totalPointsGiven.value = completionsData?.reduce((sum, c) => sum + c.points, 0) || 0
+    const { data, error } = await supabase.rpc('teacher_award_total', { p_teacher_id: currentTeacherId })
+    if (!error) totalPointsGiven.value = Number(data ?? 0)
   }
 
   return { students, studentsWithPets, leaderboardError, leaderboardLoading, leaderboardWeek, leaderboard, loading, totalStudents, totalPointsGiven, fetchStudents, fetchStudentsWithPets, performActionForStudent, fetchStudentDetail, fetchLeaderboard, fetchStats, createStudent, renameStudent, adoptPetForStudent, renamePetForStudent, deleteStudent }

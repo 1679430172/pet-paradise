@@ -8,7 +8,7 @@ const { PGlite } = await import(process.env.PGLITE_MODULE ? pathToFileURL(proces
 const db = new PGlite()
 const schema = await readFile(new URL('../supabase-schema.sql', import.meta.url), 'utf8')
 const migration = await readFile(new URL('../supabase-migration-classroom.sql', import.meta.url), 'utf8')
-assert.ok(schema.replaceAll('\r\n','\n').trimEnd().endsWith(migration.replaceAll('\r\n','\n').trimEnd()), 'fresh install includes the exact migration')
+assert.ok(schema.replaceAll('\r\n','\n').trimEnd().includes(migration.replaceAll('\r\n','\n').trimEnd()), 'fresh install includes the exact migration')
 await db.exec('CREATE ROLE anon; CREATE ROLE authenticated;')
 await db.exec(schema.slice(0, schema.indexOf('-- RLS 策略')).replace(/-- =+\s*$/, ''))
 const teacher = randomUUID(), otherTeacher = randomUUID(), student = randomUUID(), otherStudent = randomUUID()

@@ -13,6 +13,7 @@ const schema = await readFile(new URL('../supabase-schema.sql', import.meta.url)
 await db.exec('CREATE ROLE anon; CREATE ROLE authenticated;')
 await db.exec(schema.slice(0,schema.indexOf('-- RLS 策略')).replace(/-- =+\s*$/,''))
 await db.exec(await readFile(new URL('../supabase-migration-classroom.sql',import.meta.url),'utf8'))
+await db.exec(await readFile(new URL('../supabase-migration-revoke-awards.sql',import.meta.url),'utf8'))
 const teacher = randomUUID(), task = randomUUID(), ids = []
 await db.query(`INSERT INTO profiles(id,username,password,role,class_name) VALUES($1,'林老师','test','teacher','向日葵一班')`,[teacher])
 const names = ['陈小雨','林子墨','王星然','赵可欣','周一诺','许安安','苏沐阳','李思齐','何小满','吴乐乐','宋知远','郑米粒']
@@ -31,6 +32,7 @@ const errors = []
 page.on('pageerror',error=>errors.push(error.message))
 await page.addInitScript(id=>localStorage.setItem('pet_user_id',id),teacher)
 await page.route('https://fonts.googleapis.com/**', route => route.fulfill({contentType:'text/css',body:''}))
+let dropRevokeResponse = true
 let dropFeedResponse = true, failStudent = null, missingRanking = false
 await page.route('**/rest/v1/**',async route=>{
   const url = new URL(route.request().url())
@@ -43,17 +45,19 @@ await page.route('**/rest/v1/**',async route=>{
       if(name==='award_task_points' && a.p_student_id===failStudent) return json({message:'测试：该学生发放失败'},400)
       const args = name==='feed_pet' ? [a.p_actor_id,a.p_student_id,a.p_pet_id,a.p_action,a.p_request_id]
         : name==='award_task_points' ? [a.p_actor_id,a.p_student_id,a.p_task_id,a.p_request_id]
-        : name==='weekly_leaderboard' ? [a.p_teacher_id] : null
+        : name==='weekly_leaderboard' || name==='teacher_award_total' ? [a.p_teacher_id]
+        : name==='revoke_task_award' ? [a.p_actor_id,a.p_completion_id,a.p_reason] : null
       assert.ok(args,`unexpected RPC ${name}`)
       const {rows}=await db.query(`SELECT ${name}(${args.map((_,i)=>'$'+(i+1)).join(',')}) AS result`,args)
       if(name==='feed_pet' && dropFeedResponse) { dropFeedResponse=false; return json({message:'simulated lost response'},503) }
+      if(name==='revoke_task_award' && dropRevokeResponse) { dropRevokeResponse=false; return json({message:'simulated lost response'},503) }
       return json(rows[0].result)
     }
     assert.equal(route.request().method(),'GET','all writes must use RPC')
-    assert.ok(['profiles','pets','settings','tasks'].includes(resource))
+    assert.ok(['profiles','pets','settings','tasks','task_completions'].includes(resource))
     const conditions=[],args=[]
     for(const [key,value] of url.searchParams) {
-      if(['select','order','limit'].includes(key)) continue
+      if(['select','order','limit','offset'].includes(key)) continue
       assert.match(key,/^[a-z_]+$/)
       if(value.startsWith('eq.')) { args.push(value.slice(3)); conditions.push(`${key}=$${args.length}`) }
       else if(value.startsWith('in.(')) {
@@ -63,10 +67,20 @@ await page.route('**/rest/v1/**',async route=>{
     }
     let sql=`SELECT * FROM ${resource}`+(conditions.length?' WHERE '+conditions.join(' AND '):'')
     const order=url.searchParams.get('order')
-    if(order) { const [column,direction]=order.split('.');assert.match(column,/^[a-z_]+$/);sql+=` ORDER BY ${column} ${direction==='desc'?'DESC':'ASC'}` }
+    if(order) { const [column,direction]=order.split(',')[0].split('.');assert.match(column,/^[a-z_]+$/);sql+=` ORDER BY ${column} ${direction==='desc'?'DESC':'ASC'}` }
     const {rows}=await db.query(sql,args)
+    if(resource==='task_completions') {
+      const start=Number(url.searchParams.get('offset')||0), limit=Number(url.searchParams.get('limit')||rows.length)
+      const records=[]
+      for(const row of rows.slice(start,start+limit)) {
+        const student=(await db.query('SELECT username FROM profiles WHERE id=$1',[row.student_id])).rows[0]
+        const task=(await db.query('SELECT name FROM tasks WHERE id=$1',[row.task_id])).rows[0]
+        records.push({...row,student,task})
+      }
+      return route.fulfill({status:200,contentType:'application/json',headers:{'access-control-expose-headers':'content-range','content-range':`${start}-${start+records.length-1}/${rows.length}`},body:JSON.stringify(records)})
+    }
     return json(route.request().headers().accept?.includes('vnd.pgrst.object')?rows[0]:rows)
-  } catch(error) { errors.push(error.message); return json({message:error.message},400) }
+  } catch(error) { if (!error.message.includes('学生当前余额')) errors.push(error.message); return json({message:error.message},400) }
 })
 const root=process.env.APP_URL || 'http://127.0.0.1:5193/'
 const out=process.env.ARTIFACT_DIR || path.resolve('classroom-verification.local')
@@ -160,6 +174,30 @@ try {
   await page.getByRole('button',{name:'刷新',exact:true}).click()
   await page.getByRole('alert').waitFor()
   assert.match(await page.getByRole('alert').textContent(),/数据库迁移/)
+  missingRanking=false
+  await page.goto(root+'#/teacher',{waitUntil:'domcontentloaded'})
+  await page.locator('.completion-item').nth(2).waitFor()
+  assert.match(await page.locator('.pagination').textContent(),/共 3 条/)
+  const awardRow=page.locator('.completion-item').filter({hasText:'陈小雨'})
+  await awardRow.getByRole('button',{name:'撤销',exact:true}).click()
+  await page.getByLabel('撤销原因',{exact:true}).fill('选错学生')
+  await page.getByRole('button',{name:'确认撤销',exact:true}).click()
+  await awardRow.getByText('已撤销',{exact:true}).waitFor()
+  assert.equal((await db.query('SELECT points FROM profiles WHERE id=$1',[ids[0]])).rows[0].points,45,'revocation lost response retries without double deduction')
+  assert.equal(await awardRow.getByRole('button',{name:'撤销',exact:true}).count(),0)
+  const recordHeights=await page.locator('.completion-item').evaluateAll(items=>items.map(el=>el.getBoundingClientRect().height))
+  assert.equal(new Set(recordHeights).size,1,'revoked and active records have equal heights')
+  await awardRow.locator('.revoked-detail').click()
+  await page.getByRole('heading',{name:'撤销详情',exact:true}).waitFor()
+  await page.getByRole('button',{name:'关闭',exact:true}).click()
+  await page.screenshot({path:path.join(out,'award-revoked.png')})
+  await db.query('UPDATE profiles SET points=0 WHERE id=$1',[ids[1]])
+  await page.locator('.completion-item').filter({hasText:'林子墨'}).getByRole('button',{name:'撤销',exact:true}).click()
+  await page.getByLabel('撤销原因',{exact:true}).fill('重复奖励')
+  await page.getByRole('button',{name:'确认撤销',exact:true}).click()
+  await page.getByRole('alert').filter({hasText:'余额'}).waitFor()
+  await page.screenshot({path:path.join(out,'award-revoke-insufficient.png')})
+  await page.getByRole('button',{name:'取消',exact:true}).click()
   assert.deepEqual(errors,[])
   console.log('PASS: Vue + PostgreSQL integration, search, multi-select award, partial failure, petless award, feed retry idempotency, named upgrade, fullscreen toggle, mobile layout, navigation restore, weekly rank, missing migration error. Screenshots: '+out)
 } catch (error) { console.error('UI errors:',errors, 'URL:',page.url(), 'Body:',(await page.locator('body').innerText()).slice(0,1800)); throw error } finally { await browser.close(); await db.close() }

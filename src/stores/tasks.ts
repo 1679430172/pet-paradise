@@ -16,6 +16,9 @@ export interface Task {
 }
 
 export interface TaskCompletion {
+  revoked_at?: string | null
+  revoked_by?: string | null
+  revoke_reason?: string | null
   id: string
   task_id: string
   student_id: string
@@ -161,6 +164,17 @@ export const useTasksStore = defineStore('tasks', () => {
     }
   }
 
+  async function revokeAward(completionId: string, reason: string) {
+    const actor = useAuthStore().user
+    if (!actor) throw new Error('未登录')
+    const result = await classroomRpc<{ balance: number; completion: TaskCompletion; alreadyRevoked: boolean }>(
+      'revoke_task_award', { p_actor_id: actor.id, p_completion_id: completionId, p_reason: reason },
+    )
+    const existing = completions.value.find(c => c.id === completionId)
+    if (existing) Object.assign(existing, result.completion)
+    return result
+  }
+
   async function fetchCompletions(studentId?: string) {
     let query = supabase
       .from('task_completions')
@@ -176,5 +190,5 @@ export const useTasksStore = defineStore('tasks', () => {
     if (data) completions.value = data
   }
 
-  return { tasks, completions, loading, fetchTasks, fetchAllTasks, createTask, updateTask, deleteTask, awardPoints, awardPointsToStudents, fetchCompletions }
+  return { revokeAward, tasks, completions, loading, fetchTasks, fetchAllTasks, createTask, updateTask, deleteTask, awardPoints, awardPointsToStudents, fetchCompletions }
 })

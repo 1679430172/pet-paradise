@@ -57,8 +57,9 @@
             <div class="completion-info">
               <span class="completion-task">{{ c.task?.name || '任务' }}</span>
               <span class="completion-time">{{ formatTime(c.created_at) }}</span>
+              <small v-if="c.revoked_at">已撤销 · {{ c.revoke_reason }}</small>
             </div>
-            <span class="completion-points">+{{ c.points }}</span>
+            <span class="completion-points" :style="c.revoked_at ? { textDecoration: 'line-through', opacity: .5 } : {}">+{{ c.points }}</span>
           </div>
         </div>
       </div>
