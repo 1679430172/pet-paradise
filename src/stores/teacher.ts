@@ -1,4 +1,4 @@
-import { defineStore } from 'pinia'
+import { acceptHMRUpdate, defineStore } from 'pinia'
 import { ref } from 'vue'
 import { supabase } from '../lib/supabase'
 import { hashPassword } from './auth'
@@ -33,6 +33,7 @@ export interface LeaderboardEntry {
   points: number
   pet_level: number
   pet_name: string
+  pet_species?: string
 }
 
 export const useTeacherStore = defineStore('teacher', () => {
@@ -190,7 +191,23 @@ export const useTeacherStore = defineStore('teacher', () => {
       const result = await classroomRpc<{ entries: LeaderboardEntry[]; weekStart: string; weekEnd: string }>(
         'weekly_leaderboard', { p_teacher_id: currentTeacherId },
       )
-      leaderboard.value = result.entries
+      const studentIds = result.entries.map(entry => entry.id)
+      const { data: rankingPets, error: petError } = studentIds.length
+        ? await supabase.from('pets').select('id,owner_id,name,species,level,created_at').in('owner_id', studentIds)
+        : { data: [], error: null }
+      if (petError) throw petError
+      // Match the weekly ranking's representative pet: highest level, then oldest adoption.
+      const sortedPets = [...(rankingPets || [])].sort((a, b) =>
+        b.level - a.level || a.created_at.localeCompare(b.created_at) || a.id.localeCompare(b.id),
+      )
+      const representativePets = new Map<string, typeof sortedPets[number]>()
+      for (const pet of sortedPets) {
+        if (!representativePets.has(pet.owner_id)) representativePets.set(pet.owner_id, pet)
+      }
+      leaderboard.value = result.entries.map(entry => {
+        const pet = representativePets.get(entry.id)
+        return { ...entry, pet_species: pet?.species, pet_name: pet?.name || '未领养', pet_level: pet?.level || 0 }
+      })
       leaderboardWeek.value = { start: result.weekStart, end: result.weekEnd }
     } catch (error) {
       leaderboardError.value = error instanceof Error ? error.message : '排行榜加载失败'
@@ -390,3 +407,7 @@ export const useTeacherStore = defineStore('teacher', () => {
 
   return { students, studentsWithPets, leaderboardError, leaderboardLoading, leaderboardWeek, leaderboard, loading, totalStudents, totalPointsGiven, fetchStudents, fetchStudentsWithPets, performActionForStudent, fetchStudentDetail, fetchLeaderboard, fetchStats, createStudent, renameStudent, adoptPetForStudent, renamePetForStudent, deleteStudent }
 })
+
+if (import.meta.hot) {
+  import.meta.hot.accept(acceptHMRUpdate(useTeacherStore, import.meta.hot))
+}

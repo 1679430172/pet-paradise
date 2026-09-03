@@ -2,33 +2,39 @@
   <div class="page teacher-page students-page">
     <div class="header-row">
       <div>
+        <p class="class-label">{{ authStore.user?.class_name || '默认班级' }} · 班级成员</p>
         <h1 class="page-title">学生管理</h1>
-        <p class="class-label">{{ authStore.user?.class_name || '默认班级' }}</p>
+        <p class="page-description">记录每一份进步，为孩子们送上鼓励。</p>
       </div>
       <button class="btn btn-primary btn-sm" @click="showCreateDialog = true">+ 新增学生</button>
     </div>
 
+    <div class="student-tools card">
     <div class="search-bar">
       <input
         v-model="searchQuery"
         type="text"
         class="form-input"
         placeholder="搜索学生..."
+        aria-label="搜索学生"
         @input="handleSearch"
       />
+      <span class="result-count">显示 {{ teacherStore.students.length }} 名学生</span>
     </div>
 
-    <div v-if="teacherStore.students.length > 0" class="batch-toolbar card">
+    <div class="batch-toolbar">
       <label class="select-all">
         <input
           type="checkbox"
           :checked="allVisibleSelected"
           :indeterminate="someVisibleSelected"
+          :disabled="teacherStore.students.length === 0"
           @change="toggleSelectAll"
         />
         <span>{{ allVisibleSelected ? '取消全选' : '全选当前学生' }}</span>
       </label>
       <span class="selected-count">已选 {{ selectedStudentIds.length }} 人</span>
+      <button v-if="selectedStudentIds.length" class="clear-selection" @click="selectedStudentIds = []">清空</button>
       <button
         class="btn btn-primary btn-sm"
         :disabled="selectedStudentIds.length === 0"
@@ -37,14 +43,16 @@
         批量发积分
       </button>
     </div>
+    </div>
 
     <div v-if="teacherStore.loading" class="loading-state">加载中...</div>
-    <div v-else-if="teacherStore.students.length === 0" class="empty-state">暂无学生</div>
+    <div v-else-if="teacherStore.students.length === 0" class="empty-state card">{{ searchQuery ? '没有找到匹配的学生，试试其他名字吧。' : '班级里还没有学生，点击「新增学生」开始吧。' }}</div>
     <div v-else class="student-list">
       <div
         v-for="student in teacherStore.students"
         :key="student.id"
         class="student-card card"
+        :class="{ 'is-selected': selectedStudentIds.includes(student.id) }"
       >
         <label class="student-selector" @click.stop>
           <input
@@ -54,16 +62,17 @@
             @change="toggleStudent(student.id)"
           />
         </label>
-        <div class="student-info" @click="goDetail(student.id)">
+        <button type="button" class="student-info" :aria-label="`查看 ${student.username} 的详情`" @click="goDetail(student.id)">
           <div class="student-avatar">{{ student.username.charAt(0) }}</div>
           <div class="student-meta">
             <span class="student-name">{{ student.username }}</span>
-            <span class="student-points">{{ student.points }} 积分</span>
+            <span class="detail-hint">查看成长记录 →</span>
           </div>
-        </div>
+        </button>
+        <div class="student-points"><strong>{{ student.points }}</strong><span>可用积分</span></div>
         <div class="student-actions">
-          <button class="btn btn-primary btn-sm" @click="openAwardDialog(student)">发积分</button>
           <button class="btn btn-danger btn-sm" @click="handleDelete(student)">删除</button>
+          <button class="btn btn-primary btn-sm award-button" @click="openAwardDialog(student)">＋ 发积分</button>
         </div>
       </div>
     </div>
@@ -333,123 +342,54 @@ async function handleCreateStudent() {
   font-size: 0.9rem;
 }
 
-.search-bar {
-  margin-bottom: 16px;
-}
 
-.batch-toolbar {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 10px 14px;
-  margin-bottom: 12px;
-}
-
-.select-all {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  cursor: pointer;
-  font-size: 0.85rem;
-}
-
-.select-all input,
-.student-selector input {
-  width: 17px;
-  height: 17px;
-  accent-color: var(--color-primary);
-  cursor: pointer;
-}
-
-.selected-count {
-  margin-left: auto;
-  color: var(--color-text-muted);
-  font-size: 0.82rem;
-}
-
-.batch-toolbar .btn:disabled {
-  opacity: 0.45;
-  cursor: not-allowed;
-}
-
-.loading-state, .empty-state {
-  text-align: center;
-  color: #999;
-  padding: 32px;
-}
-
-.student-list {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-
-.student-card {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 14px 16px;
-}
-
-.student-selector {
-  display: flex;
-  align-items: center;
-  margin-right: 12px;
-}
-
-.student-info {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  cursor: pointer;
-  flex: 1;
-}
-
-.student-avatar {
-  width: 40px;
-  height: 40px;
-  border-radius: 50%;
-  background: linear-gradient(135deg, var(--color-primary), var(--color-secondary));
-  color: white;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-weight: 700;
-  font-size: 1rem;
-}
-
-.student-meta {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-
-.student-name {
-  font-weight: 600;
-  font-size: 0.95rem;
-}
-
-.student-points {
-  font-size: 0.8rem;
-  color: var(--color-success);
-}
-
-.btn-sm {
-  padding: 6px 14px;
-  font-size: 0.8rem;
-  border-radius: 8px;
-}
-
-.btn-danger {
-  background: var(--color-danger, #e74c3c);
-  color: white;
-  border: none;
-}
-
-.student-actions {
-  display: flex;
-  gap: 8px;
-  flex-shrink: 0;
+:global(#app .app-shell .students-page .page-title) { color: #344b46; margin: 6px 0; }
+.class-label { color: #82938c; font-size: .78rem; letter-spacing: .04em; }
+.page-description { color: #8c9691; font-size: .84rem; margin: 0; }
+.header-row { margin-bottom: 24px; }
+.btn-sm { padding: 9px 15px; font-size: .8rem; border-radius: 10px; }
+.students-page .btn-primary { background: #498b74; color: white; box-shadow: none; }
+.students-page .btn-primary:hover:not(:disabled) { background: #36775f; }
+.students-page .btn:disabled { opacity: .45; cursor: not-allowed; }
+.student-tools { padding: 18px 20px 0; margin-bottom: 20px; border: 1px solid #e6ebe5; box-shadow: 0 3px 12px #354e4205; border-radius: 18px; }
+.search-bar { display: flex; align-items: center; gap: 16px; padding-bottom: 16px; }
+.search-bar .form-input { max-width: 420px; background: #f8faf7; border: 1px solid #e3e9e2; border-radius: 11px; padding: 12px 14px; }
+.search-bar .form-input:focus { border-color: #79aa95; box-shadow: 0 0 0 3px #498b7410; }
+.result-count { margin-left: auto; font-size: .8rem; color: #89968f; white-space: nowrap; }
+.batch-toolbar { display: flex; align-items: center; gap: 12px; min-height: 64px; border-top: 1px solid #eef1ec; flex-wrap: wrap; padding: 12px 0; }
+.select-all { display: flex; align-items: center; gap: 9px; cursor: pointer; font-size: .82rem; color: #62766b; }
+.select-all input, .student-selector input { width: 17px; height: 17px; accent-color: #498b74; cursor: pointer; }
+.selected-count { margin-left: auto; color: #839188; font-size: .8rem; }
+.clear-selection { background: none; border: 0; color: #498b74; cursor: pointer; padding: 6px; }
+.loading-state, .empty-state { text-align: center; color: #8b968f; padding: 40px 20px; }
+:global(#app .app-shell .students-page .student-list) { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 300px), 1fr)); gap: 16px; }
+:global(#app .app-shell .students-page .student-card) { display: grid; grid-template-columns: 18px minmax(0, 1fr) auto; grid-template-rows: 62px 44px; gap: 10px 12px; padding: 18px 18px 10px; border: 1px solid #e5eae3; border-radius: 17px; box-shadow: 0 3px 12px #354e4206; transition: border-color .18s, background .18s; }
+:global(#app .app-shell .students-page .student-card.is-selected) { border-color: #84b69c; background: #f4faf5; box-shadow: 0 0 0 2px #498b740a; }
+.student-selector { display: flex; align-items: center; }
+.student-info { display: flex; align-items: center; gap: 11px; cursor: pointer; background: none; border: 0; padding: 0; color: inherit; text-align: left; font: inherit; }
+.student-avatar { width: 42px; height: 42px; border-radius: 14px; background: #e9f2eb; color: #5a876f; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 1rem; }
+.student-card:nth-child(3n+2) .student-avatar { background: #eef0f9; color: #8580aa; }
+.student-card:nth-child(3n) .student-avatar { background: #fcf0e5; color: #b18c65; }
+.student-meta { display: flex; flex-direction: column; gap: 5px; }
+.student-name { font-weight: 600; font-size: .95rem; color: #3c5047; overflow-wrap: anywhere; }
+.detail-hint { font-size: .68rem; color: #9aa69e; }
+.student-points { display: flex; flex-direction: column; gap: 3px; text-align: right; align-self: center; }
+.student-points strong { font-size: 1.2rem; color: #498b74; font-variant-numeric: tabular-nums; }
+.student-points span { font-size: .65rem; color: #96a299; }
+:global(#app .app-shell .students-page .student-actions) { display: flex; align-items: center; justify-content: space-between; grid-column: 1 / -1; border-top: 1px solid #edf0e9; padding-top: 9px; margin-left: 0; }
+.student-actions .btn { padding: 6px 10px; font-size: .75rem; box-shadow: none; }
+.student-actions .award-button { background: #ecf5ee; color: #498b74; }
+.student-actions .award-button:hover { color: white; }
+.btn-danger { background: transparent; color: #b3938b; border: none; }
+.btn-danger:hover { background: #fff0ed; color: #b96257; }
+.students-page button:focus-visible { outline: 2px solid #498b74; outline-offset: 3px; }
+@media (max-width: 540px) {
+  .student-tools { padding: 14px 14px 0; }
+  .search-bar { flex-wrap: wrap; gap: 10px; }
+  .result-count { margin-left: 0; }
+  .batch-toolbar { gap: 8px; }
+  .batch-toolbar .btn { margin-left: auto; }
+  .selected-count { font-size: .72rem; }
 }
 
 /* Dialog */

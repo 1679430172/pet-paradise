@@ -1,7 +1,7 @@
 <template>
   <div class="page teacher-page dashboard-page">
     <div class="teacher-header">
-      <h1>教师后台</h1>
+      <div><p class="dashboard-eyebrow">{{ authStore.user?.class_name || '班级管理' }}</p><h1>班级总览</h1></div>
       <button class="btn-logout" @click="handleLogout">退出</button>
     </div>
 
@@ -25,7 +25,7 @@
 
     <p v-if="revokeMessage" class="revoke-message" role="status">{{ revokeMessage }}</p>
     <div class="section">
-      <h3>积分发放记录</h3>
+      <div class="records-heading"><div><h3>积分发放记录</h3><p>每一次鼓励，都有迹可循</p></div><span class="records-count">{{ totalRecords }} 条记录</span></div>
       <div v-if="recordsLoading" class="empty-state" role="status">加载中...</div>
       <div v-else-if="recordsError" class="empty-state" role="alert">
         {{ recordsError }}
@@ -33,17 +33,20 @@
       </div>
       <div v-else-if="recentCompletions.length === 0" class="empty-state">暂无记录</div>
       <div v-else class="completion-list">
-        <div v-for="c in recentCompletions" :key="c.id" class="completion-item card">
+        <div v-for="c in recentCompletions" :key="c.id" class="completion-item card" :class="{ 'is-revoked': c.revoked_at }">
+          <span class="student-monogram" aria-hidden="true">{{ c.student_username.slice(0, 1) }}</span>
           <div class="completion-info">
             <span class="completion-student">{{ c.student_username }}</span>
             <span class="completion-task">{{ c.task_name }}</span>
             <small class="completion-date">{{ formatTime(c.created_at) }}</small>
           </div>
           <span class="completion-points" :class="{ 'revoked-points': c.revoked_at }">+{{ c.points }}</span>
-          <span v-if="c.revoked_at" class="revoked-label">已撤销</span>
-          <button v-else class="revoke-button" @click="openRevoke(c)">撤销</button>
-          <button v-if="c.revoked_at" class="completion-note revoked-detail" :title="`${formatTime(c.revoked_at)} · ${c.revoke_reason}`" @click="detailTarget = c">{{ formatTime(c.revoked_at) }} · {{ c.revoke_reason }} · 查看详情</button>
-          <span v-else class="completion-note">有效奖励</span>
+          <div class="record-footer">
+            <span v-if="c.revoked_at" class="revoked-label"><i />已撤销</span>
+            <span v-else class="active-label"><i />已发放</span>
+            <button v-if="c.revoked_at" class="revoked-detail" :title="`${formatTime(c.revoked_at)} · ${c.revoke_reason}`" @click="detailTarget = c">查看详情 →</button>
+            <button v-else class="revoke-button" @click="openRevoke(c)">撤销奖励</button>
+          </div>
         </div>
       </div>
       <nav class="pagination" aria-label="发放记录分页">
@@ -296,16 +299,28 @@ async function handleLogout() {
 
 .dashboard-page .completion-item {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto 52px;
-  grid-template-rows: minmax(0, 1fr) 20px;
+  grid-template-columns: 40px minmax(0, 1fr) auto;
+  grid-template-rows: minmax(0, 1fr) 36px;
   align-items: center;
-  gap: 6px 12px;
-  height: 132px;
-  padding: 12px 16px;
+  gap: 12px;
+  height: 148px;
+  padding: 18px 18px 10px;
+  border: 1px solid #e4ebe6;
+  border-radius: 16px;
+  box-shadow: 0 3px 12px #324c3906;
 }
+.dashboard-page .completion-item.is-revoked { background: #f9faf8; border-color: #e7e9e4; }
+.student-monogram { display: grid; place-items: center; width: 40px; height: 40px; border-radius: 13px; background: #eaf3ee; color: #4b7c62; font-size: 18px; font-weight: 600; }
+.is-revoked .student-monogram { background: #eeefeb; color: #93988e; }
 .completion-info > span, .completion-date { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.completion-points { white-space: nowrap; }
-.revoke-button, .revoked-label { justify-self: end; }
+.dashboard-page .completion-points { white-space: nowrap; color: #36795c; font-size: 23px; font-variant-numeric: tabular-nums; }
+.dashboard-page .revoked-points { color: #929b93; opacity: .65; }
+.record-footer { grid-column: 1 / -1; display: flex; justify-content: space-between; align-items: center; align-self: stretch; border-top: 1px solid #edf0ec; padding-top: 8px; }
+.active-label, .revoked-label { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: #738377; }
+.active-label i, .revoked-label i { width: 5px; height: 5px; border-radius: 50%; background: #68a284; }
+.revoked-label i { background: #b3b9ad; }
+.record-footer .revoke-button, .record-footer .revoked-detail { border: 0; background: none; padding: 5px 0 5px 12px; font-size: 12px; color: #8d7966; }
+.record-footer button:hover { color: #ad6634; text-decoration: underline; }
 
 .completion-info {
   display: flex;
@@ -355,5 +370,27 @@ async function handleLogout() {
 .page-button:disabled {
   opacity: .45;
   cursor: not-allowed;
+}
+
+.dashboard-eyebrow { margin: 0 0 5px; color: #839186; font-size: 13px; }
+.teacher-header h1 { color: #344f40; font-size: 26px; font-weight: 650; }
+.records-heading { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin: 26px 0 16px; }
+.records-heading h3 { margin: 0 0 5px; font-size: 18px; color: #344f40; }
+.records-heading p { color: #94a096; font-size: 12px; }
+.records-count { color: #7d8b80; background: #eff3ed; padding: 5px 10px; border-radius: 8px; font-size: 12px; white-space: nowrap; }
+:global(#app .app-shell .dashboard-page .stat-card) { display: grid; grid-template-columns: 48px 1fr; grid-template-rows: auto auto; column-gap: 16px; row-gap: 5px; text-align: left; align-content: center; justify-items: start; padding: 24px; min-height: 126px; border: 1px solid #e6ebe4; border-radius: 18px; box-shadow: 0 3px 14px #324c3905; }
+.dashboard-page .stat-icon { grid-row: 1 / 3; display: grid; place-items: center; width: 48px; height: 48px; background: #edf4ee; border-radius: 16px; }
+.dashboard-page .stat-card:nth-child(2) .stat-icon { background: #f2eff8; }
+.dashboard-page .stat-card:nth-child(3) .stat-icon { background: #fbf4e5; }
+:global(#app .app-shell .dashboard-page .stat-value) { color: #395744; font-size: 30px; line-height: 1.1; font-variant-numeric: tabular-nums; }
+.dashboard-page .stat-label { color: #8c978e; font-size: 12px; }
+.dashboard-page .pagination { border-top: 1px solid #e9ede6; padding-top: 18px; font-size: 12px; color: #8b978e; }
+.dashboard-page .page-button { border-color: #e0e8df; border-radius: 9px; color: #63816b; font-size: 12px; }
+.dashboard-page .revoke-message { font-size: 13px; border: 1px solid #d8eadb; }
+:global(#app .app-shell .dashboard-page .completion-list) { gap: 14px; }
+@media (max-width: 600px) {
+  :global(#app .app-shell .dashboard-page .stat-card) { grid-template-columns: 1fr; justify-items: center; text-align: center; padding: 14px 8px; gap: 8px; }
+  .dashboard-page .stat-icon { grid-row: auto; width: 36px; height: 36px; border-radius: 12px; font-size: 18px; }
+  :global(#app .app-shell .dashboard-page .stat-value) { font-size: 24px; }
 }
 </style>

@@ -19,12 +19,14 @@
       <div v-if="pets.length > 0" class="pet-section card">
         <h3>宠物列表（{{ pets.length }}）</h3>
         <div v-for="p in pets" :key="p.id" class="pet-item">
-          <PetAvatar
-            :species="p.species"
-            :level="p.level"
-            :size="56"
-            show-stage
-          />
+          <div class="pet-showcase">
+            <PetAvatar
+              :species="p.species"
+              :level="p.level"
+              :size="120"
+              show-stage
+            />
+          </div>
           <div class="pet-item-info">
             <div class="pet-detail">
               <span class="pet-species">{{ p.name }}</span>
@@ -32,9 +34,17 @@
             </div>
             <div class="pet-stats">
               <div class="pet-stat">
-                <span>饱食</span>
+                <span>饱食度</span>
                 <div class="stat-bar"><div class="stat-fill" :style="{ width: (p.hunger || 0) + '%' }"></div></div>
               </div>
+              <div class="stat-caption">{{ Math.round(p.hunger || 0) }} / 100</div>
+              <div class="pet-stat">
+                <span>经验</span>
+                <div class="stat-bar" role="progressbar" :aria-label="`${p.name}的升级进度`" :aria-valuenow="xpProgress(p)" :aria-valuemin="0" :aria-valuemax="100" :aria-valuetext="xpLabel(p)">
+                  <div class="stat-fill xp" :style="{ width: xpProgress(p) + '%' }"></div>
+                </div>
+              </div>
+              <div class="stat-caption">{{ xpLabel(p) }}</div>
             </div>
           </div>
         </div>
@@ -120,7 +130,7 @@
 import { ref, computed, nextTick, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useTeacherStore, type TeacherPet } from '../../stores/teacher'
-import { PET_COLORS, MAX_LEVEL } from '../../lib/constants'
+import { PET_COLORS, MAX_LEVEL, LEVEL_THRESHOLDS } from '../../lib/constants'
 import PetAvatar from '../../components/pet/PetAvatar.vue'
 import PetAdoptionFields from '../../components/pet/PetAdoptionFields.vue'
 
@@ -152,6 +162,18 @@ const renameInput = ref<HTMLInputElement | null>(null)
 const canAdoptNew = computed(() => {
   return pets.value.length === 0 || pets.value.every(p => (p.level || 1) >= MAX_LEVEL)
 })
+
+function xpProgress(pet: TeacherPet): number {
+  if (pet.level >= MAX_LEVEL) return 100
+  const previous = pet.level > 1 ? LEVEL_THRESHOLDS[pet.level - 1] : 0
+  const next = LEVEL_THRESHOLDS[pet.level] || previous
+  if (next <= previous) return 100
+  return Math.max(0, Math.min(100, (((pet.xp || 0) - previous) / (next - previous)) * 100))
+}
+
+function xpLabel(pet: TeacherPet): string {
+  return pet.level >= MAX_LEVEL ? '已满级' : `${pet.xp || 0}/${LEVEL_THRESHOLDS[pet.level]} XP`
+}
 
 function formatTime(dateStr: string) {
   const d = new Date(dateStr)
@@ -273,6 +295,22 @@ async function handleAdopt() {
   margin-bottom: 16px;
 }
 
+@media (min-width: 768px) {
+  :global(#app .app-shell .student-detail-page > .profile-section),
+  :global(#app .app-shell .student-detail-page > .pet-section),
+  :global(#app .app-shell .student-detail-page > .empty-pet-card) {
+    align-self: stretch;
+    margin-bottom: 0;
+  }
+
+  .profile-section {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+  }
+}
+
 .student-avatar-lg {
   width: 64px;
   height: 64px;
@@ -338,9 +376,27 @@ async function handleAdopt() {
 
 .pet-item {
   display: flex;
-  gap: 12px;
+  align-items: center;
+  gap: 20px;
   padding: 10px 0;
   border-bottom: 1px dashed #eee;
+}
+
+.pet-showcase {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 132px;
+  height: 140px;
+  border-radius: 24px;
+  background: radial-gradient(ellipse at 50% 65%, #fce3ef 0%, #fff5fa 55%, #faf8ff 100%);
+  border: 1px solid #f6e8ef;
+}
+
+@media (max-width: 540px) {
+  .pet-item { flex-direction: column; gap: 14px; padding: 18px 0; }
+  .pet-showcase { flex: none; width: 132px; }
+  .pet-item-info { width: 100%; }
 }
 
 .pet-item:last-of-type {
@@ -395,12 +451,14 @@ async function handleAdopt() {
   color: #666;
 }
 
-.pet-stat span {
-  width: 36px;
+.pet-stat > span {
+  flex: 0 0 3em;
+  white-space: nowrap;
 }
 
 .stat-bar {
   flex: 1;
+  min-width: 0;
   height: 8px;
   background: #eee;
   border-radius: 4px;
@@ -414,8 +472,8 @@ async function handleAdopt() {
   transition: width 0.3s;
 }
 
-.stat-fill.happy { background: #F59E0B; }
-.stat-fill.clean { background: #06B6D4; }
+.stat-fill.xp { background: linear-gradient(90deg, #a855f7, #ec4899); }
+.stat-caption { text-align: right; color: #8b8195; font-size: .72rem; font-variant-numeric: tabular-nums; }
 
 .history-section {
   margin-top: 16px;
