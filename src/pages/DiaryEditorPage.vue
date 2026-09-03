@@ -2,6 +2,7 @@
   <div class="page diary-editor-page">
     <h1 class="page-title">写日记</h1>
 
+    <p v-if="submitError" class="form-error" role="alert">{{ submitError }}</p>
     <form class="editor-form" @submit.prevent="handleSubmit">
       <div class="form-group">
         <label class="form-label">标题</label>
@@ -72,6 +73,7 @@ const file = ref<File | null>(null)
 const previewUrl = ref('')
 const fileInput = ref<HTMLInputElement | null>(null)
 const submitting = ref(false)
+const submitError = ref('')
 
 function handleFileChange(e: Event) {
   const input = e.target as HTMLInputElement
@@ -82,6 +84,8 @@ function handleFileChange(e: Event) {
 }
 
 async function handleSubmit() {
+  if (submitting.value) return
+  submitError.value = ''
   submitting.value = true
   let imageUrl: string | null = null
 
@@ -89,7 +93,7 @@ async function handleSubmit() {
     imageUrl = await diaryStore.uploadImage(file.value)
   }
 
-  await diaryStore.createEntry({
+  const result = await diaryStore.createEntry({
     title: title.value,
     content: content.value,
     mood: mood.value,
@@ -98,6 +102,10 @@ async function handleSubmit() {
   })
 
   submitting.value = false
+  if (result.error) {
+    submitError.value = typeof result.error === 'string' ? result.error : '发布失败，请稍后重试'
+    return
+  }
   router.push('/diary')
 }
 </script>

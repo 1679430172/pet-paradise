@@ -1,45 +1,49 @@
 <template>
   <div class="page teacher-page stats-page">
-    <h1 class="page-title">排行榜</h1>
-
-    <div v-if="teacherStore.loading" class="loading-state">加载中...</div>
+    <div class="ranking-heading"><div><h1 class="page-title">本周成长榜</h1>
+      <p class="ranking-note">{{ weekLabel }} · 北京时间</p></div>
+      <button class="btn btn-secondary" :disabled="teacherStore.leaderboardLoading" @click="teacherStore.fetchLeaderboard()">刷新</button>
+    </div>
+    <p class="ranking-rule">按本周获得的任务与日记奖励积分排名，喂食消费不影响排名。同分并列，每周一重新统计。</p>
+    <div v-if="teacherStore.leaderboardError" role="alert" class="ranking-error">{{ teacherStore.leaderboardError }}</div>
+    <div v-else-if="teacherStore.leaderboardLoading" class="loading-state">正在统计本周成长...</div>
     <div v-else class="leaderboard">
-      <div
-        v-for="(entry, index) in teacherStore.leaderboard"
-        :key="entry.id"
-        class="rank-item card"
-      >
-        <div class="rank-badge" :class="getRankClass(index)">{{ index + 1 }}</div>
-        <div class="rank-info">
-          <span class="rank-name">{{ entry.username }}</span>
-          <span class="rank-pet">{{ entry.pet_name }} · Lv.{{ entry.pet_level }}</span>
+      <div v-for="entry in teacherStore.leaderboard" :key="entry.id" class="rank-item card">
+        <div class="rank-badge" :class="getRankClass(entry.rank)">{{ entry.rank ?? '—' }}</div>
+        <div class="rank-info"><span class="rank-name">{{ entry.username }}</span>
+          <span class="rank-pet">{{ entry.pet_name }}<template v-if="entry.pet_level"> · Lv.{{ entry.pet_level }}</template></span>
         </div>
-        <div class="rank-points">{{ entry.points }} <small>积分</small></div>
+        <div class="rank-points">{{ entry.points }} <small>本周获得</small></div>
       </div>
-      <div v-if="teacherStore.leaderboard.length === 0" class="empty-state">暂无学生数据</div>
+      <div v-if="teacherStore.leaderboard.length === 0" class="empty-state">班级里还没有学生</div>
+      <p v-else-if="teacherStore.leaderboard.every(entry => entry.points === 0)" class="empty-state">新的一周开始啦，完成任务就能点亮本周成长榜。</p>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { onMounted } from 'vue'
+import { computed, onMounted } from 'vue'
 import { useTeacherStore } from '../../stores/teacher'
-
 const teacherStore = useTeacherStore()
-
-onMounted(() => {
-  teacherStore.fetchLeaderboard()
+const weekLabel = computed(() => {
+  const { start, end } = teacherStore.leaderboardWeek
+  if (!start || !end) return '本周'
+  const format = (date: Date) => date.toLocaleDateString('zh-CN', { timeZone: 'Asia/Shanghai', month: 'numeric', day: 'numeric' })
+  return `${format(new Date(start))} — ${format(new Date(new Date(end).getTime() - 1))}`
 })
-
-function getRankClass(index: number) {
-  if (index === 0) return 'gold'
-  if (index === 1) return 'silver'
-  if (index === 2) return 'bronze'
-  return ''
+onMounted(() => teacherStore.fetchLeaderboard())
+function getRankClass(rank: number | null) {
+  return rank === 1 ? 'gold' : rank === 2 ? 'silver' : rank === 3 ? 'bronze' : ''
 }
 </script>
 
 <style scoped>
+.ranking-heading { display: flex; justify-content: space-between; align-items: center; gap: 16px; }
+.ranking-heading .page-title { margin-bottom: 6px; }
+.ranking-note, .ranking-rule { color: #666; line-height: 1.7; }
+.ranking-rule { margin: 20px 0; padding: 16px; background: #fff7e7; border-radius: 14px; }
+.ranking-error { padding: 20px; color: #aa2841; background: #fff0f3; border-radius: 12px; }
+
 .teacher-page {
   padding-bottom: 80px;
 }

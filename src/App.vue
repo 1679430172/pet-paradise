@@ -19,12 +19,12 @@ const authStore = useAuthStore()
 const hideNavRoutes = ['login', 'register', 'pet-create']
 
 const showStudentNav = computed(() => {
-  if (hideNavRoutes.includes(route.name as string)) return false
+  if (hideNavRoutes.includes(route.name as string) || (route.name === 'teacher-pets' && route.query.classroom === '1')) return false
   return authStore.user && !authStore.isTeacher
 })
 
 const showTeacherNav = computed(() => {
-  if (hideNavRoutes.includes(route.name as string)) return false
+  if (hideNavRoutes.includes(route.name as string) || (route.name === 'teacher-pets' && route.query.classroom === '1')) return false
   return authStore.user && authStore.isTeacher
 })
 </script>

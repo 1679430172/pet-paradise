@@ -3,8 +3,7 @@ import { ref } from 'vue'
 import { supabase } from '../lib/supabase'
 import { useAuthStore } from './auth'
 import { usePetStore } from './pet'
-import { usePointsStore } from './points'
-import { DIARY_XP, PHOTO_XP } from '../lib/constants'
+import { classroomRpc } from '../lib/classroomApi'
 
 export interface DiaryEntry {
   id: string
@@ -35,62 +34,23 @@ export const useDiaryStore = defineStore('diary', () => {
     loading.value = false
   }
 
-  async function isFirstDiaryToday(): Promise<boolean> {
-    const authStore = useAuthStore()
-    if (!authStore.user) return false
-
-    const today = new Date()
-    today.setHours(0, 0, 0, 0)
-    const todayISO = today.toISOString()
-
-    const { count } = await supabase
-      .from('diary_entries')
-      .select('id', { count: 'exact', head: true })
-      .eq('owner_id', authStore.user.id)
-      .gte('created_at', todayISO)
-
-    return (count ?? 0) === 0
-  }
-
   async function createEntry(entry: {
-    title: string
-    content: string
-    image_url?: string | null
-    mood: string
-    is_public: boolean
+    title: string; content: string; image_url?: string | null; mood: string; is_public: boolean
   }) {
     const authStore = useAuthStore()
     const petStore = usePetStore()
-    const pointsStore = usePointsStore()
     if (!authStore.user || !petStore.pet) return { error: '未登录' }
-
-    // 先检查是否是今天第一篇
-    const firstToday = await isFirstDiaryToday()
-
-    const { data, error } = await supabase
-      .from('diary_entries')
-      .insert({
-        owner_id: authStore.user.id,
-        pet_id: petStore.pet.id,
-        ...entry,
+    try {
+      const result = await classroomRpc<{ entry: DiaryEntry; points: number; reward: number }>('publish_diary', {
+        p_actor_id: authStore.user.id, p_pet_id: petStore.pet.id,
+        p_entry: entry, p_request_id: crypto.randomUUID(),
       })
-      .select()
-      .single()
-
-    if (!error && data) {
-      entries.value.unshift(data)
-      // 奖励经验值
-      let xp = DIARY_XP
-      if (entry.image_url) xp += PHOTO_XP
-      await petStore.addXp(xp)
-
-      // 每天第一篇日记奖励积分
-      if (firstToday) {
-        await pointsStore.fetchDiaryPoints()
-        await pointsStore.earnPoints(pointsStore.diaryPoints)
-      }
+      entries.value.unshift(result.entry)
+      authStore.user.points = result.points
+      return { data: result.entry, error: null, earnedPoints: result.reward > 0 }
+    } catch (error) {
+      return { data: null, error: error instanceof Error ? error.message : '发布失败', earnedPoints: false }
     }
-    return { data, error, earnedPoints: firstToday ? true : false }
   }
 
   async function deleteEntry(id: string) {

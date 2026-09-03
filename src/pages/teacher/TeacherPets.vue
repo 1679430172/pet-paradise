@@ -1,8 +1,17 @@
 <template>
-  <div class="page teacher-page pets-page">
+  <div class="page teacher-page pets-page" :class="{ 'classroom-mode': classroomMode, 'classroom-compact': classroomMode && classroomDensity === 180 }" :style="classroomMode ? { '--classroom-card-width': classroomDensity + 'px' } : {}">
     <div class="page-title-row">
-      <h1 class="page-title">学生宠物</h1>
-      <button class="btn btn-primary batch-entry-btn" :disabled="batchPetOptions.length === 0" @click="openBatchFeedDialog">批量投喂</button>
+      <div><p v-if="classroomMode" class="classroom-eyebrow">{{ authStore.user?.class_name || '我们的班级' }} · {{ teacherStore.studentsWithPets.length }} 位同学</p>
+        <h1 class="page-title">{{ classroomMode ? '今天，也在一起长大' : '学生宠物' }}</h1></div>
+      <div class="page-actions">
+        <button v-if="!classroomMode" class="btn btn-secondary" @click="enterClassroom">课堂大屏</button>
+        <template v-else>
+          <select v-model="classroomDensity" class="form-input density-select" aria-label="卡片大小"><option :value="180">紧凑</option><option :value="230">标准</option><option :value="300">大字</option></select>
+          <button class="btn btn-secondary" @click="toggleFullscreen">{{ fullscreen ? '退出全屏' : '全屏显示' }}</button>
+          <button class="btn btn-secondary" @click="exitClassroom">返回普通视图</button>
+        </template>
+      <button class="btn btn-primary batch-entry-btn" :disabled="batchPetOptions.length === 0 || awarding || !!busyKey || batchFeeding" @click="openBatchFeedDialog">批量投喂</button>
+      </div>
     </div>
 
     <div class="search-bar">
@@ -11,6 +20,7 @@
         type="text"
         class="form-input"
         placeholder="搜索学生..."
+        :disabled="awarding"
         @input="handleSearch"
       />
       <label class="sort-control">
@@ -30,16 +40,30 @@
       按当前显示的宠物排序，未领养的学生排在最后。饱食度越低，宠物越饿。
     </p>
 
+    <section v-if="classroomMode" class="classroom-award-bar" aria-label="课堂快捷奖励">
+      <label class="classroom-select-all"><input type="checkbox" :checked="allAwardSelected" :disabled="awarding" @change="toggleAwardAll" />全选当前学生</label>
+      <span>已选 <strong>{{ awardStudentIds.length }}</strong> 人</span>
+      <select v-model="awardTaskId" class="form-input classroom-task" :disabled="awarding" aria-label="选择奖励任务">
+        <option value="">选择奖励任务</option><option v-for="task in tasksStore.tasks" :key="task.id" :value="task.id">{{ task.name }} +{{ task.points }}分</option>
+      </select>
+      <button class="btn btn-primary" :disabled="!awardTaskId || !awardStudentIds.length || awarding || !!busyKey || batchFeeding" @click="awardSelected">{{ awarding ? '正在发放...' : '发放奖励' }}</button>
+      <button v-if="awardStudentIds.length" class="btn btn-secondary" :disabled="awarding" @click="awardStudentIds = []">清空选择</button>
+      <p v-if="!tasksStore.tasks.length" class="classroom-task-hint">请先在任务管理中创建奖励任务。</p>
+    </section>
+    <div v-if="classroomNotice && classroomMode" class="classroom-notice" role="status">{{ classroomNotice }}</div>
+    <ul v-if="classroomMode && awardFailures.length" class="classroom-failures"><li v-for="failure in awardFailures" :key="failure.studentId">{{ teacherStore.studentsWithPets.find(s => s.id === failure.studentId)?.username || '学生' }}：{{ failure.message }}</li></ul>
     <div v-if="initialLoading" class="loading-state">加载中...</div>
-    <div v-else-if="teacherStore.studentsWithPets.length === 0" class="empty-state">暂无学生</div>
+    <div v-else-if="sortedStudents.length === 0" class="empty-state">暂无匹配的学生</div>
     <div v-else class="pet-list">
       <div
         v-for="s in sortedStudents"
         :key="s.id"
         class="pet-card card"
-        :class="{ 'empty-adopt-card': !activePet(s) }"
+        :class="{ 'empty-adopt-card': !activePet(s), 'award-selected': classroomMode && awardStudentIds.includes(s.id), 'award-bounce': !!awardBubbles[s.id] }"
         :style="cardStyle(s)"
       >
+        <label v-if="classroomMode" class="classroom-student-select"><input type="checkbox" :checked="awardStudentIds.includes(s.id)" :disabled="awarding" @change="toggleAwardStudent(s.id)" :aria-label="`选择 ${s.username}`" />选择</label>
+        <Transition name="speech-pop"><div v-if="awardBubbles[s.id]" class="award-bubble" role="status">{{ awardBubbles[s.id] }}</div></Transition>
         <!-- 左上角：积分 -->
         <span class="points-badge">{{ s.points }}分</span>
 
@@ -75,7 +99,7 @@
             <PetAvatar
               :species="activePet(s)!.species"
               :level="activePet(s)!.level"
-              :size="160"
+              :size="classroomMode ? (classroomDensity === 180 ? 110 : 140) : 160"
               show-stage
             />
             <Transition name="speech-pop">
@@ -108,7 +132,7 @@
           <div class="action-row">
             <button
               class="btn-action"
-              :disabled="busyKey === activePet(s)!.id || s.points < pointsStore.actionCosts.basic"
+              :disabled="!!busyKey || batchFeeding || awarding || s.points < pointsStore.actionCosts.basic"
               @click="handleAction(s, activePet(s)!, 'basic')"
               :title="`普通粮 -${pointsStore.actionCosts.basic}`"
             >
@@ -117,7 +141,7 @@
             </button>
             <button
               class="btn-action"
-              :disabled="busyKey === activePet(s)!.id || s.points < pointsStore.actionCosts.nice"
+              :disabled="!!busyKey || batchFeeding || awarding || s.points < pointsStore.actionCosts.nice"
               @click="handleAction(s, activePet(s)!, 'nice')"
               :title="`营养粮 -${pointsStore.actionCosts.nice}`"
             >
@@ -126,7 +150,7 @@
             </button>
             <button
               class="btn-action"
-              :disabled="busyKey === activePet(s)!.id || s.points < pointsStore.actionCosts.luxury"
+              :disabled="!!busyKey || batchFeeding || awarding || s.points < pointsStore.actionCosts.luxury"
               @click="handleAction(s, activePet(s)!, 'luxury')"
               :title="`豪华粮 -${pointsStore.actionCosts.luxury}`"
             >
@@ -260,6 +284,7 @@
               <b v-for="n in 16" :key="n" class="fx-particle" :style="{ '--i': n }">✦</b>
             </div>
             <PetAvatar :species="levelUpShowcasePet.species" :level="levelUpShowcasePet.level" :size="210" show-stage />
+            <span v-if="classroomMode" class="upgrade-student-name">{{ levelUpShowcasePet.studentName }} · {{ levelUpShowcasePet.name }}</span>
             <strong>升级成功 · Lv.{{ levelUpShowcasePet.level }}</strong>
           </div>
         </div>
@@ -272,6 +297,9 @@
 
 <script setup lang="ts">
 import { ref, computed, nextTick, onMounted, onUnmounted } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
+import { useAuthStore } from '../../stores/auth'
+import { useTasksStore } from '../../stores/tasks'
 import { useTeacherStore, type StudentWithPet, type TeacherPet } from '../../stores/teacher'
 import { usePointsStore } from '../../stores/points'
 import { PET_COLORS, MAX_LEVEL, LEVEL_THRESHOLDS, getFeedingReply } from '../../lib/constants'
@@ -281,6 +309,71 @@ import PetAdoptionFields from '../../components/pet/PetAdoptionFields.vue'
 const teacherStore = useTeacherStore()
 const pointsStore = usePointsStore()
 const initialLoading = ref(true)
+const route = useRoute()
+const router = useRouter()
+const authStore = useAuthStore()
+const tasksStore = useTasksStore()
+const classroomMode = computed(() => route.query.classroom === '1')
+const classroomDensity = ref(230)
+const fullscreen = ref(false)
+const awardStudentIds = ref<string[]>([])
+const awardTaskId = ref('')
+const awarding = ref(false)
+const classroomNotice = ref('')
+const awardFailures = ref<{ studentId: string; message: string }[]>([])
+const awardBubbles = ref<Record<string, string>>({})
+const awardTimers = new Map<string, ReturnType<typeof setTimeout>>()
+const allAwardSelected = computed(() => sortedStudents.value.length > 0 && sortedStudents.value.every(s => awardStudentIds.value.includes(s.id)))
+
+async function enterClassroom() {
+  await router.replace({ query: { ...route.query, classroom: '1' } })
+  await tasksStore.fetchTasks()
+}
+async function exitClassroom() {
+  if (document.fullscreenElement) await document.exitFullscreen().catch(() => {})
+  const query = { ...route.query }
+  delete query.classroom
+  await router.replace({ query })
+}
+async function toggleFullscreen() {
+  try {
+    if (document.fullscreenElement) await document.exitFullscreen()
+    else await document.documentElement.requestFullscreen()
+  } catch {
+    classroomNotice.value = '当前浏览器未允许全屏，仍可使用课堂大屏。'
+  }
+}
+function syncFullscreen() { fullscreen.value = !!document.fullscreenElement }
+function toggleAwardStudent(id: string) {
+  if (awarding.value) return
+  awardStudentIds.value = awardStudentIds.value.includes(id) ? awardStudentIds.value.filter(x => x !== id) : [...awardStudentIds.value, id]
+}
+function toggleAwardAll() {
+  if (awarding.value) return
+  awardStudentIds.value = allAwardSelected.value ? [] : sortedStudents.value.map(s => s.id)
+}
+async function awardSelected() {
+  if (awarding.value || !awardStudentIds.value.length || !awardTaskId.value) return
+  awarding.value = true
+  awardFailures.value = []
+  const taskName = tasksStore.tasks.find(t => t.id === awardTaskId.value)?.name || '课堂奖励'
+  try {
+    const result = await tasksStore.awardPointsToStudents([...awardStudentIds.value], awardTaskId.value)
+    for (const id of result.awardedStudentIds) {
+      const student = teacherStore.studentsWithPets.find(s => s.id === id)
+      if (student) student.points = result.balances[id] ?? student.points
+      awardBubbles.value[id] = `${taskName} +${result.points}`
+      clearTimeout(awardTimers.get(id))
+      awardTimers.set(id, setTimeout(() => { delete awardBubbles.value[id]; awardTimers.delete(id) }, 3800))
+    }
+    awardFailures.value = result.failures
+    awardStudentIds.value = awardStudentIds.value.filter(id => !result.awardedStudentIds.includes(id))
+    classroomNotice.value = result.error
+      ? `已奖励 ${result.awardedCount} 人，${awardStudentIds.value.length} 人未完成：${result.error.message}。请先确认结果再重试。`
+      : `已为 ${result.awardedCount} 位同学发放「${taskName}」奖励！`
+  } finally { awarding.value = false }
+}
+
 
 const searchQuery = ref('')
 type PetSort = 'default' | 'name-asc' | 'name-desc' | 'level-asc' | 'level-desc' | 'hunger-asc' | 'hunger-desc'
@@ -289,7 +382,7 @@ const nameCollator = new Intl.Collator('zh-CN', { numeric: true, sensitivity: 'b
 const busyKey = ref<string | null>(null)
 const toast = ref('')
 const petReplies = ref<Record<string, string>>({})
-const levelUpShowcasePet = ref<TeacherPet | null>(null)
+const levelUpShowcasePet = ref<(TeacherPet & { studentName: string }) | null>(null)
 const selectedPetIds = ref<string[]>([])
 const showBatchFeedDialog = ref(false)
 const batchFeeding = ref(false)
@@ -304,7 +397,7 @@ const batchFoods = [
 const petIdx = ref<Record<string, number>>({})
 
 const sortedStudents = computed(() => {
-  const students = [...teacherStore.studentsWithPets]
+  const students = teacherStore.studentsWithPets.filter(s => s.username.toLocaleLowerCase().includes(searchQuery.value.trim().toLocaleLowerCase()))
   const sort = sortBy.value
   if (sort === 'default') return students
   const direction = sort.endsWith('asc') ? 1 : -1
@@ -342,7 +435,7 @@ const renameError = ref('')
 const renaming = ref(false)
 const renameInput = ref<HTMLInputElement | null>(null)
 const replyTimers = new Map<string, ReturnType<typeof setTimeout>>()
-const levelUpQueue: TeacherPet[] = []
+const levelUpQueue: (TeacherPet & { studentName: string })[] = []
 let levelUpTimer: ReturnType<typeof setTimeout> | undefined
 
 const batchPetOptions = computed(() => teacherStore.studentsWithPets.flatMap(student => student.pets.map(pet => ({ student, pet }))))
@@ -417,7 +510,7 @@ function closeBatchFeedDialog() {
 }
 
 async function handleBatchFeed(action: 'basic' | 'nice' | 'luxury') {
-  if (batchFeeding.value || selectedPetIds.value.length === 0) return
+  if (batchFeeding.value || awarding.value || busyKey.value || selectedPetIds.value.length === 0) return
   const selectedIds = new Set(selectedPetIds.value)
   const targets = teacherStore.studentsWithPets.flatMap(student => student.pets
     .filter(pet => selectedIds.has(pet.id))
@@ -452,10 +545,13 @@ function cardStyle(s: StudentWithPet) {
 }
 
 onMounted(async () => {
+  syncFullscreen()
+  document.addEventListener('fullscreenchange', syncFullscreen)
   try {
     await Promise.all([
       teacherStore.fetchStudentsWithPets(undefined, true),
       pointsStore.fetchActionCosts(),
+      tasksStore.fetchTasks(),
     ])
   } finally {
     initialLoading.value = false
@@ -463,12 +559,15 @@ onMounted(async () => {
 })
 
 onUnmounted(() => {
+  document.removeEventListener('fullscreenchange', syncFullscreen)
+  awardTimers.forEach(timer => clearTimeout(timer))
+  if (classroomMode.value && document.fullscreenElement) void document.exitFullscreen().catch(() => {})
   replyTimers.forEach(timer => clearTimeout(timer))
   if (levelUpTimer) clearTimeout(levelUpTimer)
 })
 
 function handleSearch() {
-  teacherStore.fetchStudentsWithPets(searchQuery.value || undefined, true)
+  if (!awarding.value) awardStudentIds.value = []
 }
 
 function showToast(msg: string) {
@@ -477,7 +576,7 @@ function showToast(msg: string) {
 }
 
 async function handleAction(s: StudentWithPet, p: TeacherPet, action: 'basic' | 'nice' | 'luxury') {
-  if (!p.id) return
+  if (!p.id || busyKey.value || batchFeeding.value || awarding.value) return
   busyKey.value = p.id
   const result = await teacherStore.performActionForStudent(s.id, p.id, action)
   busyKey.value = null
@@ -507,7 +606,8 @@ function showPetReply(petId: string, reply: string) {
 function showLevelUpEffect(petId: string) {
   const pet = teacherStore.studentsWithPets.flatMap(student => student.pets).find(item => item.id === petId)
   if (!pet) return
-  levelUpQueue.push({ ...pet })
+  const studentName = teacherStore.studentsWithPets.find(student => student.pets.some(p => p.id === petId))?.username || ''
+  levelUpQueue.push({ ...pet, studentName })
   if (levelUpShowcasePet.value) return
   const showNext = () => {
     levelUpShowcasePet.value = levelUpQueue.shift() || null
@@ -611,6 +711,35 @@ async function handleAdopt() {
 </script>
 
 <style scoped>
+.page-actions { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+:global(#app .app-shell .page.classroom-mode) { position: fixed; inset: 0; z-index: 100; width: 100%; max-width: none; overflow-y: auto; padding: 30px 36px 50px; background: radial-gradient(ellipse at 10% 0%, #e0f4e9, transparent 55%), #f5f7ef; }
+.classroom-mode .page-title { font-size: clamp(24px, 2.4vw, 38px); color: #254d42; }
+.classroom-eyebrow { color: #53736a; margin: 0 0 8px; font-size: 16px; }
+.density-select { width: auto; }
+.classroom-award-bar { position: sticky; top: 0; z-index: 40; display: flex; align-items: center; flex-wrap: wrap; gap: 14px; background: #ffffffed; border: 1px solid #d4e4d9; border-radius: 18px; padding: 16px; margin-bottom: 20px; box-shadow: 0 8px 25px #24473510; backdrop-filter: blur(12px); }
+.classroom-select-all { display: flex; align-items: center; gap: 8px; }
+.classroom-task { flex: 1 1 200px; width: auto; max-width: 400px; }
+.classroom-task-hint { width: 100%; color: #6c766a; }
+.classroom-notice { padding: 12px 18px; color: #285b43; background: #e3f3e7; border-radius: 12px; margin-bottom: 18px; }
+.classroom-failures { padding: 14px 34px; color: #a33441; background: #fff0ef; border-radius: 12px; }
+:global(#app .app-shell .classroom-mode .pet-list) { grid-template-columns: repeat(auto-fill, minmax(min(100%, var(--classroom-card-width)), 1fr)); gap: 20px; }
+.classroom-mode .pet-card { border: 3px solid transparent; border-radius: 24px; padding-top: 56px; }
+.classroom-mode .pet-card.award-selected { border-color: #297d60; box-shadow: 0 0 0 3px #297d6022; }
+.classroom-mode .pet-stage { height: 150px; }
+.classroom-compact .pet-stage { height: 120px; }
+.classroom-compact .pet-card { gap: 5px; }
+.classroom-mode .pet-name { font-size: 25px; overflow-wrap: anywhere; }
+.classroom-mode .pet-name-top { top: 32px; }
+.classroom-mode .rename-pet-btn, .classroom-mode .adopt-mini-btn { display: none; }
+.classroom-student-select { display: flex; gap: 5px; align-items: center; position: absolute; top: 8px; left: 50%; transform: translateX(-50%); font-size: 13px; cursor: pointer; }
+.classroom-student-select input, .classroom-select-all input { accent-color: #297d60; width: 18px; height: 18px; }
+.award-bubble { position: absolute; z-index: 35; top: 80px; left: 8px; right: 8px; background: #fff9d9; color: #77510a; padding: 12px; border-radius: 15px; font-weight: 800; text-align: center; box-shadow: 0 6px 18px #55400025; overflow-wrap: anywhere; }
+.award-bounce .pet-stage { animation: reward-hop .7s ease 2; }
+.upgrade-student-name { font-size: 30px; font-weight: 800; color: #fff; text-shadow: 0 2px 10px #444; }
+@keyframes reward-hop { 0%,100% { transform: translateY(0); } 45% { transform: translateY(-18px) rotate(-4deg); } 70% { transform: translateY(-5px) rotate(3deg); } }
+@media (max-width: 700px) { :global(#app .app-shell .page.classroom-mode) { padding: 18px 12px 40px; } .classroom-mode .page-title-row { align-items: flex-start; flex-direction: column; } .classroom-award-bar { gap: 10px; } }
+@media (prefers-reduced-motion: reduce) { .award-bounce .pet-stage { animation: none; } }
+
 .teacher-page {
   padding-bottom: 80px;
 }

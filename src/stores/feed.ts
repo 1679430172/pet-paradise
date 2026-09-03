@@ -96,7 +96,7 @@ export const useFeedStore = defineStore('feed', () => {
       item.likes_count++
 
       // 给被赞的宠物主人加经验（如果不是自己）
-      if (ownerId !== authStore.user.id) {
+      if (LIKE_XP > 0 && ownerId !== authStore.user.id) {
         const { data: ownerPet } = await supabase
           .from('pets')
           .select('id, xp, level')

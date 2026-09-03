@@ -2,8 +2,8 @@ import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import { supabase } from '../lib/supabase'
 import { hashPassword } from './auth'
-import { usePointsStore } from './points'
-import { ACTIONS, LEVEL_THRESHOLDS, MAX_LEVEL, STAT_DECAY_PER_HOUR } from '../lib/constants'
+import { feedPet, classroomRpc } from '../lib/classroomApi'
+import { MAX_LEVEL, STAT_DECAY_PER_HOUR } from '../lib/constants'
 import type { Profile } from './auth'
 import { useAuthStore } from './auth'
 
@@ -27,6 +27,7 @@ export interface StudentWithPet extends Profile {
 }
 
 export interface LeaderboardEntry {
+  rank: number | null
   id: string
   username: string
   points: number
@@ -126,76 +127,27 @@ export const useTeacherStore = defineStore('teacher', () => {
     }
   }
 
-  function calculateLevel(xp: number): number {
-    for (let i = LEVEL_THRESHOLDS.length - 1; i >= 0; i--) {
-      if (xp >= LEVEL_THRESHOLDS[i]) return Math.min(MAX_LEVEL, i + 1)
-    }
-    return 1
-  }
-
+  const feedingStudents = new Set<string>()
   async function performActionForStudent(studentId: string, petId: string, action: 'basic' | 'nice' | 'luxury') {
-    const currentTeacherId = teacherId()
-    if (!currentTeacherId) return { error: new Error('未登录') }
-    const pointsStore = usePointsStore()
-    await pointsStore.fetchActionCosts()
-    const cost = pointsStore.actionCosts[action]
-
-    const { data: student } = await supabase
-      .from('profiles')
-      .select('points')
-      .eq('id', studentId)
-      .eq('teacher_id', currentTeacherId)
-      .single()
-    if (!student) return { error: new Error('学生不存在') }
-    if (student.points < cost) {
-      return { error: new Error(`学生积分不足，需要 ${cost} 积分`) }
-    }
-
-    const { data: pet } = await supabase
-      .from('pets')
-      .select('*')
-      .eq('id', petId)
-      .eq('owner_id', studentId)
-      .single()
-    if (!pet) return { error: new Error('宠物不存在') }
-
-    const config = ACTIONS[action]
-    const currentHunger = hungerWithDecay(pet)
-    const newStatVal = Math.min(100, currentHunger + config.statGain)
-    const newXp = (pet.xp || 0) + config.xp
-    const newLevel = calculateLevel(newXp)
-    const now = new Date().toISOString()
-
-    const { error: petErr } = await supabase
-      .from('pets')
-      .update({
-        hunger: newStatVal,
-        last_fed_at: now,
-        xp: newXp,
-        level: newLevel,
-      })
-      .eq('id', petId)
-    if (petErr) return { error: petErr }
-
-    const { error: ptErr } = await supabase
-      .from('profiles')
-      .update({ points: student.points - cost })
-      .eq('id', studentId)
-    if (ptErr) return { error: ptErr }
-
-    // 同步更新本地状态
-    const target = studentsWithPets.value.find(s => s.id === studentId)
-    if (target) {
-      target.points = student.points - cost
-      const targetPet = target.pets?.find(p => p.id === petId)
-      if (targetPet) {
-        targetPet.hunger = newStatVal
-        targetPet.xp = newXp
-        targetPet.level = newLevel
+    const actorId = teacherId()
+    if (!actorId) return { error: new Error('未登录') }
+    if (feedingStudents.has(studentId)) return { error: new Error('正在投喂该学生的宠物，请稍候') }
+    feedingStudents.add(studentId)
+    try {
+      const result = await feedPet(actorId, studentId, petId, action)
+      for (const list of [students.value, studentsWithPets.value]) {
+        const student = list.find(s => s.id === studentId)
+        if (!student) continue
+        student.points = result.points
+        const pet = student.pets?.find(p => p.id === petId)
+        if (pet) Object.assign(pet, result.pet)
       }
+      return { error: null, cost: result.cost, newLevel: result.pet.level, leveledUp: result.leveledUp }
+    } catch (error) {
+      return { error: error instanceof Error ? error : new Error('投喂失败') }
+    } finally {
+      feedingStudents.delete(studentId)
     }
-
-    return { error: null, cost, newLevel, leveledUp: newLevel > (pet.level || 1) }
   }
 
   async function fetchStudentDetail(id: string) {
@@ -226,39 +178,25 @@ export const useTeacherStore = defineStore('teacher', () => {
     return { profile, pets: (pets || []).map(applyHungerDecay), completions }
   }
 
+  const leaderboardError = ref('')
+  const leaderboardLoading = ref(false)
+  const leaderboardWeek = ref({ start: '', end: '' })
   async function fetchLeaderboard() {
     const currentTeacherId = teacherId()
-    if (!currentTeacherId) return
-    loading.value = true
-    const { data: studentsData } = await supabase
-      .from('profiles')
-      .select('id, username, points')
-      .eq('role', 'student')
-      .eq('teacher_id', currentTeacherId)
-      .order('points', { ascending: false })
-      .limit(50)
-
-    if (studentsData) {
-      const entries: LeaderboardEntry[] = []
-      for (const s of studentsData) {
-        const { data: pets } = await supabase
-          .from('pets')
-          .select('name, level')
-          .eq('owner_id', s.id)
-          .order('level', { ascending: false })
-          .limit(1)
-        const top = pets && pets[0]
-        entries.push({
-          id: s.id,
-          username: s.username,
-          points: s.points,
-          pet_level: top?.level || 0,
-          pet_name: top?.name || '未创建',
-        })
-      }
-      leaderboard.value = entries
+    if (!currentTeacherId || leaderboardLoading.value) return
+    leaderboardLoading.value = true
+    leaderboardError.value = ''
+    try {
+      const result = await classroomRpc<{ entries: LeaderboardEntry[]; weekStart: string; weekEnd: string }>(
+        'weekly_leaderboard', { p_teacher_id: currentTeacherId },
+      )
+      leaderboard.value = result.entries
+      leaderboardWeek.value = { start: result.weekStart, end: result.weekEnd }
+    } catch (error) {
+      leaderboardError.value = error instanceof Error ? error.message : '排行榜加载失败'
+    } finally {
+      leaderboardLoading.value = false
     }
-    loading.value = false
   }
 
   async function createStudent(username: string, password: string) {
@@ -453,5 +391,5 @@ export const useTeacherStore = defineStore('teacher', () => {
     totalPointsGiven.value = completionsData?.reduce((sum, c) => sum + c.points, 0) || 0
   }
 
-  return { students, studentsWithPets, leaderboard, loading, totalStudents, totalPointsGiven, fetchStudents, fetchStudentsWithPets, performActionForStudent, fetchStudentDetail, fetchLeaderboard, fetchStats, createStudent, renameStudent, adoptPetForStudent, renamePetForStudent, deleteStudent }
+  return { students, studentsWithPets, leaderboardError, leaderboardLoading, leaderboardWeek, leaderboard, loading, totalStudents, totalPointsGiven, fetchStudents, fetchStudentsWithPets, performActionForStudent, fetchStudentDetail, fetchLeaderboard, fetchStats, createStudent, renameStudent, adoptPetForStudent, renamePetForStudent, deleteStudent }
 })

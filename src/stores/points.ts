@@ -1,7 +1,6 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import { supabase } from '../lib/supabase'
-import { useAuthStore } from './auth'
 import { DEFAULT_ACTION_COSTS } from '../lib/constants'
 
 export interface ActionCosts {
@@ -80,40 +79,5 @@ export const usePointsStore = defineStore('points', () => {
     }
   }
 
-  async function earnPoints(amount: number) {
-    const authStore = useAuthStore()
-    if (!authStore.user) return false
-
-    const newPoints = authStore.user.points + amount
-    const { error } = await supabase
-      .from('profiles')
-      .update({ points: newPoints })
-      .eq('id', authStore.user.id)
-
-    if (!error) {
-      authStore.user.points = newPoints
-      return true
-    }
-    return false
-  }
-
-  async function spendPoints(amount: number) {
-    const authStore = useAuthStore()
-    if (!authStore.user) return false
-    if (authStore.user.points < amount) return false
-
-    const newPoints = authStore.user.points - amount
-    const { error } = await supabase
-      .from('profiles')
-      .update({ points: newPoints })
-      .eq('id', authStore.user.id)
-
-    if (!error) {
-      authStore.user.points = newPoints
-      return true
-    }
-    return false
-  }
-
-  return { actionCosts, diaryPoints, loading, fetchActionCosts, fetchDiaryPoints, updateActionCosts, updateDiaryPoints, earnPoints, spendPoints }
+  return { actionCosts, diaryPoints, loading, fetchActionCosts, fetchDiaryPoints, updateActionCosts, updateDiaryPoints }
 })

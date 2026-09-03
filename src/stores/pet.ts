@@ -2,8 +2,8 @@ import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import { supabase } from '../lib/supabase'
 import { useAuthStore } from './auth'
-import { usePointsStore } from './points'
-import { ACTIONS, LEVEL_THRESHOLDS, STAT_DECAY_PER_HOUR, MAX_LEVEL, getFeedingReply } from '../lib/constants'
+import { feedPet } from '../lib/classroomApi'
+import { LEVEL_THRESHOLDS, STAT_DECAY_PER_HOUR, MAX_LEVEL, getFeedingReply } from '../lib/constants'
 
 export interface Pet {
   id: string
@@ -129,52 +129,25 @@ export const usePetStore = defineStore('pet', () => {
     return { data, error }
   }
 
+  const feeding = new Set<string>()
   async function performAction(action: 'basic' | 'nice' | 'luxury') {
     const target = currentPet.value
-    if (!target) return { success: false, message: '没有宠物' }
-    if (target.level >= MAX_LEVEL) {
-      // 允许继续操作但不再升级，也可提示
-    }
-
-    const pointsStore = usePointsStore()
-    const cost = pointsStore.actionCosts[action]
     const authStore = useAuthStore()
-
-    if (!authStore.user || authStore.user.points < cost) {
-      return { success: false, message: `积分不足，需要 ${cost} 积分` }
+    if (!target || !authStore.user) return { success: false, message: '没有宠物或未登录' }
+    if (feeding.has(target.owner_id)) return { success: false, message: '正在投喂，请稍候' }
+    feeding.add(target.owner_id)
+    try {
+      const oldLevel = target.level
+      const result = await feedPet(authStore.user.id, target.owner_id, target.id, action)
+      Object.assign(target, result.pet)
+      authStore.user.points = result.points
+      return { success: true, message: getLevelUpMessage(oldLevel, target.level) || '投喂成功',
+        reply: getFeedingReply(action), leveledUp: result.leveledUp }
+    } catch (error) {
+      return { success: false, message: error instanceof Error ? error.message : '投喂失败' }
+    } finally {
+      feeding.delete(target.owner_id)
     }
-
-    // 扣积分
-    const spent = await pointsStore.spendPoints(cost)
-    if (!spent) {
-      return { success: false, message: '扣积分失败' }
-    }
-
-    const config = ACTIONS[action]
-    const newStatVal = Math.min(100, target.hunger + config.statGain)
-    const newXp = target.xp + config.xp
-    const oldLevel = target.level
-    const newLevel = calculateLevel(newXp)
-    const now = new Date().toISOString()
-
-    const updates: any = {
-      hunger: newStatVal,
-      last_fed_at: now,
-      xp: newXp,
-      level: newLevel,
-    }
-
-    const { error } = await supabase
-      .from('pets')
-      .update(updates)
-      .eq('id', target.id)
-
-    if (!error) {
-      Object.assign(target, updates)
-      const levelMessage = getLevelUpMessage(oldLevel, newLevel)
-      return { success: true, message: levelMessage || '投喂成功', reply: getFeedingReply(action), leveledUp: newLevel > oldLevel }
-    }
-    return { success: false, message: '操作失败' }
   }
 
   function calculateLevel(xp: number): number {
@@ -193,6 +166,7 @@ export const usePetStore = defineStore('pet', () => {
   }
 
   async function addXp(amount: number) {
+    if (amount <= 0) return
     const target = currentPet.value
     if (!target) return
     const newXp = target.xp + amount
