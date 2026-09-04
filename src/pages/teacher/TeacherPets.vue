@@ -790,7 +790,10 @@ async function handleAdopt() {
 .classroom-award-bar .btn { padding: 10px 16px; font-size: 13px; border-radius: 10px; white-space: nowrap; }
 
 .classroom-mode .pet-card.award-selected { border-color: #297d60; box-shadow: 0 0 0 3px #297d6022; }
-.classroom-mode .pet-stage { height: 150px; }
+.classroom-mode .pet-stage {
+  height: 150px;
+  z-index: 3;
+}
 .classroom-compact .pet-stage { height: 120px; }
 .classroom-compact .pet-card { gap: 5px; }
 .classroom-mode .pet-name { font-size: 25px; overflow-wrap: anywhere; }
