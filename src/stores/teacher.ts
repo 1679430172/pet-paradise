@@ -209,7 +209,13 @@ export const useTeacherStore = defineStore('teacher', () => {
       const result = await classroomRpc<{ entries: LeaderboardEntry[]; weekStart: string; weekEnd: string }>(
         'weekly_leaderboard', { p_teacher_id: currentTeacherId },
       )
-      const studentIds = result.entries.map(entry => entry.id)
+      // The RPC order is deterministic (points, username, id). Assign unique
+      // positions here as well so the UI stays correct before a DB migration is applied.
+      const rankedEntries = result.entries.map((entry, index) => ({
+        ...entry,
+        rank: entry.points > 0 ? index + 1 : null,
+      }))
+      const studentIds = rankedEntries.map(entry => entry.id)
       const { data: rankingPets, error: petError } = studentIds.length
         ? await supabase.from('pets').select('id,owner_id,name,species,level,created_at').in('owner_id', studentIds)
         : { data: [], error: null }
@@ -231,7 +237,7 @@ export const useTeacherStore = defineStore('teacher', () => {
       const cosmeticMap = new Map((cosmeticData || []).map((row: any) => [row.pet_id, {
         frame: row.frame?.style_key || null, background: row.background?.style_key || null,
       }]))
-      leaderboard.value = result.entries.map(entry => {
+      leaderboard.value = rankedEntries.map(entry => {
         const pet = representativePets.get(entry.id)
         return { ...entry, pet_id: pet?.id, pet_species: pet?.species, pet_name: pet?.name || '未领养', pet_level: pet?.level || 0,
           cosmetics: pet ? cosmeticMap.get(pet.id) : undefined }

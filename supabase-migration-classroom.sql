@@ -174,7 +174,7 @@ RETURNS JSONB LANGUAGE sql STABLE SECURITY INVOKER SET search_path = public AS $
     WHERE p.teacher_id = p_teacher_id AND p.role = 'student'
     GROUP BY p.id,p.username
   ), ranked AS (
-    SELECT t.*,CASE WHEN t.points > 0 THEN dense_rank() OVER (ORDER BY t.points DESC) ELSE NULL END AS rank,
+    SELECT t.*,CASE WHEN t.points > 0 THEN row_number() OVER (ORDER BY t.points DESC,t.username,t.id) ELSE NULL END AS rank,
       COALESCE(pet.level,0) AS pet_level,COALESCE(pet.name,'未领养') AS pet_name
     FROM totals t LEFT JOIN LATERAL (
       SELECT name,level FROM pets WHERE owner_id = t.id ORDER BY level DESC,created_at,id LIMIT 1

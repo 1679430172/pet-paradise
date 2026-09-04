@@ -4,7 +4,7 @@
       <p class="ranking-note">{{ weekLabel }} · 北京时间</p></div>
       <button class="btn btn-secondary" :disabled="teacherStore.leaderboardLoading" @click="teacherStore.fetchLeaderboard()">刷新</button>
     </div>
-    <p class="ranking-rule">按本周获得的任务与日记奖励积分排名，喂食消费不影响排名。同分并列，每周一重新统计。</p>
+    <p class="ranking-rule">按本周获得的任务与日记奖励积分排名，喂食消费不影响排名。同分时按学生名称排序，每周一重新统计。</p>
     <div v-if="teacherStore.leaderboardError" role="alert" class="ranking-error">{{ teacherStore.leaderboardError }}</div>
     <div v-else-if="teacherStore.leaderboardLoading" class="loading-state">正在统计本周成长...</div>
     <div v-else>
