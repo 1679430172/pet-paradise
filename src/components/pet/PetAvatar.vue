@@ -9,7 +9,7 @@
         :src="imgSrc"
         :alt="species"
         class="pet-avatar-img"
-        :style="eggImageStyle"
+        :style="imageLayoutStyle"
         loading="lazy"
         decoding="async"
         @error="imgError = true"
@@ -25,8 +25,8 @@
 
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
-import { getPetImage, getPetStage, PET_STAGE_LABELS, PET_SPECIES } from '../../lib/constants'
-import eggLayouts from '../../lib/egg-layout.json'
+import { getPetImage, getPetStage, PET_STAGE_LABELS, PET_SPECIES, type PetStage } from '../../lib/constants'
+import petLayouts from '../../lib/pet-layout.json'
 
 interface Props {
   species?: string
@@ -57,19 +57,35 @@ const imgSrc = computed(() => getPetImage(props.species || PET_SPECIES[0], props
 const stageLabel = computed(() => PET_STAGE_LABELS[getPetStage(props.level || 1)])
 const stage = computed(() => getPetStage(props.level || 1))
 
-// Normalize visible egg silhouettes, not their differently padded source canvases.
-// Regenerate bounds with scripts/measure-egg-layout.py after changing egg assets.
-const eggImageStyle = computed(() => {
-  if (stage.value !== 'egg') return undefined
-  const species = props.species as keyof typeof eggLayouts
-  const bounds = eggLayouts[species] ?? eggLayouts[PET_SPECIES[0]]
-  const scale = 0.52 / (bounds.bottom - bounds.top)
+// Normalize visible silhouettes, not their differently padded source canvases.
+// Regenerate bounds with scripts/measure-pet-layout.py after changing pet assets.
+const STAGE_VISIBLE_HEIGHT: Record<PetStage, number> = {
+  egg: 0.52,
+  baby: 0.60,
+  teen: 0.70,
+  adult: 0.82,
+  final: 0.96,
+}
+const MAX_VISIBLE_WIDTH = 0.90
+const VISIBLE_BOTTOM_ANCHOR = 0.80
+const imageLayoutStyle = computed(() => {
+  const species = props.species as keyof typeof petLayouts
+  const speciesLayouts = petLayouts[species] ?? petLayouts[PET_SPECIES[0]]
+  const bounds = speciesLayouts[stage.value]
+  const visibleWidth = bounds.right - bounds.left
+  const visibleHeight = bounds.bottom - bounds.top
+  // Respect both axes so wide later-stage pets cannot be clipped by compact cards.
+  const scale = Math.min(
+    STAGE_VISIBLE_HEIGHT[stage.value] / visibleHeight,
+    MAX_VISIBLE_WIDTH / visibleWidth,
+  )
   return {
     position: 'absolute' as const,
     width: `${scale * 100}%`,
     height: `${scale * 100}%`,
     left: `${(0.5 - (bounds.left + bounds.right) / 2 * scale) * 100}%`,
-    top: `${(0.84 - bounds.bottom * scale) * 100}%`,
+    // Keep the complete silhouette above the stage badge instead of overlaying it.
+    top: `${(VISIBLE_BOTTOM_ANCHOR - bounds.bottom * scale) * 100}%`,
   }
 })
 
@@ -156,6 +172,7 @@ const emojiStyle = computed(() => ({
   display: block;
   width: 100%;
   height: 100%;
+  overflow: visible;
   transform-origin: 50% 82%;
   animation: pet-breathe 2.8s ease-in-out infinite;
   will-change: transform;

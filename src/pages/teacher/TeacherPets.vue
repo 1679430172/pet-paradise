@@ -90,7 +90,11 @@
             :class="{ 'max-badge': activePet(s)!.level >= MAX_LEVEL }"
           >Lv.{{ activePet(s)!.level }}</span>
 
-          <div class="pet-stage">
+          <div
+            class="pet-stage"
+            @mouseenter="showHoverReply(activePet(s)!)"
+            @mouseleave="hideHoverReply"
+          >
             <button
               v-if="s.pets.length > 1"
               class="nav-arrow left"
@@ -106,7 +110,9 @@
               show-stage
             />
             <Transition name="speech-pop">
-              <div v-if="petReplies[activePet(s)!.id]" class="pet-speech">{{ petReplies[activePet(s)!.id] }}</div>
+              <div v-if="petReplies[activePet(s)!.id] || hoverPetId === activePet(s)!.id" class="pet-speech">
+                {{ petReplies[activePet(s)!.id] || hoverPetReply }}
+              </div>
             </Transition>
             <button
               v-if="s.pets.length > 1"
@@ -388,6 +394,8 @@ const nameCollator = new Intl.Collator('zh-CN', { numeric: true, sensitivity: 'b
 const busyKey = ref<string | null>(null)
 const toast = ref('')
 const petReplies = ref<Record<string, string>>({})
+const hoverPetId = ref<string | null>(null)
+const hoverPetReply = ref('')
 const levelUpShowcasePet = ref<(TeacherPet & { studentName: string }) | null>(null)
 const selectedPetIds = ref<string[]>([])
 const showBatchFeedDialog = ref(false)
@@ -441,6 +449,14 @@ const renameError = ref('')
 const renaming = ref(false)
 const renameInput = ref<HTMLInputElement | null>(null)
 const replyTimers = new Map<string, ReturnType<typeof setTimeout>>()
+const HOVER_REPLIES = [
+  '你好呀，陪我玩一会儿吧！',
+  '今天也要一起加油哦！',
+  '见到你真开心！',
+  '摸摸我，我会乖乖的～',
+  '我正在努力长大！',
+  '要不要和我打个招呼？',
+] as const
 const levelUpQueue: (TeacherPet & { studentName: string })[] = []
 let levelUpTimer: ReturnType<typeof setTimeout> | undefined
 
@@ -606,6 +622,17 @@ function showPetReply(petId: string, reply: string) {
     petReplies.value = nextReplies
     replyTimers.delete(petId)
   }, 3200))
+}
+
+function showHoverReply(pet: TeacherPet) {
+  if (!pet.id) return
+  hoverPetId.value = pet.id
+  hoverPetReply.value = HOVER_REPLIES[Math.floor(Math.random() * HOVER_REPLIES.length)]
+}
+
+function hideHoverReply() {
+  hoverPetId.value = null
+  hoverPetReply.value = ''
 }
 
 function showLevelUpEffect(petId: string) {

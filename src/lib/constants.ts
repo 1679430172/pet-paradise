@@ -97,7 +97,7 @@ export const PET_STAGES = ['egg', 'baby', 'teen', 'adult', 'final'] as const
 export type PetStage = typeof PET_STAGES[number]
 
 // public 目录下的素材不会经过 Vite 文件名哈希；更新此值可避免 CDN/浏览器继续使用旧图。
-const PET_ASSET_VERSION = '20260813-cute'
+const PET_ASSET_VERSION = '20260904-complete'
 
 export const PET_STAGE_LABELS: Record<PetStage, string> = {
   egg: '蛋',
