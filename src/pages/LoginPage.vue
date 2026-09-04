@@ -27,6 +27,14 @@
           required
         />
       </div>
+      <div class="form-group">
+        <label for="login-class" class="form-label">班级（学生同名时选择）</label>
+        <select id="login-class" v-model="teacherId" class="form-input" :disabled="classesLoading">
+          <option value="">不选择班级</option>
+          <option v-for="item in classes" :key="item.id" :value="item.id">{{ classLabel(item) }}</option>
+        </select>
+        <p class="class-hint">老师和管理员登录时不用选择。</p>
+      </div>
 
       <p v-if="error" class="auth-error">{{ error }}</p>
 
@@ -52,24 +60,39 @@ const authStore = useAuthStore()
 
 const username = ref('')
 const password = ref('')
+interface LoginClass { id: string; username: string; class_name: string | null }
+const teacherId = ref('')
+const classes = ref<LoginClass[]>([])
+const classesLoading = ref(true)
 const error = ref('')
 const loading = ref(false)
 const registrationEnabled = ref(false)
 const registrationChecked = ref(false)
 
 onMounted(async () => {
-  const result = await authStore.fetchRegistrationEnabled()
-  registrationEnabled.value = result.data
+  const [registration, classResult] = await Promise.all([
+    authStore.fetchRegistrationEnabled(),
+    authStore.fetchRegistrationClasses(),
+  ])
+  registrationEnabled.value = registration.data
   registrationChecked.value = true
+  classes.value = classResult.data || []
+  classesLoading.value = false
 })
+
+function classLabel(item: LoginClass) {
+  const name = item.class_name || '默认班级'
+  const duplicated = classes.value.some(other => other.id !== item.id && (other.class_name || '默认班级') === name)
+  return duplicated ? `${name}（${item.username}）` : name
+}
 
 async function handleSubmit() {
   error.value = ''
   loading.value = true
-  const { error: err } = await authStore.signIn(username.value, password.value)
+  const { error: err } = await authStore.signIn(username.value, password.value, teacherId.value || undefined)
   loading.value = false
   if (err) {
-    error.value = '用户名或密码错误'
+    error.value = err.message || '用户名或密码错误'
   } else {
     router.push(authStore.isAdmin ? '/admin' : authStore.isTeacher ? '/teacher' : '/')
   }
@@ -135,4 +158,10 @@ async function handleSubmit() {
 }
 
 .registration-closed { color: #999; }
+
+.class-hint {
+  margin-top: 6px;
+  color: var(--color-text-muted);
+  font-size: 0.78rem;
+}
 </style>

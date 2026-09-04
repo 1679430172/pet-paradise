@@ -22,6 +22,14 @@ ALTER TABLE profiles ADD COLUMN IF NOT EXISTS teacher_id UUID REFERENCES profile
 ALTER TABLE profiles ADD COLUMN IF NOT EXISTS is_admin BOOLEAN NOT NULL DEFAULT false;
 CREATE INDEX IF NOT EXISTS profiles_teacher_id_idx ON profiles(teacher_id);
 
+-- Student names only need to be unique inside the same teacher's class.
+-- Teacher/admin account names remain globally unique among teacher accounts.
+ALTER TABLE profiles DROP CONSTRAINT IF EXISTS profiles_username_key;
+CREATE UNIQUE INDEX IF NOT EXISTS profiles_teacher_username_unique
+  ON profiles(username) WHERE role = 'teacher';
+CREATE UNIQUE INDEX IF NOT EXISTS profiles_student_class_username_unique
+  ON profiles(teacher_id, username) WHERE role = 'student';
+
 -- ============== 2. 宠物表（支持一人多宠物） ==============
 CREATE TABLE IF NOT EXISTS pets (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -204,7 +212,7 @@ VALUES (
   'teacher',
   0
 )
-ON CONFLICT (username) DO UPDATE SET role = 'teacher';
+ON CONFLICT (username) WHERE role = 'teacher' DO UPDATE SET role = 'teacher';
 
 UPDATE profiles
 SET is_admin = true

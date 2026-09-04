@@ -86,6 +86,7 @@ export const useAuthStore = defineStore('auth', () => {
   async function signUp(username: string, password: string, teacherId: string) {
     loading.value = true
     try {
+      const normalizedUsername = username.trim()
       const registration = await fetchRegistrationEnabled()
       if (registration.error) throw new Error('注册状态校验失败，请稍后重试')
       if (!registration.data) throw new Error('账号注册已关闭，请联系管理员')
@@ -93,11 +94,13 @@ export const useAuthStore = defineStore('auth', () => {
       const { data: existing } = await supabase
         .from('profiles')
         .select('id')
-        .eq('username', username)
-        .single()
+        .eq('role', 'student')
+        .eq('teacher_id', teacherId)
+        .eq('username', normalizedUsername)
+        .maybeSingle()
 
       if (existing) {
-        throw new Error('用户名已被注册')
+        throw new Error('该班级已经有同名学生')
       }
 
       const { data: teacher, error: classError } = await supabase
@@ -116,7 +119,7 @@ export const useAuthStore = defineStore('auth', () => {
       const { data, error } = await supabase
         .from('profiles')
         .insert({
-          username,
+          username: normalizedUsername,
           password: hashedPwd,
           role: 'student',
           points: 0,
@@ -138,24 +141,30 @@ export const useAuthStore = defineStore('auth', () => {
     }
   }
 
-  async function signIn(username: string, password: string) {
+  async function signIn(username: string, password: string, teacherId?: string) {
     loading.value = true
     try {
       const hashedPwd = await hashPassword(password)
-      const { data, error } = await supabase
+      let query = supabase
         .from('profiles')
         .select('*')
-        .eq('username', username)
+        .eq('username', username.trim())
         .eq('password', hashedPwd)
-        .single()
+      if (teacherId) {
+        query = query.eq('role', 'student').eq('teacher_id', teacherId)
+      }
+      const { data, error } = await query.limit(2)
 
-      if (error || !data) {
+      if (error || !data || data.length === 0) {
         throw new Error('用户名或密码错误')
       }
+      if (data.length > 1) {
+        throw new Error('该名字存在于多个班级，请选择班级后登录')
+      }
 
-      user.value = data
-      localStorage.setItem('pet_user_id', data.id)
-      return { data, error: null }
+      user.value = data[0]
+      localStorage.setItem('pet_user_id', data[0].id)
+      return { data: data[0], error: null }
     } catch (error: any) {
       return { data: null, error }
     } finally {

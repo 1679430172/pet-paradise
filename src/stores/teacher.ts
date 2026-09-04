@@ -221,19 +221,22 @@ export const useTeacherStore = defineStore('teacher', () => {
     if (!authStore.user) return { data: null, error: new Error('未登录') }
     loading.value = true
     try {
+      const normalizedUsername = username.trim()
       const { data: existing } = await supabase
         .from('profiles')
         .select('id')
-        .eq('username', username)
+        .eq('role', 'student')
+        .eq('teacher_id', authStore.user.id)
+        .eq('username', normalizedUsername)
         .maybeSingle()
       if (existing) {
-        throw new Error('用户名已被注册')
+        throw new Error('该班级已经有同名学生')
       }
       const hashedPwd = await hashPassword(password)
       const { data, error } = await supabase
         .from('profiles')
         .insert({
-          username,
+          username: normalizedUsername,
           password: hashedPwd,
           role: 'student',
           points: 0,
@@ -313,6 +316,8 @@ export const useTeacherStore = defineStore('teacher', () => {
       const { data: existing, error: existingError } = await supabase
         .from('profiles')
         .select('id')
+        .eq('role', 'student')
+        .eq('teacher_id', currentTeacherId)
         .eq('username', normalizedUsername)
         .neq('id', studentId)
         .maybeSingle()
