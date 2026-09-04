@@ -178,7 +178,7 @@ npm run preview  # 预览构建产物
 - **数据模型保留字段**：`pets.happiness / cleanliness / last_played_at / last_cleaned_at` 为历史字段，前端不再读写但保留以兼容旧数据；如需清理可手动 DROP
 - **统一 fallback**：`getPetImage` 对未知 species（旧数据库历史值）自动回退到 `PET_SPECIES[0]`；图片加载失败则在 `PetAvatar` 内回退到对应 emoji
 - **多宠物**：`pets.owner_id` 无 UNIQUE 约束；满 20 级才能继续领养下一只
-- **成长机制**：当前仅喂食增加宠物 XP；日记、图片和点赞暂不增加 XP；Lv.20 累计需要 1500 XP
+- **成长机制**：当前仅喂食增加宠物 XP；日记、图片和点赞暂不增加 XP；升级所需经验逐级增加，Lv.20 累计需要 3050 XP
 - **饱食度**：每小时衰减 1.5 点，最低为 0；三档粮食均不设置饱食度使用门槛
 - **形态阶段**：Lv.1-3 蛋 / 4-8 幼年 / 9-13 青年 / 14-19 成年 / 20 完全体（详见 `getPetStage`）
 - **积分配置可在线修改**：教师端 → 积分设置；保存到 `settings` 表，前端读取做了"旧 `{feed,play,clean}` 格式自动回退默认值"的兼容

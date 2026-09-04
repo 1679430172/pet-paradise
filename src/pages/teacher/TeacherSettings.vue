@@ -45,15 +45,15 @@
       <p class="settings-desc">设置三档喂食所需的积分（统一作用于饱食度，档位越高恢复越多、获得经验越多）</p>
 
       <div class="form-group">
-        <label class="form-label">🍖 普通粮消耗（hunger +20，xp +5）</label>
+        <label class="form-label">🍖 普通粮消耗（饱食度 +25，XP +8）</label>
         <input v-model.number="costs.basic" type="number" class="form-input" min="0" max="100" />
       </div>
       <div class="form-group">
-        <label class="form-label">🍗 营养粮消耗（hunger +50，xp +12）</label>
+        <label class="form-label">🍗 营养粮消耗（饱食度 +55，XP +18）</label>
         <input v-model.number="costs.nice" type="number" class="form-input" min="0" max="100" />
       </div>
       <div class="form-group">
-        <label class="form-label">🥩 豪华粮消耗（hunger +100，xp +25）</label>
+        <label class="form-label">🥩 豪华粮消耗（饱食度 +100，XP +40）</label>
         <input v-model.number="costs.luxury" type="number" class="form-input" min="0" max="100" />
       </div>
 

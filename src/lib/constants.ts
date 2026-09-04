@@ -71,25 +71,25 @@ export const MAX_LEVEL = 20
 // 等级经验值表（1..20）
 export const LEVEL_THRESHOLDS = [
   0,     // Level 1
-  15,    // Level 2
-  35,    // Level 3
-  60,    // Level 4
-  90,    // Level 5
-  125,   // Level 6
-  165,   // Level 7
-  210,   // Level 8
-  260,   // Level 9
-  320,   // Level 10
-  390,   // Level 11
-  470,   // Level 12
-  560,   // Level 13
-  660,   // Level 14
-  770,   // Level 15
-  890,   // Level 16
-  1020,  // Level 17
-  1160,  // Level 18
-  1320,  // Level 19
-  1500,  // Level 20
+  20,    // Level 2  (+20)
+  50,    // Level 3  (+30)
+  90,    // Level 4  (+40)
+  140,   // Level 5  (+50)
+  200,   // Level 6  (+60)
+  275,   // Level 7  (+75)
+  365,   // Level 8  (+90)
+  470,   // Level 9  (+105)
+  590,   // Level 10 (+120)
+  730,   // Level 11 (+140)
+  890,   // Level 12 (+160)
+  1070,  // Level 13 (+180)
+  1270,  // Level 14 (+200)
+  1495,  // Level 15 (+225)
+  1745,  // Level 16 (+250)
+  2025,  // Level 17 (+280)
+  2335,  // Level 18 (+310)
+  2675,  // Level 19 (+340)
+  3050,  // Level 20 (+375)
 ]
 
 // 形态阶段：Lv.1-3 蛋 / Lv.4-8 幼年（蛋壳逐渐破裂）/ Lv.9-13 青年 / Lv.14-19 成年 / Lv.20 完全体

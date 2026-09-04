@@ -55,7 +55,7 @@ DECLARE
   prices JSONB;
   old_level INTEGER;
   result JSONB;
-  thresholds INTEGER[] := ARRAY[0,15,35,60,90,125,165,210,260,320,390,470,560,660,770,890,1020,1160,1320,1500];
+  thresholds INTEGER[] := ARRAY[0,20,50,90,140,200,275,365,470,590,730,890,1070,1270,1495,1745,2025,2335,2675,3050];
 BEGIN
   IF p_request_id IS NULL OR p_actor_id IS NULL OR p_student_id IS NULL OR p_pet_id IS NULL OR p_action IS NULL OR p_action NOT IN ('basic','nice','luxury') THEN
     RAISE EXCEPTION '无效的喂食请求';
