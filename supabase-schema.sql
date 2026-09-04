@@ -116,6 +116,17 @@ CREATE TABLE IF NOT EXISTS task_completions (
   created_at TIMESTAMPTZ DEFAULT now()
 );
 
+-- 删除老师时保留其历史任务与奖励记录，仅清空创建人/发放人引用。
+-- DROP/ADD 同时修复已经按旧版 schema 创建的数据库。
+ALTER TABLE tasks DROP CONSTRAINT IF EXISTS tasks_created_by_fkey;
+ALTER TABLE tasks
+  ADD CONSTRAINT tasks_created_by_fkey
+  FOREIGN KEY (created_by) REFERENCES profiles(id) ON DELETE SET NULL;
+ALTER TABLE task_completions DROP CONSTRAINT IF EXISTS task_completions_awarded_by_fkey;
+ALTER TABLE task_completions
+  ADD CONSTRAINT task_completions_awarded_by_fkey
+  FOREIGN KEY (awarded_by) REFERENCES profiles(id) ON DELETE SET NULL;
+
 -- ==========================================
 -- RLS 策略（开放式，因为不使用 Supabase Auth）
 -- ==========================================
@@ -435,6 +446,10 @@ COMMIT;
 BEGIN;
 ALTER TABLE task_completions ADD COLUMN IF NOT EXISTS revoked_at TIMESTAMPTZ;
 ALTER TABLE task_completions ADD COLUMN IF NOT EXISTS revoked_by UUID REFERENCES profiles(id);
+ALTER TABLE task_completions DROP CONSTRAINT IF EXISTS task_completions_revoked_by_fkey;
+ALTER TABLE task_completions
+  ADD CONSTRAINT task_completions_revoked_by_fkey
+  FOREIGN KEY (revoked_by) REFERENCES profiles(id) ON DELETE SET NULL;
 ALTER TABLE task_completions ADD COLUMN IF NOT EXISTS revoke_reason TEXT;
 -- 延续原项目的开放 RLS；撤销 RPC 使用调用者权限，需要允许写撤销元信息。
 DROP POLICY IF EXISTS "允许撤销任务奖励" ON task_completions;
