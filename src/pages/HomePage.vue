@@ -40,7 +40,7 @@
           class="pet-avatar animate-float"
           :species="petStore.currentPet.species"
           :level="petStore.currentPet.level"
-          :size="260"
+          :size="190"
           show-stage
         />
         <Transition name="speech-pop">
@@ -303,21 +303,25 @@ onMounted(async () => {
 
 .pet-display {
   position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
   overflow: visible;
-  width: 100%;
-  height: 500px;
-  min-height: 500px;
+  width: min(300px, calc(100vw - 56px));
+  height: 480px;
+  min-height: 480px;
   box-sizing: border-box;
   text-align: center;
-  padding: 28px 20px;
-  margin-bottom: 16px;
+  padding: 42px 24px 28px;
+  margin: 0 auto 28px;
 }
 
 .pet-display[class*="cosmetic-frame-"]::after { inset: -5.56%; border-radius: 30px; }
-.pet-display.cosmetic-frame-leaf { --cosmetic-frame-image: url('/assets/shop/frame-leaf-landscape-v3.png'); }
-.pet-display.cosmetic-frame-candy { --cosmetic-frame-image: url('/assets/shop/frame-candy-landscape-v3.png'); }
-.pet-display.cosmetic-frame-starlight { --cosmetic-frame-image: url('/assets/shop/frame-starlight-landscape-v3.png'); }
-.pet-display.cosmetic-frame-gold { --cosmetic-frame-image: url('/assets/shop/frame-gold-landscape-v3.png'); }
+.pet-display.cosmetic-frame-leaf { --cosmetic-frame-image: url('/assets/shop/frame-leaf-portrait-v3.png'); }
+.pet-display.cosmetic-frame-candy { --cosmetic-frame-image: url('/assets/shop/frame-candy-portrait-v3.png'); }
+.pet-display.cosmetic-frame-starlight { --cosmetic-frame-image: url('/assets/shop/frame-starlight-portrait-v3.png'); }
+.pet-display.cosmetic-frame-gold { --cosmetic-frame-image: url('/assets/shop/frame-gold-portrait-v3.png'); }
 
 .care-panel {
   padding: 24px;
@@ -459,7 +463,7 @@ onMounted(async () => {
 }
 
 .pet-identity {
-  width: min(360px, calc(100% - 24px));
+  width: 100%;
   box-sizing: border-box;
   padding: 14px 18px 13px;
   border: 1px solid rgba(255, 255, 255, 0.82);
