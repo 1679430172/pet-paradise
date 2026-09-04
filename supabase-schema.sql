@@ -82,6 +82,11 @@ INSERT INTO settings (key, value)
 VALUES ('diary_points', '{"points": 5}')
 ON CONFLICT (key) DO NOTHING;
 
+-- 是否允许学生从登录页自行注册账号
+INSERT INTO settings (key, value)
+VALUES ('registration_enabled', '{"enabled": true}')
+ON CONFLICT (key) DO NOTHING;
+
 -- ============== 6. 任务定义表 ==============
 CREATE TABLE IF NOT EXISTS tasks (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),

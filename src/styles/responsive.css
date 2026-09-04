@@ -17,7 +17,6 @@
   overflow-wrap: anywhere;
 }
 #app .app-shell .create-page { padding-bottom: 32px; }
-#app .app-shell .admin-page > :is(.admin-header, .create-card, .classes-section) { max-width: none; }
 #app .app-shell :is(.form-input, .card, .form-group, .task-info, .rank-info, .student-meta, .feed-info, .completion-info) { min-width: 0; }
 #app .app-shell :is(.header-row, .page-header, .page-title-row, .teacher-header, .admin-header) { flex-wrap: wrap; gap: 12px; }
 #app .app-shell :is(.student-card, .task-card, .rank-item) { gap: 12px; }
@@ -126,7 +125,6 @@
   #app .app-shell :is(.bottom-nav, .teacher-nav) a { flex: 0 0 auto; flex-direction: row; justify-content: flex-start; gap: 14px; padding: 14px 18px; font-size: 1rem; border-radius: var(--radius-sm); }
   #app .app-shell :is(.bottom-nav, .teacher-nav) a.active { background: #fff0f5; color: var(--color-primary); }
   #app .app-shell :is(.bottom-nav, .teacher-nav) a:hover { background: #fff8fb; }
-  #app .app-shell .admin-page .class-grid { grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); }
 }
 
 /* Large monitors: more content per row, with a readable centered maximum. */

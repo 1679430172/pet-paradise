@@ -6,7 +6,20 @@
       <p>注册一个账号，创建你的专属宠物！</p>
     </div>
 
-    <form class="auth-form card" @submit.prevent="handleSubmit">
+    <div v-if="registrationLoading" class="auth-form card registration-closed-card">
+      <div class="closed-icon">⏳</div>
+      <h2>正在确认注册状态</h2>
+      <p>请稍候...</p>
+    </div>
+
+    <div v-else-if="!registrationEnabled" class="auth-form card registration-closed-card">
+      <div class="closed-icon">🔒</div>
+      <h2>账号注册已关闭</h2>
+      <p>管理员暂未开放新账号注册，请联系管理员或稍后再试。</p>
+      <router-link class="btn btn-primary auth-btn" to="/login">返回登录</router-link>
+    </div>
+
+    <form v-else class="auth-form card" @submit.prevent="handleSubmit">
       <div class="form-group">
         <label class="form-label">用户名</label>
         <input
@@ -63,7 +76,7 @@
       <p v-if="error" class="auth-error">{{ error }}</p>
       <p v-if="success" class="auth-success">{{ success }}</p>
 
-      <button type="submit" class="btn btn-primary auth-btn" :disabled="loading || classesLoading || !teacherId || !!classesError">
+      <button type="submit" class="btn btn-primary auth-btn" :disabled="loading || registrationLoading || classesLoading || !teacherId || !!classesError">
         {{ loading ? '注册中...' : '注册' }}
       </button>
 
@@ -93,8 +106,21 @@ const classesError = ref('')
 const error = ref('')
 const success = ref('')
 const loading = ref(false)
+const registrationLoading = ref(true)
+const registrationEnabled = ref(false)
 
-onMounted(loadClasses)
+onMounted(async () => {
+  const result = await authStore.fetchRegistrationEnabled()
+  registrationEnabled.value = result.data
+  registrationLoading.value = false
+  if (result.error) {
+    classesLoading.value = false
+    classesError.value = '注册状态加载失败，请刷新重试。'
+    return
+  }
+  if (registrationEnabled.value) await loadClasses()
+  else classesLoading.value = false
+})
 
 function classLabel(item: RegistrationClass) {
   const name = item.class_name || '默认班级'
@@ -120,7 +146,7 @@ async function loadClasses() {
 }
 
 async function handleSubmit() {
-  if (loading.value || classesLoading.value) return
+  if (loading.value || registrationLoading.value || classesLoading.value || !registrationEnabled.value) return
   error.value = ''
   success.value = ''
 
@@ -234,4 +260,10 @@ async function handleSubmit() {
   font-size: 0.9rem;
   color: var(--color-text-muted);
 }
+
+.registration-closed-card { text-align: center; }
+.registration-closed-card h2 { margin: 6px 0 10px; color: var(--color-secondary); }
+.registration-closed-card p { margin-bottom: 20px; color: var(--color-text-muted); font-size: .9rem; line-height: 1.7; }
+.registration-closed-card .auth-btn { display: block; box-sizing: border-box; text-decoration: none; }
+.closed-icon { font-size: 2.8rem; }
 </style>

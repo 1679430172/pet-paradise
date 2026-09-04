@@ -34,15 +34,16 @@
         {{ loading ? '登录中...' : '登录' }}
       </button>
 
-      <p class="auth-switch">
+      <p v-if="registrationChecked && registrationEnabled" class="auth-switch">
         还没有账号？<router-link to="/register">去注册</router-link>
       </p>
+      <p v-else-if="registrationChecked" class="auth-switch registration-closed">管理员已关闭账号注册</p>
     </form>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue'
+import { onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '../stores/auth'
 
@@ -53,6 +54,14 @@ const username = ref('')
 const password = ref('')
 const error = ref('')
 const loading = ref(false)
+const registrationEnabled = ref(false)
+const registrationChecked = ref(false)
+
+onMounted(async () => {
+  const result = await authStore.fetchRegistrationEnabled()
+  registrationEnabled.value = result.data
+  registrationChecked.value = true
+})
 
 async function handleSubmit() {
   error.value = ''
@@ -124,4 +133,6 @@ async function handleSubmit() {
   font-size: 0.9rem;
   color: var(--color-text-muted);
 }
+
+.registration-closed { color: #999; }
 </style>

@@ -60,9 +60,36 @@ export const useAuthStore = defineStore('auth', () => {
       .order('username')
   }
 
+  async function fetchRegistrationEnabled() {
+    const { data, error } = await supabase
+      .from('settings')
+      .select('value')
+      .eq('key', 'registration_enabled')
+      .maybeSingle()
+    if (error) return { data: false, error }
+    return { data: data?.value?.enabled !== false, error: null }
+  }
+
+  async function updateRegistrationEnabled(enabled: boolean) {
+    if (!user.value || !isAdmin.value) return { error: new Error('仅管理员可修改注册设置') }
+    const { data, error } = await supabase
+      .from('settings')
+      .upsert({ key: 'registration_enabled', value: { enabled }, updated_at: new Date().toISOString() }, { onConflict: 'key' })
+      .select('value')
+      .single()
+    if (error) return { data: null, error }
+    const savedEnabled = data?.value?.enabled === true
+    if (savedEnabled !== enabled) return { data: null, error: new Error('注册设置未能正确保存，请重试') }
+    return { data: savedEnabled, error: null }
+  }
+
   async function signUp(username: string, password: string, teacherId: string) {
     loading.value = true
     try {
+      const registration = await fetchRegistrationEnabled()
+      if (registration.error) throw new Error('注册状态校验失败，请稍后重试')
+      if (!registration.data) throw new Error('账号注册已关闭，请联系管理员')
+
       const { data: existing } = await supabase
         .from('profiles')
         .select('id')
@@ -307,5 +334,5 @@ export const useAuthStore = defineStore('auth', () => {
     return { error }
   }
 
-  return { user, profile, initialized, loading, isTeacher, isStudent, isAdmin, init, signUp, fetchRegistrationClasses, signIn, signOut, refreshProfile, updateClassName, createTeacher, fetchTeachers, deleteTeacher, fetchTeacherStudents, updateTeacherClass, resetAccountPassword, deleteManagedStudent }
+  return { user, profile, initialized, loading, isTeacher, isStudent, isAdmin, init, signUp, fetchRegistrationClasses, fetchRegistrationEnabled, updateRegistrationEnabled, signIn, signOut, refreshProfile, updateClassName, createTeacher, fetchTeachers, deleteTeacher, fetchTeacherStudents, updateTeacherClass, resetAccountPassword, deleteManagedStudent }
 })
