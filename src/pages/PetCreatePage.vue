@@ -1,5 +1,5 @@
 <template>
-  <div class="create-page">
+  <div class="create-page" :class="{ 'has-selection': species }">
     <div class="create-header">
       <h1>{{ petStore.pets.length > 0 ? '领养新伙伴' : '选择你的宠物' }}</h1>
       <p>选一个可爱的伙伴陪伴你吧！</p>
@@ -24,13 +24,13 @@
     </div>
 
     <!-- 颜色选择 -->
-    <div class="section">
+    <div v-if="species" class="section">
       <h3>选择颜色</h3>
       <PetColorPicker v-model="color" />
     </div>
 
     <!-- 取名 -->
-    <div class="section">
+    <div v-if="species" class="section">
       <h3>给它取个名字</h3>
       <input
         v-model="name"
@@ -77,6 +77,7 @@
     <p v-if="errorMsg" class="form-error">{{ errorMsg }}</p>
 
     <button
+      v-if="species"
       class="btn btn-primary create-btn"
       :disabled="!species || !name || loading"
       @click="handleCreate"

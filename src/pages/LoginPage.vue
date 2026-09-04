@@ -27,14 +27,16 @@
           required
         />
       </div>
-      <div class="form-group">
-        <label for="login-class" class="form-label">班级（学生同名时选择）</label>
-        <select id="login-class" v-model="teacherId" class="form-input" :disabled="classesLoading">
-          <option value="">不选择班级</option>
-          <option v-for="item in classes" :key="item.id" :value="item.id">{{ classLabel(item) }}</option>
-        </select>
-        <p class="class-hint">老师和管理员登录时不用选择。</p>
-      </div>
+      <Transition name="class-picker">
+        <div v-if="showClassSelector" class="class-picker">
+          <label for="login-class" class="form-label">请选择你所在的班级</label>
+          <select id="login-class" v-model="teacherId" class="form-input" :disabled="classesLoading" required>
+            <option disabled value="">{{ classesLoading ? '正在加载班级...' : '请选择班级' }}</option>
+            <option v-for="item in classes" :key="item.id" :value="item.id">{{ classLabel(item) }}</option>
+          </select>
+          <p class="class-hint">检测到其他班级也有同名账号，选择后即可准确登录。</p>
+        </div>
+      </Transition>
 
       <p v-if="error" class="auth-error">{{ error }}</p>
 
@@ -64,6 +66,7 @@ interface LoginClass { id: string; username: string; class_name: string | null }
 const teacherId = ref('')
 const classes = ref<LoginClass[]>([])
 const classesLoading = ref(true)
+const showClassSelector = ref(false)
 const error = ref('')
 const loading = ref(false)
 const registrationEnabled = ref(false)
@@ -92,7 +95,12 @@ async function handleSubmit() {
   const { error: err } = await authStore.signIn(username.value, password.value, teacherId.value || undefined)
   loading.value = false
   if (err) {
-    error.value = err.message || '用户名或密码错误'
+    if (err.message === '该名字存在于多个班级，请选择班级后登录') {
+      showClassSelector.value = true
+      error.value = ''
+    } else {
+      error.value = err.message || '用户名或密码错误'
+    }
   } else {
     router.push(authStore.isAdmin ? '/admin' : authStore.isTeacher ? '/teacher' : '/')
   }
@@ -159,9 +167,23 @@ async function handleSubmit() {
 
 .registration-closed { color: #999; }
 
+.class-picker {
+  margin-top: 2px;
+  padding: 12px 14px;
+  border: 1px solid rgba(236, 72, 153, 0.18);
+  border-radius: 12px;
+  background: rgba(253, 242, 248, 0.58);
+}
+
 .class-hint {
   margin-top: 6px;
   color: var(--color-text-muted);
   font-size: 0.78rem;
+  line-height: 1.5;
 }
+
+.class-picker-enter-active,
+.class-picker-leave-active { transition: opacity 0.2s ease, transform 0.2s ease; }
+.class-picker-enter-from,
+.class-picker-leave-to { opacity: 0; transform: translateY(-5px); }
 </style>

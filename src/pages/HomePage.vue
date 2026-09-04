@@ -6,13 +6,6 @@
     </div>
 
     <template v-else-if="petStore.currentPet">
-      <!-- 积分余额 -->
-      <div class="points-banner">
-        <span class="points-icon">⭐</span>
-        <span class="points-value">{{ authStore.user?.points || 0 }}</span>
-        <span class="points-label">积分</span>
-      </div>
-
       <!-- 宠物切换条 -->
       <div v-if="petStore.pets.length > 1 || petStore.canAdoptNew" class="pet-switcher">
         <button
@@ -47,15 +40,17 @@
           class="pet-avatar animate-float"
           :species="petStore.currentPet.species"
           :level="petStore.currentPet.level"
-          :size="200"
+          :size="260"
           show-stage
         />
         <Transition name="speech-pop">
           <div v-if="petReply" class="pet-speech">{{ petReply }}</div>
         </Transition>
-        <h2 class="pet-name">{{ petStore.currentPet.name }}</h2>
-        <div class="pet-level">
-          <span class="level-badge">Lv.{{ petStore.currentPet.level }}</span>
+        <div class="pet-identity">
+          <div class="pet-title-row">
+            <h2 class="pet-name">{{ petStore.currentPet.name }}</h2>
+            <span class="level-badge">Lv.{{ petStore.currentPet.level }}</span>
+          </div>
           <div class="xp-bar">
             <div class="progress-bar">
               <div class="progress-fill" :style="{ width: xpPercent + '%', background: 'linear-gradient(90deg, var(--color-primary), var(--color-secondary))' }"></div>
@@ -68,50 +63,66 @@
         </div>
       </div>
 
-      <!-- 状态条 -->
-      <div class="stats-grid">
-        <div class="stat-item">
-          <span class="stat-icon">🍖</span>
-          <div class="stat-info">
-            <span class="stat-label">饱食</span>
-            <div class="progress-bar">
-              <div class="progress-fill" :style="{ width: petStore.currentPet.hunger + '%', background: '#4ECDC4' }"></div>
-            </div>
+      <aside class="care-panel card">
+        <div class="care-heading">
+          <div>
+            <span class="care-eyebrow">今日照顾</span>
+            <h2>陪 {{ petStore.currentPet.name }} 长大</h2>
           </div>
-          <span class="stat-val">{{ petStore.currentPet.hunger }}</span>
+          <div class="points-balance" title="可用积分">
+            <span class="points-icon">⭐</span>
+            <strong>{{ authStore.user?.points || 0 }}</strong>
+            <span>积分</span>
+          </div>
         </div>
-      </div>
 
-      <!-- 互动按钮 -->
-      <div class="actions-grid">
-        <button
-          class="action-btn"
-          :disabled="!canAfford('basic')"
-          @click="doAction('basic')"
-        >
-          <span class="action-icon">🍖</span>
-          <span class="action-label">普通粮</span>
-          <span class="action-cost">{{ pointsStore.actionCosts.basic }} 积分</span>
-        </button>
-        <button
-          class="action-btn"
-          :disabled="!canAfford('nice')"
-          @click="doAction('nice')"
-        >
-          <span class="action-icon">🍗</span>
-          <span class="action-label">营养粮</span>
-          <span class="action-cost">{{ pointsStore.actionCosts.nice }} 积分</span>
-        </button>
-        <button
-          class="action-btn"
-          :disabled="!canAfford('luxury')"
-          @click="doAction('luxury')"
-        >
-          <span class="action-icon">🥩</span>
-          <span class="action-label">豪华粮</span>
-          <span class="action-cost">{{ pointsStore.actionCosts.luxury }} 积分</span>
-        </button>
-      </div>
+        <!-- 状态条 -->
+        <div class="stats-grid">
+          <div class="stat-item">
+            <span class="stat-icon">🍖</span>
+            <div class="stat-info">
+              <span class="stat-label">当前饱食度</span>
+              <div class="progress-bar">
+                <div class="progress-fill" :style="{ width: petStore.currentPet.hunger + '%', background: '#4ECDC4' }"></div>
+              </div>
+            </div>
+            <span class="stat-val">{{ petStore.currentPet.hunger }}</span>
+          </div>
+        </div>
+
+        <div class="care-divider"><span>选择食物</span></div>
+
+        <!-- 互动按钮 -->
+        <div class="actions-grid">
+          <button
+            class="action-btn"
+            :disabled="!canAfford('basic')"
+            @click="doAction('basic')"
+          >
+            <span class="action-icon">🍖</span>
+            <span class="action-label">普通粮</span>
+            <span class="action-cost">{{ pointsStore.actionCosts.basic }} 积分</span>
+          </button>
+          <button
+            class="action-btn"
+            :disabled="!canAfford('nice')"
+            @click="doAction('nice')"
+          >
+            <span class="action-icon">🍗</span>
+            <span class="action-label">营养粮</span>
+            <span class="action-cost">{{ pointsStore.actionCosts.nice }} 积分</span>
+          </button>
+          <button
+            class="action-btn"
+            :disabled="!canAfford('luxury')"
+            @click="doAction('luxury')"
+          >
+            <span class="action-icon">🥩</span>
+            <span class="action-label">豪华粮</span>
+            <span class="action-cost">{{ pointsStore.actionCosts.luxury }} 积分</span>
+          </button>
+        </div>
+      </aside>
 
       <Teleport to="body">
         <Transition name="upgrade-showcase">
@@ -228,31 +239,8 @@ onMounted(async () => {
   margin-top: 12px;
 }
 
-.points-banner {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  background: linear-gradient(135deg, #FFF8E1, #FFECB3);
-  border: 1px solid #FFD54F;
-  border-radius: var(--radius);
-  padding: 12px;
-  margin-bottom: 16px;
-}
-
 .points-icon {
-  font-size: 1.3rem;
-}
-
-.points-value {
-  font-size: 1.5rem;
-  font-weight: 700;
-  color: #F57F17;
-}
-
-.points-label {
-  font-size: 0.85rem;
-  color: #F9A825;
+  font-size: 1rem;
 }
 
 .pet-switcher {
@@ -315,6 +303,60 @@ onMounted(async () => {
   padding: 28px 20px;
   margin-bottom: 16px;
 }
+
+.care-panel {
+  padding: 24px;
+  border: 1px solid rgba(232, 218, 205, 0.9);
+  background: rgba(255, 255, 255, 0.88);
+  box-shadow: 0 12px 32px rgba(78, 52, 43, 0.08);
+}
+
+.care-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 22px;
+}
+
+.care-eyebrow {
+  color: var(--color-primary);
+  font-size: 0.7rem;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+}
+
+.care-heading h2 {
+  margin: 5px 0 0;
+  font-size: 1.15rem;
+}
+
+.points-balance {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  flex-shrink: 0;
+  padding: 8px 11px;
+  border: 1px solid #f3d98b;
+  border-radius: 999px;
+  color: #a76b11;
+  background: #fff8df;
+}
+
+.points-balance strong { font-size: 1rem; }
+.points-balance > span:last-child { font-size: 0.7rem; }
+
+.care-divider {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 22px 0 14px;
+  color: var(--color-text-muted);
+  font-size: 0.72rem;
+}
+
+.care-divider::before,
+.care-divider::after { content: ''; height: 1px; flex: 1; background: var(--color-border); }
 
 .pet-display.level-up-active { z-index: 30; }
 
@@ -398,19 +440,34 @@ onMounted(async () => {
 .speech-pop-enter-from, .speech-pop-leave-to { opacity: 0; transform: translateY(5px) scale(.94); }
 
 .pet-avatar {
-  margin: 0 auto 16px;
+  margin: 0 auto 6px;
+}
+
+.pet-identity {
+  width: min(360px, calc(100% - 24px));
+  box-sizing: border-box;
+  padding: 14px 18px 13px;
+  border: 1px solid rgba(255, 255, 255, 0.82);
+  border-radius: 17px;
+  background: rgba(255, 255, 255, 0.72);
+  box-shadow: 0 10px 26px rgba(72, 45, 58, 0.09), inset 0 1px 0 white;
+  backdrop-filter: blur(8px);
+}
+
+.pet-title-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  margin-bottom: 10px;
 }
 
 .pet-name {
-  font-size: 1.5rem;
+  margin: 0;
+  font-size: 1.3rem;
   color: var(--color-text);
-  margin-bottom: 12px;
-}
-
-.pet-level {
-  display: flex;
-  align-items: center;
-  gap: 12px;
+  line-height: 1.2;
+  text-align: left;
 }
 
 .level-badge {
@@ -424,7 +481,7 @@ onMounted(async () => {
 }
 
 .xp-bar {
-  flex: 1;
+  width: 100%;
 }
 
 .xp-text {

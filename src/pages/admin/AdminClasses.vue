@@ -7,8 +7,8 @@
         <p>管理老师、班级和学生账号</p>
       </div>
       <div class="header-actions">
-        <button class="primary-action" @click="showCreateForm = !showCreateForm">
-          <span>{{ showCreateForm ? '×' : '+' }}</span>{{ showCreateForm ? '收起' : '新增老师' }}
+        <button class="primary-action" @click="openCreateForm">
+          <span>+</span>新建班级
         </button>
         <button class="logout-btn" @click="handleLogout">退出</button>
       </div>
@@ -47,36 +47,47 @@
     <div v-if="registrationMessage || registrationError" class="notice" :class="{ error: registrationError }" role="status">
       {{ registrationError || registrationMessage }}
     </div>
+    <div v-if="success || (!showCreateForm && error)" class="notice" :class="{ error: !success && error }" role="status">
+      {{ success || error }}
+    </div>
 
-    <Transition name="form-slide">
-    <section v-if="showCreateForm" class="create-card card">
-      <div class="section-title">
-        <div>
-          <h2>新增老师和班级</h2>
-          <p>创建登录账号，并同时建立老师负责的班级。</p>
-        </div>
+    <Transition name="dialog-fade">
+      <div v-if="showCreateForm" class="create-dialog-overlay" @click.self="closeCreateForm">
+        <section class="create-dialog" role="dialog" aria-modal="true" aria-labelledby="create-class-title">
+          <header class="create-dialog-header">
+            <div>
+              <span class="drawer-label">新建班级</span>
+              <h2 id="create-class-title">填写班级与老师信息</h2>
+              <p>创建后，老师使用这里设置的账号管理该班级。</p>
+            </div>
+            <button class="drawer-close" aria-label="关闭" :disabled="submitting" @click="closeCreateForm">×</button>
+          </header>
+          <div class="create-dialog-body">
+            <div class="form-grid">
+              <label>
+                <span><b>1</b> 班级名称</span>
+                <input v-model="form.className" class="form-input" maxlength="30" autofocus placeholder="例如：彩虹二班" />
+                <small>将显示在学生注册和班级列表中</small>
+              </label>
+              <label>
+                <span><b>2</b> 老师登录账号</span>
+                <input v-model="form.username" class="form-input" maxlength="20" autocomplete="off" placeholder="例如：teacher_wang" />
+                <small>老师登录后只能管理这个班级</small>
+              </label>
+              <label>
+                <span><b>3</b> 初始密码</span>
+                <input v-model="form.password" type="password" class="form-input" minlength="6" autocomplete="new-password" placeholder="至少 6 位" />
+                <small>创建后请将账号和密码交给老师</small>
+              </label>
+            </div>
+            <p v-if="error" class="message error">{{ error }}</p>
+            <div class="form-actions">
+              <button class="secondary-action" :disabled="submitting" @click="closeCreateForm">取消</button>
+              <button class="primary-action submit" :disabled="submitting" @click="createTeacher">{{ submitting ? '正在创建...' : '创建班级' }}</button>
+            </div>
+          </div>
+        </section>
       </div>
-      <div class="form-grid">
-        <label>
-          <span>老师账号</span>
-          <input v-model="form.username" class="form-input" maxlength="20" autocomplete="off" placeholder="例如：teacher_wang" />
-        </label>
-        <label>
-          <span>初始密码</span>
-          <input v-model="form.password" type="password" class="form-input" minlength="6" autocomplete="new-password" placeholder="至少 6 位" />
-        </label>
-        <label>
-          <span>班级名称</span>
-          <input v-model="form.className" class="form-input" maxlength="30" placeholder="例如：彩虹二班" />
-        </label>
-      </div>
-      <p v-if="error" class="message error">{{ error }}</p>
-      <p v-if="success" class="message success">{{ success }}</p>
-      <div class="form-actions">
-        <button class="secondary-action" :disabled="submitting" @click="showCreateForm = false">取消</button>
-        <button class="primary-action submit" :disabled="submitting" @click="createTeacher">{{ submitting ? '正在创建...' : '确认创建' }}</button>
-      </div>
-    </section>
     </Transition>
 
     <section class="classes-section">
@@ -85,7 +96,7 @@
         <div class="search-box"><span>⌕</span><input v-model="searchQuery" placeholder="搜索班级或老师" /></div>
       </div>
       <div v-if="loading" class="empty-state">正在加载...</div>
-      <div v-else-if="teachers.length === 0" class="empty-state">还没有老师账号，请先创建</div>
+      <div v-else-if="teachers.length === 0" class="empty-state">还没有班级，请先新建班级</div>
       <div v-else-if="filteredTeachers.length === 0" class="empty-state">没有找到匹配的班级</div>
       <div v-else class="class-grid">
         <article v-for="teacher in filteredTeachers" :key="teacher.id" class="class-card card">
@@ -222,6 +233,20 @@ const filteredTeachers = computed(() => {
 })
 const managingTeacher = computed(() => teachers.value.find(teacher => teacher.id === expandedTeacherId.value) || null)
 
+function openCreateForm() {
+  error.value = ''
+  success.value = ''
+  showCreateForm.value = true
+}
+
+function closeCreateForm() {
+  showCreateForm.value = false
+  error.value = ''
+  form.username = ''
+  form.password = ''
+  form.className = ''
+}
+
 onMounted(async () => {
   await Promise.all([loadTeachers(), loadRegistrationSetting()])
 })
@@ -266,7 +291,7 @@ async function createTeacher() {
     error.value = result.error.message || '创建失败，请重试'
     return
   }
-  success.value = `已创建老师「${result.data?.username}」和班级「${result.data?.class_name}」`
+  success.value = `“${result.data?.class_name}”已创建，老师可使用账号“${result.data?.username}”登录。`
   form.username = ''
   form.password = ''
   form.className = ''
@@ -371,7 +396,7 @@ async function handleLogout() {
 
 <style scoped>
 .admin-page { --admin-purple:#7657d5; --admin-ink:#292238; min-height:100vh; padding:38px 28px 100px; background:#f8f7fb; color:var(--admin-ink); }
-.admin-header,.overview-grid,.create-card,.classes-section,.notice { max-width:1120px; margin-left:auto; margin-right:auto; }
+.admin-header,.overview-grid,.classes-section,.notice { max-width:1120px; margin-left:auto; margin-right:auto; }
 .admin-header { margin-bottom:28px; display:flex; justify-content:space-between; align-items:flex-end; gap:24px; }
 .eyebrow { color:#9a8ab6; font-size:.68rem; font-weight:800; letter-spacing:.16em; }
 .admin-header h1 { margin:6px 0 4px; font-size:2rem; letter-spacing:-.04em; }
@@ -393,12 +418,11 @@ async function handleLogout() {
 .status-pill { padding:3px 7px; border-radius:999px; color:#827989; background:#f0eef2; font-size:.66rem; font-weight:700; }.status-pill.enabled { color:#18854c; background:#e5f9ee; }
 .switch { cursor:pointer; }.switch.disabled { opacity:.55; cursor:wait; }.switch input { position:absolute; opacity:0; pointer-events:none; }.switch-track { width:46px; height:26px; display:block; padding:3px; border-radius:99px; background:#d8d4dc; transition:.2s; }.switch-track span { width:20px; height:20px; display:block; border-radius:50%; background:white; box-shadow:0 1px 4px rgba(0,0,0,.18); transition:.2s; }.switch input:checked + .switch-track { background:#38bd72; }.switch input:checked + .switch-track span { transform:translateX(20px); }
 .notice { box-sizing:border-box; margin-top:-14px; margin-bottom:22px; padding:10px 14px; border-radius:10px; color:#187e49; background:#eaf9f1; font-size:.8rem; }.notice.error { color:#c94359; background:#fff0f2; }
-.create-card { box-sizing:border-box; margin-bottom:28px; padding:24px; border:1px solid #e8e2ef; box-shadow:0 8px 28px rgba(57,42,74,.08); }
 .section-title h2,.list-heading h2 { margin:0 0 5px; font-size:1.12rem; }
-.form-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:14px; margin-top:20px; }.form-grid label { display:flex; flex-direction:column; gap:7px; color:#514b59; font-size:.78rem; font-weight:700; }.form-grid .form-input { border-color:#e5dfea; background:#fbfafc; }
+.create-dialog-overlay { position:fixed; inset:0; z-index:250; display:grid; place-items:center; padding:20px; background:rgba(35,28,43,.42); backdrop-filter:blur(3px); }.create-dialog { width:min(500px,100%); overflow:hidden; border:1px solid #e5dfeb; border-radius:18px; background:white; box-shadow:0 24px 70px rgba(40,30,50,.24); }.create-dialog-header { display:flex; justify-content:space-between; align-items:flex-start; padding:22px 24px 18px; border-bottom:1px solid #eee9f1; }.create-dialog-header h2 { margin:5px 0 4px; font-size:1.25rem; }.create-dialog-header p { margin:0; color:#8e8794; font-size:.78rem; }.create-dialog-body { padding:22px 24px 24px; }.form-grid { display:grid; gap:17px; }.form-grid label { display:flex; flex-direction:column; gap:7px; color:#514b59; font-size:.78rem; font-weight:700; }.form-grid label span { display:flex; align-items:center; gap:7px; }.form-grid label span b { width:19px; height:19px; display:inline-grid; place-items:center; border-radius:50%; color:#7255c8; background:#eee9ff; font-size:.68rem; }.form-grid label small { color:#9a929f; font-size:.7rem; font-weight:400; line-height:1.4; }.form-grid .form-input { border-color:#e5dfea; background:#fbfafc; }
 .form-actions { justify-content:flex-end; margin-top:20px; }.primary-action.submit { min-width:110px; }
 .message { margin:14px 0 0; font-size:.8rem; }.message.error { color:var(--color-danger); }.message.success { color:var(--color-success); }
-.form-slide-enter-active,.form-slide-leave-active { transition:.2s ease; }.form-slide-enter-from,.form-slide-leave-to { opacity:0; transform:translateY(-8px); }
+.dialog-fade-enter-active,.dialog-fade-leave-active { transition:opacity .18s ease; }.dialog-fade-enter-from,.dialog-fade-leave-to { opacity:0; }.dialog-fade-enter-active .create-dialog { animation:modal-in .18s ease-out; }
 .classes-section { margin-bottom:24px; }.list-heading { display:flex; align-items:flex-end; justify-content:space-between; gap:18px; margin-bottom:14px; }
 .search-box { width:230px; display:flex; align-items:center; gap:8px; padding:9px 12px; border:1px solid #e7e2eb; border-radius:10px; background:white; color:#999; }.search-box input { width:100%; border:0; outline:0; background:transparent; font:inherit; font-size:.8rem; }
 .class-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:14px; align-items:start; }.class-card { padding:0; overflow:hidden; border:1px solid #ebe6ef; box-shadow:0 3px 14px rgba(57,42,74,.045); }
