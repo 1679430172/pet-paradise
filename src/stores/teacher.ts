@@ -7,6 +7,7 @@ import { MAX_LEVEL, STAT_DECAY_PER_HOUR } from '../lib/constants'
 import type { Profile } from './auth'
 import { useAuthStore } from './auth'
 import type { CosmeticSelection } from '../lib/cosmetics'
+import type { ShopItem } from './shop'
 
 export interface TeacherPet {
   id: string
@@ -47,6 +48,8 @@ export const useTeacherStore = defineStore('teacher', () => {
   const loading = ref(false)
   const totalStudents = ref(0)
   const totalPointsGiven = ref(0)
+  const cosmeticItems = ref<ShopItem[]>([])
+  const cosmeticOwnedIds = ref<string[]>([])
 
   function teacherId(): string | null {
     return useAuthStore().user?.id || null
@@ -435,7 +438,47 @@ export const useTeacherStore = defineStore('teacher', () => {
     if (!error) totalPointsGiven.value = Number(data ?? 0)
   }
 
-  return { students, studentsWithPets, leaderboardError, leaderboardLoading, leaderboardWeek, leaderboard, loading, totalStudents, totalPointsGiven, fetchStudents, fetchStudentsWithPets, performActionForStudent, fetchStudentDetail, fetchLeaderboard, fetchStats, createStudent, renameStudent, adoptPetForStudent, renamePetForStudent, deleteStudent }
+  async function fetchStudentCosmetics(studentId: string) {
+    const currentTeacherId = teacherId()
+    if (!currentTeacherId) throw new Error('未登录')
+    const student = studentsWithPets.value.find(item => item.id === studentId)
+    if (!student) throw new Error('该学生不属于当前老师')
+    const [catalog, owned] = await Promise.all([
+      supabase.from('shop_items').select('*').eq('is_active', true).order('sort_order'),
+      supabase.from('user_items').select('item_id').eq('user_id', studentId),
+    ])
+    if (catalog.error?.code === '42P01') throw new Error('商城尚未启用，请先执行数据库迁移')
+    if (catalog.error || owned.error) throw catalog.error || owned.error
+    cosmeticItems.value = (catalog.data || []) as ShopItem[]
+    cosmeticOwnedIds.value = (owned.data || []).map(row => row.item_id)
+  }
+
+  async function purchaseCosmeticForStudent(studentId: string, petId: string, item: ShopItem) {
+    const currentTeacherId = teacherId()
+    if (!currentTeacherId) throw new Error('未登录')
+    const result = await classroomRpc<{ balance: number; alreadyOwned: boolean }>('teacher_purchase_shop_item', {
+      p_actor_id: currentTeacherId, p_student_id: studentId, p_item_id: item.id, p_request_id: crypto.randomUUID(),
+    })
+    const student = studentsWithPets.value.find(entry => entry.id === studentId)
+    if (student) student.points = result.balance
+    if (!cosmeticOwnedIds.value.includes(item.id)) cosmeticOwnedIds.value.push(item.id)
+    await equipCosmeticForStudent(studentId, petId, item.category, item)
+    return result
+  }
+
+  async function equipCosmeticForStudent(studentId: string, petId: string, category: 'frame' | 'background', item: ShopItem | null) {
+    const currentTeacherId = teacherId()
+    if (!currentTeacherId) throw new Error('未登录')
+    await classroomRpc('teacher_equip_pet_cosmetic', {
+      p_actor_id: currentTeacherId, p_student_id: studentId, p_pet_id: petId,
+      p_category: category, p_item_id: item?.id || null,
+    })
+    const student = studentsWithPets.value.find(entry => entry.id === studentId)
+    const pet = student?.pets.find(entry => entry.id === petId)
+    if (pet) pet.cosmetics = { ...pet.cosmetics, [category]: item?.style_key || null }
+  }
+
+  return { students, studentsWithPets, leaderboardError, leaderboardLoading, leaderboardWeek, leaderboard, loading, totalStudents, totalPointsGiven, cosmeticItems, cosmeticOwnedIds, fetchStudents, fetchStudentsWithPets, performActionForStudent, fetchStudentDetail, fetchLeaderboard, fetchStats, fetchStudentCosmetics, purchaseCosmeticForStudent, equipCosmeticForStudent, createStudent, renameStudent, adoptPetForStudent, renamePetForStudent, deleteStudent }
 })
 
 if (import.meta.hot) {

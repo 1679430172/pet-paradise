@@ -20,12 +20,16 @@ CREATE TABLE IF NOT EXISTS shop_items (
 CREATE TABLE IF NOT EXISTS shop_orders (
   id UUID PRIMARY KEY,
   buyer_id UUID NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
+  actor_id UUID REFERENCES profiles(id) ON DELETE SET NULL,
   item_id UUID NOT NULL REFERENCES shop_items(id),
   price INTEGER NOT NULL CHECK (price >= 0),
   balance_after INTEGER NOT NULL,
   created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   UNIQUE(buyer_id, item_id)
 );
+
+ALTER TABLE shop_orders ADD COLUMN IF NOT EXISTS actor_id UUID REFERENCES profiles(id) ON DELETE SET NULL;
+UPDATE shop_orders SET actor_id=buyer_id WHERE actor_id IS NULL;
 
 CREATE TABLE IF NOT EXISTS user_items (
   user_id UUID NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
@@ -95,10 +99,61 @@ BEGIN
   IF NOT FOUND THEN RAISE EXCEPTION '商品已下架'; END IF;
   IF COALESCE(buyer.points,0) < item.price THEN RAISE EXCEPTION '积分不足，需要 % 积分',item.price; END IF;
   UPDATE profiles SET points=COALESCE(points,0)-item.price WHERE id=p_buyer_id RETURNING * INTO buyer;
-  INSERT INTO shop_orders(id,buyer_id,item_id,price,balance_after)
-    VALUES(p_request_id,p_buyer_id,item.id,item.price,buyer.points) RETURNING * INTO existing;
+  INSERT INTO shop_orders(id,buyer_id,actor_id,item_id,price,balance_after)
+    VALUES(p_request_id,p_buyer_id,p_buyer_id,item.id,item.price,buyer.points) RETURNING * INTO existing;
   INSERT INTO user_items(user_id,item_id,order_id) VALUES(p_buyer_id,item.id,existing.id);
   RETURN jsonb_build_object('balance',buyer.points,'order',to_jsonb(existing),'alreadyOwned',false);
+END $$;
+
+CREATE OR REPLACE FUNCTION teacher_purchase_shop_item(
+  p_actor_id UUID, p_student_id UUID, p_item_id UUID, p_request_id UUID
+) RETURNS JSONB LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
+DECLARE student profiles%ROWTYPE; item shop_items%ROWTYPE; existing shop_orders%ROWTYPE;
+BEGIN
+  IF p_actor_id IS NULL OR p_student_id IS NULL OR p_item_id IS NULL OR p_request_id IS NULL THEN RAISE EXCEPTION '无效的代购请求'; END IF;
+  SELECT * INTO student FROM profiles WHERE id=p_student_id AND role='student' FOR UPDATE;
+  IF NOT FOUND OR student.teacher_id IS DISTINCT FROM p_actor_id
+    OR NOT EXISTS(SELECT 1 FROM profiles WHERE id=p_actor_id AND role='teacher') THEN RAISE EXCEPTION '只能操作自己班级的学生'; END IF;
+  SELECT * INTO existing FROM shop_orders WHERE id=p_request_id;
+  IF FOUND THEN
+    IF existing.buyer_id IS DISTINCT FROM p_student_id OR existing.item_id IS DISTINCT FROM p_item_id OR existing.actor_id IS DISTINCT FROM p_actor_id THEN RAISE EXCEPTION '请求编号已用于其他购买'; END IF;
+    RETURN jsonb_build_object('balance',existing.balance_after,'order',to_jsonb(existing),'alreadyOwned',false);
+  END IF;
+  IF EXISTS(SELECT 1 FROM user_items WHERE user_id=p_student_id AND item_id=p_item_id) THEN
+    RETURN jsonb_build_object('balance',student.points,'alreadyOwned',true);
+  END IF;
+  SELECT * INTO item FROM shop_items WHERE id=p_item_id AND is_active=true;
+  IF NOT FOUND THEN RAISE EXCEPTION '商品已下架'; END IF;
+  IF COALESCE(student.points,0) < item.price THEN RAISE EXCEPTION '学生积分不足，需要 % 积分',item.price; END IF;
+  UPDATE profiles SET points=COALESCE(points,0)-item.price WHERE id=p_student_id RETURNING * INTO student;
+  INSERT INTO shop_orders(id,buyer_id,actor_id,item_id,price,balance_after)
+    VALUES(p_request_id,p_student_id,p_actor_id,item.id,item.price,student.points) RETURNING * INTO existing;
+  INSERT INTO user_items(user_id,item_id,order_id) VALUES(p_student_id,item.id,existing.id);
+  RETURN jsonb_build_object('balance',student.points,'order',to_jsonb(existing),'alreadyOwned',false);
+END $$;
+
+CREATE OR REPLACE FUNCTION teacher_equip_pet_cosmetic(
+  p_actor_id UUID, p_student_id UUID, p_pet_id UUID, p_category TEXT, p_item_id UUID DEFAULT NULL
+) RETURNS JSONB LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
+DECLARE item shop_items%ROWTYPE; equipped pet_cosmetics%ROWTYPE;
+BEGIN
+  IF p_category NOT IN ('frame','background') THEN RAISE EXCEPTION '无效的装扮类型'; END IF;
+  IF NOT EXISTS(SELECT 1 FROM profiles WHERE id=p_actor_id AND role='teacher')
+    OR NOT EXISTS(SELECT 1 FROM profiles WHERE id=p_student_id AND role='student' AND teacher_id=p_actor_id)
+    OR NOT EXISTS(SELECT 1 FROM pets WHERE id=p_pet_id AND owner_id=p_student_id) THEN RAISE EXCEPTION '只能装扮自己班级学生的宠物'; END IF;
+  IF p_item_id IS NOT NULL THEN
+    SELECT i.* INTO item FROM shop_items i JOIN user_items u ON u.item_id=i.id
+      WHERE i.id=p_item_id AND u.user_id=p_student_id AND i.category=p_category AND i.is_active=true;
+    IF NOT FOUND THEN RAISE EXCEPTION '学生尚未拥有该装扮'; END IF;
+  END IF;
+  INSERT INTO pet_cosmetics(pet_id,frame_item_id,background_item_id)
+    VALUES(p_pet_id,CASE WHEN p_category='frame' THEN p_item_id END,CASE WHEN p_category='background' THEN p_item_id END)
+  ON CONFLICT (pet_id) DO UPDATE SET
+    frame_item_id=CASE WHEN p_category='frame' THEN p_item_id ELSE pet_cosmetics.frame_item_id END,
+    background_item_id=CASE WHEN p_category='background' THEN p_item_id ELSE pet_cosmetics.background_item_id END,
+    updated_at=now()
+  RETURNING * INTO equipped;
+  RETURN to_jsonb(equipped);
 END $$;
 
 CREATE OR REPLACE FUNCTION equip_pet_cosmetic(
@@ -126,5 +181,5 @@ END $$;
 
 GRANT SELECT ON shop_items,shop_orders,user_items,pet_cosmetics TO anon,authenticated;
 REVOKE INSERT, UPDATE, DELETE ON shop_orders,user_items,pet_cosmetics FROM anon,authenticated;
-GRANT EXECUTE ON FUNCTION purchase_shop_item(UUID,UUID,UUID),equip_pet_cosmetic(UUID,UUID,TEXT,UUID) TO anon,authenticated;
+GRANT EXECUTE ON FUNCTION purchase_shop_item(UUID,UUID,UUID),equip_pet_cosmetic(UUID,UUID,TEXT,UUID),teacher_purchase_shop_item(UUID,UUID,UUID,UUID),teacher_equip_pet_cosmetic(UUID,UUID,UUID,TEXT,UUID) TO anon,authenticated;
 COMMIT;

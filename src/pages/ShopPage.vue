@@ -53,7 +53,7 @@
           <span class="order-preview cosmetic-card" :class="order.item ? cosmeticClasses({ [order.item.category]: order.item.style_key }) : []" :style="getPetThemeStyle(petStore.currentPet?.appearance.color || '#d89072')">
             <PetAvatar v-if="petStore.currentPet" :species="petStore.currentPet.species" :level="petStore.currentPet.level" :size="34" />
           </span>
-          <div><strong>{{ order.item?.name || '装扮商品' }}</strong><small>{{ formatTime(order.created_at) }}</small></div><span class="order-price">-{{ order.price }} 积分</span>
+          <div><strong>{{ order.item?.name || '装扮商品' }}</strong><small>{{ formatTime(order.created_at) }}{{ order.actor?.role === 'teacher' ? ` · ${order.actor.username}老师代购` : '' }}</small></div><span class="order-price">-{{ order.price }} 积分</span>
         </div>
       </section>
     </template>

@@ -92,8 +92,15 @@
 
           <div
             class="pet-stage"
+            :class="{ 'can-open-cosmetics': !classroomMode }"
+            :role="!classroomMode ? 'button' : undefined"
+            :tabindex="!classroomMode ? 0 : undefined"
+            :aria-label="!classroomMode ? `打开 ${s.username} 的宠物装扮` : undefined"
             @mouseenter="showHoverReply(activePet(s)!)"
             @mouseleave="hideHoverReply"
+            @click="handlePetStageClick(s, activePet(s)!)"
+            @keydown.enter.prevent="handlePetStageClick(s, activePet(s)!)"
+            @keydown.space.prevent="handlePetStageClick(s, activePet(s)!)"
           >
             <button
               v-if="s.pets.length > 1"
@@ -101,7 +108,7 @@
               type="button"
               title="上一只"
               aria-label="上一只宠物"
-              @click="prev(s)"
+              @click.stop="prev(s)"
             >‹</button>
             <PetAvatar
               :species="activePet(s)!.species"
@@ -120,7 +127,7 @@
               type="button"
               title="下一只"
               aria-label="下一只宠物"
-              @click="next(s)"
+              @click.stop="next(s)"
             >›</button>
           </div>
           <!-- 主标题：学生姓名 -->
@@ -205,6 +212,35 @@
       </div>
     </div>
 
+    </div>
+
+    <!-- 学生装扮弹窗 -->
+    <div v-if="showCosmeticDialog" class="dialog-overlay" @click.self="closeCosmeticDialog">
+      <div class="dialog cosmetic-dialog card">
+        <div class="cosmetic-dialog-head">
+          <div><h3>为 {{ cosmeticTargetStudent?.username }} 更换装扮</h3><p>{{ cosmeticTargetPet?.name }} · 使用学生积分购买</p></div>
+          <strong>{{ cosmeticTargetStudent?.points || 0 }} 积分</strong>
+        </div>
+        <div class="cosmetic-tabs" role="tablist">
+          <button :class="{ active: cosmeticTab === 'frame' }" @click="cosmeticTab = 'frame'">卡片边框</button>
+          <button :class="{ active: cosmeticTab === 'background' }" @click="cosmeticTab = 'background'">背景主题</button>
+        </div>
+        <div v-if="cosmeticLoading" class="cosmetic-loading">正在加载装扮...</div>
+        <p v-else-if="cosmeticError" class="form-error">{{ cosmeticError }}</p>
+        <div v-else class="teacher-cosmetic-grid">
+          <article v-for="item in visibleCosmeticItems" :key="item.id" class="teacher-cosmetic-item" :class="{ equipped: isCosmeticEquipped(item) }">
+            <div class="teacher-cosmetic-preview cosmetic-card" :class="cosmeticClasses({ [item.category]: item.style_key })" :style="item.category === 'frame' ? getPetThemeStyle(cosmeticTargetPet?.appearance?.color) : undefined">
+              <PetAvatar v-if="cosmeticTargetPet" :species="cosmeticTargetPet.species" :level="cosmeticTargetPet.level" :size="74" show-stage />
+            </div>
+            <div class="teacher-cosmetic-copy"><strong>{{ item.name }}</strong><small>{{ item.description }}</small><span>{{ cosmeticOwned(item) ? '已拥有' : `${item.price} 积分` }}</span></div>
+            <button v-if="isCosmeticEquipped(item)" class="cosmetic-remove" :disabled="!!cosmeticBusyId" @click="removeStudentCosmetic(item)">卸下</button>
+            <button v-else-if="cosmeticOwned(item)" class="cosmetic-equip" :disabled="!!cosmeticBusyId" @click="equipStudentCosmetic(item)">装备</button>
+            <button v-else class="cosmetic-buy" :disabled="!!cosmeticBusyId || (cosmeticTargetStudent?.points || 0) < item.price" @click="buyStudentCosmetic(item)">{{ cosmeticBusyId === item.id ? '处理中...' : '购买并装备' }}</button>
+          </article>
+        </div>
+        <p class="cosmetic-dialog-note">购买将扣除该学生积分；教师只能操作自己班级的学生。</p>
+        <div class="dialog-actions"><button class="btn-cancel" :disabled="!!cosmeticBusyId" @click="closeCosmeticDialog">完成</button></div>
+      </div>
     </div>
 
     <!-- 批量投喂弹窗 -->
@@ -316,6 +352,7 @@ import { usePointsStore } from '../../stores/points'
 import { PET_COLORS, MAX_LEVEL, LEVEL_THRESHOLDS, getFeedingReply } from '../../lib/constants'
 import { getPetThemeStyle } from '../../lib/petTheme'
 import { cosmeticClasses } from '../../lib/cosmetics'
+import type { ShopItem } from '../../stores/shop'
 import PetAvatar from '../../components/pet/PetAvatar.vue'
 import PetAdoptionFields from '../../components/pet/PetAdoptionFields.vue'
 
@@ -402,6 +439,14 @@ const selectedPetIds = ref<string[]>([])
 const showBatchFeedDialog = ref(false)
 const batchFeeding = ref(false)
 const selectedBatchAction = ref<'basic' | 'nice' | 'luxury'>('basic')
+const showCosmeticDialog = ref(false)
+const cosmeticTargetStudent = ref<StudentWithPet | null>(null)
+const cosmeticTargetPet = ref<TeacherPet | null>(null)
+const cosmeticTab = ref<'frame' | 'background'>('frame')
+const cosmeticLoading = ref(false)
+const cosmeticBusyId = ref<string | null>(null)
+const cosmeticError = ref('')
+const visibleCosmeticItems = computed(() => teacherStore.cosmeticItems.filter(item => item.category === cosmeticTab.value))
 const batchFoods = [
   { action: 'basic' as const, label: '普通粮', icon: '🍖', gain: 20 },
   { action: 'nice' as const, label: '营养粮', icon: '🍗', gain: 50 },
@@ -623,6 +668,67 @@ function showPetReply(petId: string, reply: string) {
     petReplies.value = nextReplies
     replyTimers.delete(petId)
   }, 3200))
+}
+
+async function openCosmeticDialog(student: StudentWithPet, pet: TeacherPet) {
+  cosmeticTargetStudent.value = student
+  cosmeticTargetPet.value = pet
+  cosmeticTab.value = 'frame'
+  cosmeticError.value = ''
+  cosmeticLoading.value = true
+  showCosmeticDialog.value = true
+  try { await teacherStore.fetchStudentCosmetics(student.id) }
+  catch (error) { cosmeticError.value = error instanceof Error ? error.message : '装扮加载失败' }
+  finally { cosmeticLoading.value = false }
+}
+
+function handlePetStageClick(student: StudentWithPet, pet: TeacherPet) {
+  if (classroomMode.value || busyKey.value || batchFeeding.value || awarding.value) return
+  void openCosmeticDialog(student, pet)
+}
+
+function closeCosmeticDialog() {
+  if (cosmeticBusyId.value) return
+  showCosmeticDialog.value = false
+  cosmeticTargetStudent.value = null
+  cosmeticTargetPet.value = null
+  cosmeticError.value = ''
+}
+
+function cosmeticOwned(item: ShopItem) { return teacherStore.cosmeticOwnedIds.includes(item.id) }
+function isCosmeticEquipped(item: ShopItem) { return cosmeticTargetPet.value?.cosmetics?.[item.category] === item.style_key }
+
+async function buyStudentCosmetic(item: ShopItem) {
+  if (!cosmeticTargetStudent.value || !cosmeticTargetPet.value || cosmeticBusyId.value) return
+  cosmeticBusyId.value = item.id
+  cosmeticError.value = ''
+  try {
+    await teacherStore.purchaseCosmeticForStudent(cosmeticTargetStudent.value.id, cosmeticTargetPet.value.id, item)
+    showToast(`已为 ${cosmeticTargetStudent.value.username} 购买并装备「${item.name}」`)
+  } catch (error) { cosmeticError.value = error instanceof Error ? error.message : '购买失败' }
+  finally { cosmeticBusyId.value = null }
+}
+
+async function equipStudentCosmetic(item: ShopItem) {
+  if (!cosmeticTargetStudent.value || !cosmeticTargetPet.value || cosmeticBusyId.value) return
+  cosmeticBusyId.value = item.id
+  cosmeticError.value = ''
+  try {
+    await teacherStore.equipCosmeticForStudent(cosmeticTargetStudent.value.id, cosmeticTargetPet.value.id, item.category, item)
+    showToast(`已为 ${cosmeticTargetStudent.value.username} 装备「${item.name}」`)
+  } catch (error) { cosmeticError.value = error instanceof Error ? error.message : '装备失败' }
+  finally { cosmeticBusyId.value = null }
+}
+
+async function removeStudentCosmetic(item: ShopItem) {
+  if (!cosmeticTargetStudent.value || !cosmeticTargetPet.value || cosmeticBusyId.value) return
+  cosmeticBusyId.value = `remove-${item.category}`
+  cosmeticError.value = ''
+  try {
+    await teacherStore.equipCosmeticForStudent(cosmeticTargetStudent.value.id, cosmeticTargetPet.value.id, item.category, null)
+    showToast(`已卸下 ${item.category === 'frame' ? '卡片边框' : '背景主题'}`)
+  } catch (error) { cosmeticError.value = error instanceof Error ? error.message : '卸下失败' }
+  finally { cosmeticBusyId.value = null }
 }
 
 function showHoverReply(pet: TeacherPet) {
@@ -1401,6 +1507,9 @@ async function handleAdopt() {
   font-weight: 600;
 }
 
+.pet-stage.can-open-cosmetics { cursor:pointer; border-radius:18px; }
+.pet-stage.can-open-cosmetics:focus-visible { outline:3px solid #a85879; outline-offset:3px; }
+
 .adopt-btn {
   margin-top: 10px;
   padding: 8px 17px;
@@ -1474,6 +1583,34 @@ async function handleAdopt() {
 }
 
 .batch-feed-dialog { max-width: 460px; overflow: hidden; }
+.cosmetic-dialog { max-width: 760px; overflow: hidden; }
+.cosmetic-dialog-head { display:flex; align-items:flex-start; justify-content:space-between; gap:20px; }
+.cosmetic-dialog-head h3 { margin:0 0 4px; }
+.cosmetic-dialog-head p { margin:0; color:var(--color-text-muted); font-size:.78rem; }
+.cosmetic-dialog-head > strong { flex:none; padding:8px 12px; border:1px solid #eadba9; border-radius:999px; background:#fff9df; color:#986b18; font-size:.8rem; }
+.cosmetic-tabs { display:flex; gap:4px; margin:18px 0 14px; padding:4px; border-radius:12px; background:#f0ede9; }
+.cosmetic-tabs button { flex:1; padding:8px; border-radius:9px; color:#777; background:transparent; font-size:.78rem; font-weight:700; }
+.cosmetic-tabs button.active { color:#a14f6d; background:#fff; box-shadow:0 2px 8px #382d240d; }
+.cosmetic-loading { padding:60px 0; color:var(--color-text-muted); text-align:center; }
+.teacher-cosmetic-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:12px; max-height:53vh; overflow-y:auto; padding:4px 12px 8px 4px; }
+.teacher-cosmetic-item { display:grid; grid-template-columns:82px minmax(0,1fr) auto; align-items:center; gap:12px; min-width:0; padding:12px; border:1.5px solid #ebe5df; border-radius:16px; background:#fffdfa; }
+.teacher-cosmetic-item.equipped { border-color:#718d68; box-shadow:0 0 0 3px #718d6815; }
+.teacher-cosmetic-preview { width:70px; height:100px; display:grid; place-items:center; border-radius:12px; }
+.teacher-cosmetic-preview[class*="cosmetic-frame-"]::after { inset:-5.56%; }
+.teacher-cosmetic-preview.cosmetic-frame-leaf { --cosmetic-frame-image:url('/assets/shop/frame-leaf-portrait-v3.png'); }
+.teacher-cosmetic-preview.cosmetic-frame-candy { --cosmetic-frame-image:url('/assets/shop/frame-candy-portrait-v3.png'); }
+.teacher-cosmetic-preview.cosmetic-frame-starlight { --cosmetic-frame-image:url('/assets/shop/frame-starlight-portrait-v3.png'); }
+.teacher-cosmetic-preview.cosmetic-frame-gold { --cosmetic-frame-image:url('/assets/shop/frame-gold-portrait-v3.png'); }
+.teacher-cosmetic-preview :deep(.pet-avatar-wrap) { position:relative; z-index:2; transform:scale(.72); }
+.teacher-cosmetic-copy { display:flex; flex-direction:column; min-width:0; gap:3px; }
+.teacher-cosmetic-copy strong { color:#3d4944; font-size:.86rem; }
+.teacher-cosmetic-copy small { overflow:hidden; color:var(--color-text-muted); font-size:.66rem; text-overflow:ellipsis; white-space:nowrap; }
+.teacher-cosmetic-copy span { margin-top:4px; color:#a8761c; font-size:.7rem; font-weight:750; }
+.cosmetic-buy,.cosmetic-equip,.cosmetic-remove { width:78px; padding:8px 6px; border-radius:9px; font-size:.68rem; font-weight:750; }
+.cosmetic-buy,.cosmetic-equip { color:#fff; background:#617e63; }
+.cosmetic-remove { color:#667b55; background:#edf4e8; }
+.cosmetic-buy:disabled,.cosmetic-equip:disabled,.cosmetic-remove:disabled { opacity:.42; cursor:not-allowed; }
+.cosmetic-dialog-note { margin:12px 2px 0; color:#8d8b87; font-size:.7rem; }
 .batch-dialog-title { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
 .batch-dialog-title h3 { margin: 0 0 3px; }
 .batch-dialog-title p { margin: 0; color: var(--color-text-muted); font-size: .78rem; }
@@ -1502,6 +1639,8 @@ async function handleAdopt() {
 
 @media (max-width: 480px) {
   .batch-pet-list { grid-template-columns: 1fr; }
+  .teacher-cosmetic-grid { grid-template-columns:1fr; }
+  .teacher-cosmetic-item { grid-template-columns:72px minmax(0,1fr) auto; }
 }
 
 .rename-field {

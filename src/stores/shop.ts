@@ -24,6 +24,7 @@ export interface ShopOrder {
   balance_after: number
   created_at: string
   item?: Pick<ShopItem, 'name' | 'icon' | 'category' | 'style_key'>
+  actor?: { username: string; role: string } | null
 }
 
 export const useShopStore = defineStore('shop', () => {
@@ -43,12 +44,18 @@ export const useShopStore = defineStore('shop', () => {
     if (!force && loadedUserId.value === auth.user.id && items.value.length) return
     loading.value = true
     try {
-      const [catalog, owned, history, equipped] = await Promise.all([
+      const [catalog, owned, historyWithActor, equipped] = await Promise.all([
         supabase.from('shop_items').select('*').eq('is_active', true).order('sort_order'),
         supabase.from('user_items').select('item_id').eq('user_id', auth.user.id),
-        supabase.from('shop_orders').select('id,item_id,price,balance_after,created_at,item:shop_items(name,icon,category,style_key)').eq('buyer_id', auth.user.id).order('created_at', { ascending: false }),
+        supabase.from('shop_orders').select('id,item_id,price,balance_after,created_at,item:shop_items(name,icon,category,style_key),actor:profiles!shop_orders_actor_id_fkey(username,role)').eq('buyer_id', auth.user.id).order('created_at', { ascending: false }),
         supabase.from('pet_cosmetics').select('pet_id,frame:shop_items!pet_cosmetics_frame_item_id_fkey(style_key),background:shop_items!pet_cosmetics_background_item_id_fkey(style_key)'),
       ])
+      let history: any = historyWithActor
+      if (history.error && ['PGRST200', 'PGRST204', '42703'].includes(history.error.code || '')) {
+        history = await supabase.from('shop_orders')
+          .select('id,item_id,price,balance_after,created_at,item:shop_items(name,icon,category,style_key)')
+          .eq('buyer_id', auth.user.id).order('created_at', { ascending: false })
+      }
       if (catalog.error?.code === '42P01') throw new Error('商城尚未启用，请先执行数据库迁移')
       const firstError = catalog.error || owned.error || history.error || equipped.error
       if (firstError) throw firstError
