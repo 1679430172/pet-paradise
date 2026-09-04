@@ -35,7 +35,7 @@
       </div>
 
       <!-- 宠物展示 -->
-      <div class="pet-display card" :style="getPetThemeStyle(petStore.currentPet.appearance.color)">
+      <div class="pet-display card cosmetic-card" :class="petCosmeticClasses" :style="getPetThemeStyle(petStore.currentPet.appearance.color)">
         <PetAvatar
           class="pet-avatar animate-float"
           :species="petStore.currentPet.species"
@@ -151,6 +151,8 @@ import { useRouter } from 'vue-router'
 import { usePetStore } from '../stores/pet'
 import { useAuthStore } from '../stores/auth'
 import { usePointsStore } from '../stores/points'
+import { useShopStore } from '../stores/shop'
+import { cosmeticClasses } from '../lib/cosmetics'
 import { LEVEL_THRESHOLDS, MAX_LEVEL } from '../lib/constants'
 import { getPetThemeStyle } from '../lib/petTheme'
 import PetAvatar from '../components/pet/PetAvatar.vue'
@@ -159,12 +161,14 @@ const router = useRouter()
 const petStore = usePetStore()
 const authStore = useAuthStore()
 const pointsStore = usePointsStore()
+const shopStore = useShopStore()
 const petReply = ref('')
 const levelUpEffect = ref(false)
 let replyTimer: ReturnType<typeof setTimeout> | undefined
 let levelUpTimer: ReturnType<typeof setTimeout> | undefined
 const message = ref('')
 const isError = ref(false)
+const petCosmeticClasses = computed(() => cosmeticClasses(shopStore.selectionForPet(petStore.currentPet?.id)))
 
 const nextLevelXp = computed(() => {
   if (!petStore.currentPet) return 50
@@ -216,6 +220,7 @@ onMounted(async () => {
   await Promise.all([
     petStore.fetchPets(),
     pointsStore.fetchActionCosts(),
+    shopStore.fetchAll().catch(() => undefined),
   ])
   if (petStore.pets.length === 0) {
     router.push('/pet/create')
@@ -299,10 +304,20 @@ onMounted(async () => {
 .pet-display {
   position: relative;
   overflow: visible;
+  width: 100%;
+  height: 500px;
+  min-height: 500px;
+  box-sizing: border-box;
   text-align: center;
   padding: 28px 20px;
   margin-bottom: 16px;
 }
+
+.pet-display[class*="cosmetic-frame-"]::after { inset: -5.56%; border-radius: 30px; }
+.pet-display.cosmetic-frame-leaf { --cosmetic-frame-image: url('/assets/shop/frame-leaf-landscape-v3.png'); }
+.pet-display.cosmetic-frame-candy { --cosmetic-frame-image: url('/assets/shop/frame-candy-landscape-v3.png'); }
+.pet-display.cosmetic-frame-starlight { --cosmetic-frame-image: url('/assets/shop/frame-starlight-landscape-v3.png'); }
+.pet-display.cosmetic-frame-gold { --cosmetic-frame-image: url('/assets/shop/frame-gold-landscape-v3.png'); }
 
 .care-panel {
   padding: 24px;

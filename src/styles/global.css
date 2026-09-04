@@ -119,6 +119,28 @@ input, textarea {
   border: 2px solid var(--color-border);
 }
 
+/* 商城装扮由稳定的 style_key 映射为样式，数据库内不存放任意 CSS。 */
+.cosmetic-card { position: relative; isolation: isolate; background-color: var(--color-bg-card); }
+.cosmetic-card[class*="cosmetic-frame-"]::after {
+  content: '';
+  position: absolute;
+  z-index: 3;
+  inset: 0;
+  border-radius: inherit;
+  background: var(--cosmetic-frame-image) center / 100% 100% no-repeat;
+  pointer-events: none;
+}
+.cosmetic-card[class*="cosmetic-frame-"] > * { position: relative; z-index: 1; }
+.cosmetic-frame-leaf { --cosmetic-frame-image: url('/assets/shop/frame-leaf.png'); border-color: transparent !important; }
+.cosmetic-frame-candy { --cosmetic-frame-image: url('/assets/shop/frame-candy.png'); border-color: transparent !important; }
+.cosmetic-frame-starlight { --cosmetic-frame-image: url('/assets/shop/frame-starlight.png'); border-color: transparent !important; }
+.cosmetic-frame-gold { --cosmetic-frame-image: url('/assets/shop/frame-gold.png'); border-color: transparent !important; }
+.cosmetic-background-meadow { background: radial-gradient(circle at 18% 22%,#fffbd8 0 7%,transparent 8%),linear-gradient(160deg,#e9f6d8,#c9ead5) !important; }
+.cosmetic-background-sunset { background: radial-gradient(circle at 78% 20%,#fff3bd 0 9%,transparent 10%),linear-gradient(145deg,#ffe0c5,#f8bad2 55%,#c9b8e8) !important; }
+.cosmetic-background-ocean { background: radial-gradient(circle at 20% 25%,#ffffff88 0 5%,transparent 6%),radial-gradient(circle at 82% 68%,#ffffff77 0 7%,transparent 8%),linear-gradient(145deg,#d9fbfa,#9fd7ed) !important; }
+.cosmetic-background-night { background: radial-gradient(circle at 20% 20%,#fff 0 1px,transparent 2px),radial-gradient(circle at 73% 32%,#fff8b0 0 2px,transparent 3px),linear-gradient(145deg,#252b58,#594d91) !important; color:#fff; }
+.cosmetic-background-hidden { background: transparent !important; box-shadow:none !important; }
+
 /* 表单 */
 .form-group {
   margin-bottom: 16px;

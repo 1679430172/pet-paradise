@@ -1,5 +1,5 @@
 <template>
-  <div class="page teacher-page pets-page" :class="{ 'classroom-mode': classroomMode, 'classroom-compact': classroomMode && classroomDensity === 180 }" :style="classroomMode ? { '--classroom-card-width': classroomDensity + 'px' } : {}">
+  <div class="page teacher-page pets-page" :class="{ 'classroom-mode': classroomMode, 'classroom-compact': classroomMode && classroomDensity === 180 }" :style="classroomMode ? { '--classroom-card-width': classroomDensity + 'px', '--classroom-card-height': (classroomDensity === 180 ? 350 : classroomDensity === 230 ? 410 : 480) + 'px' } : {}">
     <header class="pets-toolbar">
     <div class="page-title-row">
       <div><p v-if="classroomMode" class="classroom-eyebrow">{{ authStore.user?.class_name || '我们的班级' }} · {{ teacherStore.studentsWithPets.length }} 位同学</p>
@@ -62,7 +62,7 @@
         v-for="s in sortedStudents"
         :key="s.id"
         class="pet-card card"
-        :class="{ 'empty-adopt-card': !activePet(s), 'award-selected': classroomMode && awardStudentIds.includes(s.id), 'award-bounce': !!awardBubbles[s.id] }"
+        :class="[cosmeticClasses(activePet(s)?.cosmetics), { 'cosmetic-card': !!activePet(s), 'empty-adopt-card': !activePet(s), 'award-selected': classroomMode && awardStudentIds.includes(s.id), 'award-bounce': !!awardBubbles[s.id] }]"
         :style="cardStyle(s)"
       >
         <label v-if="classroomMode" class="classroom-student-select"><input type="checkbox" :checked="awardStudentIds.includes(s.id)" :disabled="awarding" @change="toggleAwardStudent(s.id)" :aria-label="`选择 ${s.username}`" /><span class="card-selection-mark" aria-hidden="true">{{ awardStudentIds.includes(s.id) ? '✓' : '' }}</span></label>
@@ -315,6 +315,7 @@ import { useTeacherStore, type StudentWithPet, type TeacherPet } from '../../sto
 import { usePointsStore } from '../../stores/points'
 import { PET_COLORS, MAX_LEVEL, LEVEL_THRESHOLDS, getFeedingReply } from '../../lib/constants'
 import { getPetThemeStyle } from '../../lib/petTheme'
+import { cosmeticClasses } from '../../lib/cosmetics'
 import PetAvatar from '../../components/pet/PetAvatar.vue'
 import PetAdoptionFields from '../../components/pet/PetAdoptionFields.vue'
 
@@ -762,8 +763,15 @@ async function handleAdopt() {
 .classroom-task-hint { width: 100%; color: #6c766a; }
 .classroom-notice { padding: 12px 18px; color: #285b43; background: #e3f3e7; border-radius: 12px; margin-bottom: 18px; }
 .classroom-failures { padding: 14px 34px; color: #a33441; background: #fff0ef; border-radius: 12px; }
-:global(#app .app-shell .classroom-mode .pet-list) { grid-template-columns: repeat(auto-fill, minmax(min(100%, var(--classroom-card-width)), 1fr)); gap: 20px; }
+:global(#app .app-shell .classroom-mode .pet-list) { grid-template-columns: repeat(auto-fill, minmax(min(100%, var(--classroom-card-width)), 1fr)); gap: 62px; padding: 28px; }
 .pets-page .pet-card { border: 2px solid #ffffff; border-radius: 22px; box-shadow: 0 4px 18px #233d3210; }
+.classroom-mode .pet-card { width: 100%; height: var(--classroom-card-height); box-sizing: border-box; }
+.pets-page .pet-card[class*="cosmetic-frame-"] { overflow: visible; padding-inline: 28px; padding-bottom: 24px; }
+.pets-page .pet-card[class*="cosmetic-frame-"]::after { inset: -5.56%; border-radius: 30px; }
+.pets-page .pet-card.cosmetic-frame-leaf { --cosmetic-frame-image: url('/assets/shop/frame-leaf-portrait-v3.png'); }
+.pets-page .pet-card.cosmetic-frame-candy { --cosmetic-frame-image: url('/assets/shop/frame-candy-portrait-v3.png'); }
+.pets-page .pet-card.cosmetic-frame-starlight { --cosmetic-frame-image: url('/assets/shop/frame-starlight-portrait-v3.png'); }
+.pets-page .pet-card.cosmetic-frame-gold { --cosmetic-frame-image: url('/assets/shop/frame-gold-portrait-v3.png'); }
 .classroom-mode .pet-card { padding-top: 48px; }
 .pets-page .pet-card.empty-adopt-card::before { display: none; }
 .classroom-mode .pet-card:hover { box-shadow: 0 8px 24px #233d321c; }

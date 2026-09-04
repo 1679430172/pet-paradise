@@ -6,6 +6,7 @@ import { feedPet, classroomRpc } from '../lib/classroomApi'
 import { MAX_LEVEL, STAT_DECAY_PER_HOUR } from '../lib/constants'
 import type { Profile } from './auth'
 import { useAuthStore } from './auth'
+import type { CosmeticSelection } from '../lib/cosmetics'
 
 export interface TeacherPet {
   id: string
@@ -20,6 +21,7 @@ export interface TeacherPet {
   last_fed_at?: string | null
   appearance?: any
   created_at?: string
+  cosmetics?: CosmeticSelection
 }
 
 export interface StudentWithPet extends Profile {
@@ -34,6 +36,8 @@ export interface LeaderboardEntry {
   pet_level: number
   pet_name: string
   pet_species?: string
+  pet_id?: string
+  cosmetics?: CosmeticSelection
 }
 
 export const useTeacherStore = defineStore('teacher', () => {
@@ -111,6 +115,17 @@ export const useTeacherStore = defineStore('teacher', () => {
           .order('created_at', { ascending: true })
         if (error) return
         petsData = (data || []).map(applyHungerDecay)
+        const petIds = petsData.map(p => p.id)
+        if (petIds.length) {
+          const { data: cosmeticData } = await supabase
+            .from('pet_cosmetics')
+            .select('pet_id,frame:shop_items!pet_cosmetics_frame_item_id_fkey(style_key),background:shop_items!pet_cosmetics_background_item_id_fkey(style_key)')
+            .in('pet_id', petIds)
+          const cosmeticMap = new Map((cosmeticData || []).map((row: any) => [row.pet_id, {
+            frame: row.frame?.style_key || null, background: row.background?.style_key || null,
+          }]))
+          petsData = petsData.map(pet => ({ ...pet, cosmetics: cosmeticMap.get(pet.id) }))
+        }
       }
       const petMap = new Map<string, TeacherPet[]>()
       petsData.forEach(p => {
@@ -204,9 +219,19 @@ export const useTeacherStore = defineStore('teacher', () => {
       for (const pet of sortedPets) {
         if (!representativePets.has(pet.owner_id)) representativePets.set(pet.owner_id, pet)
       }
+      const representativeIds = [...representativePets.values()].map(pet => pet.id)
+      const { data: cosmeticData } = representativeIds.length
+        ? await supabase.from('pet_cosmetics')
+          .select('pet_id,frame:shop_items!pet_cosmetics_frame_item_id_fkey(style_key),background:shop_items!pet_cosmetics_background_item_id_fkey(style_key)')
+          .in('pet_id', representativeIds)
+        : { data: [] }
+      const cosmeticMap = new Map((cosmeticData || []).map((row: any) => [row.pet_id, {
+        frame: row.frame?.style_key || null, background: row.background?.style_key || null,
+      }]))
       leaderboard.value = result.entries.map(entry => {
         const pet = representativePets.get(entry.id)
-        return { ...entry, pet_species: pet?.species, pet_name: pet?.name || '未领养', pet_level: pet?.level || 0 }
+        return { ...entry, pet_id: pet?.id, pet_species: pet?.species, pet_name: pet?.name || '未领养', pet_level: pet?.level || 0,
+          cosmetics: pet ? cosmeticMap.get(pet.id) : undefined }
       })
       leaderboardWeek.value = { start: result.weekStart, end: result.weekEnd }
     } catch (error) {

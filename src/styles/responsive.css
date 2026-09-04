@@ -71,7 +71,7 @@
   #app .app-shell .profile-page :is(.badges-section, .pet-info) { grid-column: 2; margin: 0; }
   #app .app-shell .profile-page .logout-btn { grid-column: 1; }
   #app .app-shell .student-detail-page .history-section { grid-column: 1 / -1; }
-  #app .app-shell .home-page { display: grid; grid-template-columns: minmax(0, 1.5fr) minmax(340px, .75fr); gap: 24px; align-content: start; align-items: stretch; }
+  #app .app-shell .home-page { display: grid; grid-template-columns: minmax(0, 1.5fr) minmax(340px, .75fr); gap: 64px; align-content: start; align-items: stretch; }
   #app .app-shell .home-page > :is(.pet-switcher, .loading) { grid-column: 1 / -1; margin-bottom: 0; }
   #app .app-shell .home-page .pet-display { grid-column: 1; min-height: 460px; margin: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; }
   #app .app-shell .home-page .care-panel { grid-column: 2; margin: 0; }
