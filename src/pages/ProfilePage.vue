@@ -56,12 +56,23 @@
       </div>
     </div>
 
+    <section class="password-card card">
+      <div class="password-heading"><div><h3>修改密码</h3><p>修改后请使用新密码登录</p></div><span>账号安全</span></div>
+      <form class="password-form" @submit.prevent="handleChangePassword">
+        <label><span>当前密码</span><input v-model="currentPassword" class="form-input" type="password" autocomplete="current-password" placeholder="请输入当前密码" /></label>
+        <label><span>新密码</span><input v-model="newPassword" class="form-input" type="password" autocomplete="new-password" minlength="4" placeholder="至少 4 位" /></label>
+        <label><span>确认新密码</span><input v-model="confirmPassword" class="form-input" type="password" autocomplete="new-password" minlength="4" placeholder="再次输入新密码" /></label>
+        <p v-if="passwordMessage" class="password-message" :class="{ error: passwordError }" role="status">{{ passwordMessage }}</p>
+        <button class="btn btn-primary" type="submit" :disabled="changingPassword">{{ changingPassword ? '正在修改...' : '确认修改' }}</button>
+      </form>
+    </section>
+
     <button class="btn btn-secondary logout-btn" @click="handleLogout">退出登录</button>
   </div>
 </template>
 
 <script setup lang="ts">
-import { onMounted } from 'vue'
+import { onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '../stores/auth'
 import { usePetStore } from '../stores/pet'
@@ -71,6 +82,12 @@ import type { PetSpecies } from '../lib/constants'
 const router = useRouter()
 const authStore = useAuthStore()
 const petStore = usePetStore()
+const currentPassword = ref('')
+const newPassword = ref('')
+const confirmPassword = ref('')
+const passwordMessage = ref('')
+const passwordError = ref(false)
+const changingPassword = ref(false)
 
 function formatDate(dateStr: string) {
   const d = new Date(dateStr)
@@ -80,6 +97,24 @@ function formatDate(dateStr: string) {
 async function handleLogout() {
   await authStore.signOut()
   router.push('/login')
+}
+
+async function handleChangePassword() {
+  passwordMessage.value = ''
+  passwordError.value = true
+  if (!currentPassword.value) { passwordMessage.value = '请输入当前密码'; return }
+  if (newPassword.value.length < 4) { passwordMessage.value = '新密码至少 4 位'; return }
+  if (newPassword.value !== confirmPassword.value) { passwordMessage.value = '两次输入的新密码不一致'; return }
+  if (newPassword.value === currentPassword.value) { passwordMessage.value = '新密码不能与当前密码相同'; return }
+  changingPassword.value = true
+  const { error } = await authStore.changeOwnPassword(currentPassword.value, newPassword.value)
+  changingPassword.value = false
+  if (error) { passwordMessage.value = error.message; return }
+  currentPassword.value = ''
+  newPassword.value = ''
+  confirmPassword.value = ''
+  passwordError.value = false
+  passwordMessage.value = '密码修改成功'
 }
 
 onMounted(() => {
@@ -225,4 +260,15 @@ onMounted(() => {
   width: 100%;
   padding: 12px;
 }
+
+.password-card { margin-bottom:20px; padding:20px; }
+.password-heading { display:flex; align-items:flex-start; justify-content:space-between; gap:16px; margin-bottom:16px; }
+.password-heading h3 { margin:0 0 3px; font-size:1rem; }
+.password-heading p { margin:0; color:var(--color-text-muted); font-size:.72rem; }
+.password-heading > span { padding:4px 9px; border-radius:999px; background:#edf5ef; color:#5f7d68; font-size:.66rem; }
+.password-form { display:grid; gap:12px; }
+.password-form label { display:grid; gap:6px; color:#666; font-size:.78rem; }
+.password-form .btn { width:100%; padding:11px; }
+.password-message { margin:0; color:#39734f; font-size:.76rem; }
+.password-message.error { color:var(--color-danger,#c84e55); }
 </style>

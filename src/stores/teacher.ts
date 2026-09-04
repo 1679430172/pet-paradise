@@ -438,6 +438,22 @@ export const useTeacherStore = defineStore('teacher', () => {
     if (!error) totalPointsGiven.value = Number(data ?? 0)
   }
 
+  async function resetStudentPassword(studentId: string, password: string) {
+    const currentTeacherId = teacherId()
+    if (!currentTeacherId) return { error: new Error('未登录') }
+    if (password.length < 4) return { error: new Error('新密码至少 4 位') }
+    try {
+      await classroomRpc('teacher_reset_student_password', {
+        p_actor_id: currentTeacherId,
+        p_student_id: studentId,
+        p_new_password: await hashPassword(password),
+      })
+      return { error: null }
+    } catch (error) {
+      return { error: error instanceof Error ? error : new Error('重置密码失败') }
+    }
+  }
+
   async function fetchStudentCosmetics(studentId: string) {
     const currentTeacherId = teacherId()
     if (!currentTeacherId) throw new Error('未登录')
@@ -478,7 +494,7 @@ export const useTeacherStore = defineStore('teacher', () => {
     if (pet) pet.cosmetics = { ...pet.cosmetics, [category]: item?.style_key || null }
   }
 
-  return { students, studentsWithPets, leaderboardError, leaderboardLoading, leaderboardWeek, leaderboard, loading, totalStudents, totalPointsGiven, cosmeticItems, cosmeticOwnedIds, fetchStudents, fetchStudentsWithPets, performActionForStudent, fetchStudentDetail, fetchLeaderboard, fetchStats, fetchStudentCosmetics, purchaseCosmeticForStudent, equipCosmeticForStudent, createStudent, renameStudent, adoptPetForStudent, renamePetForStudent, deleteStudent }
+  return { students, studentsWithPets, leaderboardError, leaderboardLoading, leaderboardWeek, leaderboard, loading, totalStudents, totalPointsGiven, cosmeticItems, cosmeticOwnedIds, fetchStudents, fetchStudentsWithPets, performActionForStudent, fetchStudentDetail, fetchLeaderboard, fetchStats, fetchStudentCosmetics, purchaseCosmeticForStudent, equipCosmeticForStudent, createStudent, renameStudent, resetStudentPassword, adoptPetForStudent, renamePetForStudent, deleteStudent }
 })
 
 if (import.meta.hot) {

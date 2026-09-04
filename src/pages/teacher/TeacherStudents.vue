@@ -71,6 +71,7 @@
         </button>
         <div class="student-points"><strong>{{ student.points }}</strong><span>可用积分</span></div>
         <div class="student-actions">
+          <button class="btn btn-secondary btn-sm password-button" @click="openPasswordDialog(student)">重置密码</button>
           <button class="btn btn-danger btn-sm" @click="handleDelete(student)">删除</button>
           <button class="btn btn-primary btn-sm award-button" @click="openAwardDialog(student)">＋ 发积分</button>
         </div>
@@ -127,6 +128,21 @@
       </div>
     </div>
 
+    <!-- 重置学生密码弹窗 -->
+    <div v-if="passwordStudent" class="dialog-overlay" @click.self="closePasswordDialog">
+      <div class="dialog card">
+        <h3>重置学生密码</h3>
+        <p class="dialog-hint">学生账号：{{ passwordStudent.username }}</p>
+        <div class="form-field"><label>新密码</label><input v-model="resetPassword" class="form-input" type="password" autocomplete="new-password" minlength="4" placeholder="至少 4 位" /></div>
+        <div class="form-field"><label>确认新密码</label><input v-model="resetPasswordConfirm" class="form-input" type="password" autocomplete="new-password" minlength="4" placeholder="再次输入新密码" @keyup.enter="handleResetPassword" /></div>
+        <p v-if="passwordError" class="form-error" role="alert">{{ passwordError }}</p>
+        <div class="dialog-actions">
+          <button class="btn btn-secondary" :disabled="resettingPassword" @click="closePasswordDialog">取消</button>
+          <button class="btn btn-primary" :disabled="resettingPassword" @click="handleResetPassword">{{ resettingPassword ? '正在重置...' : '确认重置' }}</button>
+        </div>
+      </div>
+    </div>
+
     <!-- 成功提示 -->
     <div v-if="toast" class="toast">{{ toast }}</div>
   </div>
@@ -173,6 +189,11 @@ const newUsername = ref('')
 const newPassword = ref('')
 const createError = ref('')
 const creating = ref(false)
+const passwordStudent = ref<Profile | null>(null)
+const resetPassword = ref('')
+const resetPasswordConfirm = ref('')
+const passwordError = ref('')
+const resettingPassword = ref(false)
 
 onMounted(async () => {
   await Promise.all([
@@ -256,6 +277,36 @@ async function handleDelete(student: Profile) {
     toast.value = `已删除学生「${student.username}」`
     setTimeout(() => { toast.value = '' }, 2500)
   }
+}
+
+function openPasswordDialog(student: Profile) {
+  passwordStudent.value = student
+  resetPassword.value = ''
+  resetPasswordConfirm.value = ''
+  passwordError.value = ''
+}
+
+function closePasswordDialog() {
+  if (resettingPassword.value) return
+  passwordStudent.value = null
+  resetPassword.value = ''
+  resetPasswordConfirm.value = ''
+  passwordError.value = ''
+}
+
+async function handleResetPassword() {
+  if (!passwordStudent.value || resettingPassword.value) return
+  passwordError.value = ''
+  if (resetPassword.value.length < 4) { passwordError.value = '新密码至少 4 位'; return }
+  if (resetPassword.value !== resetPasswordConfirm.value) { passwordError.value = '两次输入的新密码不一致'; return }
+  resettingPassword.value = true
+  const studentName = passwordStudent.value.username
+  const { error } = await teacherStore.resetStudentPassword(passwordStudent.value.id, resetPassword.value)
+  resettingPassword.value = false
+  if (error) { passwordError.value = error.message || '重置失败，请重试'; return }
+  closePasswordDialog()
+  toast.value = `已重置学生「${studentName}」的密码`
+  setTimeout(() => { toast.value = '' }, 2500)
 }
 
 function closeCreateDialog() {
@@ -376,8 +427,9 @@ async function handleCreateStudent() {
 .student-points { display: flex; flex-direction: column; gap: 3px; text-align: right; align-self: center; }
 .student-points strong { font-size: 1.2rem; color: #498b74; font-variant-numeric: tabular-nums; }
 .student-points span { font-size: .65rem; color: #96a299; }
-:global(#app .app-shell .students-page .student-actions) { display: flex; align-items: center; justify-content: space-between; grid-column: 1 / -1; border-top: 1px solid #edf0e9; padding-top: 9px; margin-left: 0; }
+:global(#app .app-shell .students-page .student-actions) { display: flex; align-items: center; justify-content: flex-end; gap:8px; grid-column: 1 / -1; border-top: 1px solid #edf0e9; padding-top: 9px; margin-left: 0; }
 .student-actions .btn { padding: 6px 10px; font-size: .75rem; box-shadow: none; }
+.student-actions .password-button { margin-right:auto; color:#66776e; background:#f2f5f2; border-color:#e1e7e1; }
 .student-actions .award-button { background: #ecf5ee; color: #498b74; }
 .student-actions .award-button:hover { color: white; }
 .btn-danger { background: transparent; color: #b3938b; border: none; }

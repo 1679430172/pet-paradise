@@ -189,6 +189,17 @@ export const useAuthStore = defineStore('auth', () => {
     }
   }
 
+  async function changeOwnPassword(currentPassword: string, newPassword: string) {
+    if (!user.value || !isStudent.value) return { error: new Error('仅学生可在此修改密码') }
+    if (newPassword.length < 4) return { error: new Error('新密码至少 4 位') }
+    const [currentHash, newHash] = await Promise.all([hashPassword(currentPassword), hashPassword(newPassword)])
+    const { error } = await supabase.rpc('change_student_password', {
+      p_actor_id: user.value.id, p_current_password: currentHash, p_new_password: newHash,
+    })
+    if (error?.code === 'PGRST202') return { error: new Error('修改密码功能尚未启用，请先执行数据库迁移') }
+    return { error: error ? new Error(error.message || '修改密码失败') : null }
+  }
+
   async function updateClassName(className: string) {
     if (!user.value || !isTeacher.value) return { error: new Error('仅老师可修改班级名称') }
     const normalized = className.trim()
@@ -343,5 +354,5 @@ export const useAuthStore = defineStore('auth', () => {
     return { error }
   }
 
-  return { user, profile, initialized, loading, isTeacher, isStudent, isAdmin, init, signUp, fetchRegistrationClasses, fetchRegistrationEnabled, updateRegistrationEnabled, signIn, signOut, refreshProfile, updateClassName, createTeacher, fetchTeachers, deleteTeacher, fetchTeacherStudents, updateTeacherClass, resetAccountPassword, deleteManagedStudent }
+  return { user, profile, initialized, loading, isTeacher, isStudent, isAdmin, init, signUp, fetchRegistrationClasses, fetchRegistrationEnabled, updateRegistrationEnabled, signIn, signOut, refreshProfile, changeOwnPassword, updateClassName, createTeacher, fetchTeachers, deleteTeacher, fetchTeacherStudents, updateTeacherClass, resetAccountPassword, deleteManagedStudent }
 })
