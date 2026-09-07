@@ -1,3 +1,4 @@
+import { hungerReference, isPetTravelling } from '../lib/petTravel'
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import { supabase } from '../lib/supabase'
@@ -16,6 +17,7 @@ export interface Pet {
   hunger: number
   happiness: number
   cleanliness: number
+  hunger_paused_until?: string | null
   last_fed_at: string | null
   last_played_at: string | null
   last_cleaned_at: string | null
@@ -93,7 +95,7 @@ export const usePetStore = defineStore('pet', () => {
       return Math.max(0, currentVal - decay)
     }
     pets.value.forEach(p => {
-      p.hunger = decayField(p.last_fed_at || p.created_at, p.hunger)
+      p.hunger = decayField(hungerReference(p), p.hunger)
     })
   }
 
@@ -134,6 +136,7 @@ export const usePetStore = defineStore('pet', () => {
     const target = currentPet.value
     const authStore = useAuthStore()
     if (!target || !authStore.user) return { success: false, message: '没有宠物或未登录' }
+    if (isPetTravelling(target)) return { success: false, message: '宠物旅行中，暂不可喂食，饱食度不会下降' }
     if (feeding.has(target.owner_id)) return { success: false, message: '正在投喂，请稍候' }
     feeding.add(target.owner_id)
     try {

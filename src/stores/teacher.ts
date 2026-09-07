@@ -1,3 +1,4 @@
+import { hungerReference, isPetTravelling } from '../lib/petTravel'
 import { acceptHMRUpdate, defineStore } from 'pinia'
 import { ref } from 'vue'
 import { readPeriodLeaderboard, type RankingPeriod } from '../lib/leaderboard'
@@ -38,6 +39,7 @@ export interface TeacherPet {
   hunger?: number
   happiness?: number
   cleanliness?: number
+  hunger_paused_until?: string | null
   last_fed_at?: string | null
   appearance?: any
   created_at?: string
@@ -76,7 +78,7 @@ export const useTeacherStore = defineStore('teacher', () => {
 
   function hungerWithDecay(pet: TeacherPet): number {
     const hunger = pet.hunger ?? 0
-    const referenceAt = pet.last_fed_at || pet.created_at
+    const referenceAt = hungerReference(pet)
     if (!referenceAt) return hunger
     const elapsed = Date.now() - new Date(referenceAt).getTime()
     const hours = Math.max(0, Math.floor(elapsed / (60 * 60 * 1000)))
@@ -169,6 +171,7 @@ export const useTeacherStore = defineStore('teacher', () => {
   async function performActionForStudent(studentId: string, petId: string, action: 'basic' | 'nice' | 'luxury') {
     const actorId = teacherId()
     if (!actorId) return { error: new Error('未登录') }
+    if (isPetTravelling(studentsWithPets.value.find(s => s.id === studentId)?.pets.find(p => p.id === petId))) return { error: new Error('宠物旅行中，暂不可喂食') }
     if (feedingStudents.has(studentId)) return { error: new Error('正在投喂该学生的宠物，请稍候') }
     feedingStudents.add(studentId)
     try {

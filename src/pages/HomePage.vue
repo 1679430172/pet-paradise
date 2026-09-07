@@ -90,7 +90,7 @@
           </div>
         </div>
 
-        <div class="care-divider"><span>选择食物</span></div>
+        <div class="care-divider"><span>{{ travelling ? '🧳 旅行中 · 暂不可喂食，饱食度不消耗' : '选择食物' }}</span></div>
 
         <!-- 互动按钮 -->
         <div class="actions-grid">
@@ -146,6 +146,7 @@
 </template>
 
 <script setup lang="ts">
+import { isPetTravelling } from '../lib/petTravel'
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { usePetStore } from '../stores/pet'
@@ -164,6 +165,9 @@ const authStore = useAuthStore()
 const pointsStore = usePointsStore()
 const shopStore = useShopStore()
 const petReply = ref('')
+const careClock = ref(Date.now())
+let careClockTimer: ReturnType<typeof setInterval> | undefined
+const travelling = computed(() => isPetTravelling(petStore.currentPet, careClock.value))
 const levelUpEffect = ref(false)
 let replyTimer: ReturnType<typeof setTimeout> | undefined
 let levelUpTimer: ReturnType<typeof setTimeout> | undefined
@@ -174,7 +178,7 @@ const petCosmeticClasses = computed(() => cosmeticClasses(shopStore.selectionFor
 const xpPercent = computed(() => petStore.currentPet ? xpProgress(petStore.currentPet) : 0)
 
 function canAfford(action: 'basic' | 'nice' | 'luxury') {
-  return (authStore.user?.points || 0) >= pointsStore.actionCosts[action]
+  return !travelling.value && (authStore.user?.points || 0) >= pointsStore.actionCosts[action]
 }
 
 async function doAction(action: 'basic' | 'nice' | 'luxury') {
@@ -197,11 +201,13 @@ async function doAction(action: 'basic' | 'nice' | 'luxury') {
 }
 
 onUnmounted(() => {
+  clearInterval(careClockTimer)
   if (replyTimer) clearTimeout(replyTimer)
   if (levelUpTimer) clearTimeout(levelUpTimer)
 })
 
 onMounted(async () => {
+  careClockTimer = setInterval(() => { careClock.value = Date.now() }, 1000)
   await Promise.all([
     petStore.fetchPets(),
     pointsStore.fetchActionCosts(),

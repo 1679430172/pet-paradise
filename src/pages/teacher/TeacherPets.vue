@@ -62,7 +62,7 @@
         v-for="s in sortedStudents"
         :key="s.id"
         class="pet-card card"
-        :class="[cosmeticClasses(activePet(s)?.cosmetics), { 'cosmetic-card': !!activePet(s), 'empty-adopt-card': !activePet(s), 'award-selected': classroomMode && awardStudentIds.includes(s.id), 'award-bounce': !!awardBubbles[s.id] }]"
+        :class="[cosmeticClasses(activePet(s)?.cosmetics), { 'travelling-card': isTravelling(activePet(s)), 'cosmetic-card': !!activePet(s), 'empty-adopt-card': !activePet(s), 'award-selected': classroomMode && awardStudentIds.includes(s.id), 'award-bounce': !!awardBubbles[s.id] }]"
         :style="cardStyle(s)"
       >
         <label v-if="classroomMode" class="classroom-student-select"><input type="checkbox" :checked="awardStudentIds.includes(s.id)" :disabled="awarding" @change="toggleAwardStudent(s.id)" :aria-label="`选择 ${s.username}`" /><span class="card-selection-mark" aria-hidden="true">{{ awardStudentIds.includes(s.id) ? '✓' : '' }}</span></label>
@@ -111,7 +111,15 @@
               aria-label="上一只宠物"
               @click.stop="prev(s)"
             ><PetSpeciesMark class="switch-species-mark" :species="activePet(s)!.species" /><svg class="switch-chevron" viewBox="0 0 24 24" aria-hidden="true"><path d="m14 7-5 5 5 5" /></svg></button>
-            <PetAvatar
+            <div v-if="isTravelling(activePet(s))" class="travel-scene" aria-label="宠物正在旅行">
+              <span class="travel-sun" aria-hidden="true">☀</span>
+              <span class="travel-cloud" aria-hidden="true">☁</span>
+              <span class="travel-mountains" aria-hidden="true">⛰</span>
+              <span class="travel-luggage" aria-hidden="true">🧳</span>
+              <strong>出去看世界啦</strong>
+              <small>{{ travelCardLabel(activePet(s)!.id) }}</small>
+            </div>
+            <PetAvatar v-else
               :species="activePet(s)!.species"
               :level="activePet(s)!.level"
               :size="classroomMode ? (classroomDensity === 180 ? 110 : 140) : 160"
@@ -149,7 +157,10 @@
             </div>
           </div>
 
-          <div class="action-row">
+          <div v-if="isTravelling(activePet(s))" class="travel-care-note">
+            <strong>🧭 旅行中 · 暂不可喂食</strong><span>饱食度已暂停消耗，归来后恢复</span>
+          </div>
+          <div v-else class="action-row">
             <button
               class="btn-action"
               :disabled="!!busyKey || batchFeeding || awarding || s.points < pointsStore.actionCosts.basic"
@@ -341,6 +352,7 @@
 </template>
 
 <script setup lang="ts">
+import { isPetTravelling } from '../../lib/petTravel'
 import TeacherTravelDialog from '../../components/teacher/TeacherTravelDialog.vue'
 import { ref, computed, nextTick, onMounted, onUnmounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
@@ -456,8 +468,14 @@ async function refreshTravelOverview() {
   try {
     const result = await classroomRpc<{ serverNow: string; entries: { student_id: string; pet_id: string; pet_name: string; returns_at: string }[] }>('teacher_travel_overview', { p_actor_id: authStore.user.id })
     travelOverview.value = Object.fromEntries(result.entries.map(entry => [entry.pet_id, entry]))
+    await teacherStore.fetchStudentsWithPets(undefined, true)
     travelServerAt = Date.parse(result.serverNow); travelReceivedAt = performance.now(); travelClock.value = travelServerAt
-  } catch { travelOverview.value = {} }
+  } catch { /* Keep the last known trip state; the server validates feeding. */ }
+}
+function isTravelling(pet: TeacherPet | null | undefined) {
+  if (!pet) return false
+  const now = travelClock.value || Date.now()
+  return isPetTravelling(pet, now) || !!travelOverview.value[pet.id] && Date.parse(travelOverview.value[pet.id]!.returns_at) > now
 }
 function travelCardLabel(petId: string) {
   const trip = travelOverview.value[petId]
@@ -466,7 +484,7 @@ function travelCardLabel(petId: string) {
   return minutes <= 0 ? `${trip.pet_name} · 待领取` : `旅行中 · ${Math.floor(minutes / 60)}时${minutes % 60}分`
 }
 function refreshVisibleTravel() { if (document.visibilityState === 'visible') void refreshTravelOverview() }
-onMounted(() => { void refreshTravelOverview(); travelClockTimer = setInterval(() => { travelClock.value = travelServerAt + performance.now() - travelReceivedAt }, 1000); document.addEventListener('visibilitychange', refreshVisibleTravel) })
+onMounted(() => { void refreshTravelOverview(); travelClockTimer = setInterval(() => { travelClock.value = travelServerAt ? travelServerAt + performance.now() - travelReceivedAt : Date.now() }, 1000); document.addEventListener('visibilitychange', refreshVisibleTravel) })
 onUnmounted(() => { clearInterval(travelClockTimer); document.removeEventListener('visibilitychange', refreshVisibleTravel) })
 const cosmeticTravelBalance = ref<{ stamps: number | null; tickets: number | null } | null>(null)
 const cosmeticBalanceError = ref('')
@@ -532,7 +550,7 @@ const HOVER_REPLIES = [
 const levelUpQueue: (TeacherPet & { studentName: string })[] = []
 let levelUpTimer: ReturnType<typeof setTimeout> | undefined
 
-const batchPetOptions = computed(() => teacherStore.studentsWithPets.flatMap(student => student.pets.map(pet => ({ student, pet }))))
+const batchPetOptions = computed(() => teacherStore.studentsWithPets.flatMap(student => student.pets.filter(pet => !isTravelling(pet)).map(pet => ({ student, pet }))))
 const allVisibleSelected = computed(() => batchPetOptions.value.length > 0 && batchPetOptions.value.every(({ pet }) => selectedPetIds.value.includes(pet.id)))
 const someVisibleSelected = computed(() => !allVisibleSelected.value && batchPetOptions.value.some(({ pet }) => selectedPetIds.value.includes(pet.id)))
 
@@ -593,7 +611,7 @@ async function handleBatchFeed(action: 'basic' | 'nice' | 'luxury') {
   if (batchFeeding.value || awarding.value || busyKey.value || selectedPetIds.value.length === 0) return
   const selectedIds = new Set(selectedPetIds.value)
   const targets = teacherStore.studentsWithPets.flatMap(student => student.pets
-    .filter(pet => selectedIds.has(pet.id))
+    .filter(pet => selectedIds.has(pet.id) && !isTravelling(pet))
     .map(pet => ({ student, pet })))
   if (targets.length === 0) return
 
@@ -655,6 +673,7 @@ function showToast(msg: string) {
 }
 
 async function handleAction(s: StudentWithPet, p: TeacherPet, action: 'basic' | 'nice' | 'luxury') {
+  if (isTravelling(p)) return
   if (!p.id || busyKey.value || batchFeeding.value || awarding.value) return
   busyKey.value = p.id
   const result = await teacherStore.performActionForStudent(s.id, p.id, action)
@@ -771,7 +790,7 @@ async function removeStudentCosmetic(item: ShopItem) {
 }
 
 function showHoverReply(pet: TeacherPet) {
-  if (!pet.id) return
+  if (!pet.id || isTravelling(pet)) return
   hoverPetId.value = pet.id
   hoverPetReply.value = HOVER_REPLIES[Math.floor(Math.random() * HOVER_REPLIES.length)]
 }
@@ -889,6 +908,20 @@ async function handleAdopt() {
 </script>
 
 <style scoped>
+.travel-scene { position:relative; display:flex; flex-direction:column; align-items:center; justify-content:flex-end; width:100%; height:100%; overflow:hidden; border-radius:18px; background:linear-gradient(#d7eff4 0%,#eff9ec 66%,#c8dbb6 67%); padding:12px 4px; color:#355b53; }
+.travel-scene strong, .travel-scene small { position:relative; z-index:1; }
+.travel-scene strong { font-size:.88rem; margin-top:3px; }
+.travel-scene small { font-size:.65rem; margin-top:4px; }
+.travel-sun { position:absolute; top:8px; right:22px; color:#eeb949; font-size:30px; }
+.travel-cloud { position:absolute; top:9px; left:22px; color:white; font-size:32px; }
+.travel-mountains { position:absolute; top:32px; left:12px; color:#8ab3a0; font-size:70px; opacity:.65; }
+.travel-luggage { position:relative; z-index:1; font-size:48px; line-height:1.1; }
+.travel-care-note { position:relative; z-index:4; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:5px; min-height:50px; border:1px dashed #b8cec1; border-radius:13px; background:#eef6ef; color:#426957; text-align:center; padding:5px; }
+.travel-care-note strong { font-size:.72rem; }
+.travel-care-note span { font-size:.61rem; }
+.classroom-compact .travel-scene { padding:6px 3px; }
+.classroom-compact .travel-luggage { font-size:32px; }
+
 .pets-toolbar, .pets-content { display: contents; }
 .classroom-mode .pets-toolbar { flex: 0 0 auto; display: grid; grid-template-columns: minmax(380px, .9fr) minmax(0, 1.4fr); align-items: center; gap: 12px 24px; padding: 18px 24px; background: #f8fcf8; border-bottom: 1px solid #d4e4d9; box-shadow: 0 3px 12px #24473508; }
 .classroom-mode .pets-toolbar .page-title-row { grid-column: 1 / -1; margin: 0; }
