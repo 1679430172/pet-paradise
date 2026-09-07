@@ -40,7 +40,7 @@
             <span class="completion-task">{{ c.task_name }}</span>
             <small class="completion-date">{{ formatTime(c.created_at) }}</small>
           </div>
-          <span class="completion-points" :class="{ 'revoked-points': c.revoked_at }">+{{ c.points }}</span>
+          <span class="completion-points" :class="{ 'revoked-points': c.revoked_at }">{{ rewardLabel(c) }}</span>
           <div class="record-footer">
             <span v-if="c.revoked_at" class="revoked-label"><i />已撤销</span>
             <span v-else class="active-label"><i />已发放</span>
@@ -61,7 +61,7 @@
     <div v-if="detailTarget" class="revoke-overlay" @click.self="detailTarget = null" @keydown.esc="detailTarget = null">
       <div class="revoke-dialog card" role="dialog" aria-modal="true" aria-labelledby="revoke-detail-title">
         <h3 id="revoke-detail-title">撤销详情</h3>
-        <p>{{ detailTarget.student_username }} · {{ detailTarget.task_name }} · {{ detailTarget.points }} 分</p>
+        <p>{{ detailTarget.student_username }} · {{ detailTarget.task_name }} · {{ rewardLabel(detailTarget) }}</p>
         <p class="revoke-hint">{{ formatTime(detailTarget.revoked_at!) }}</p>
         <p class="full-revoke-reason">{{ detailTarget.revoke_reason }}</p>
         <button class="btn btn-secondary" @click="detailTarget = null">关闭</button>
@@ -70,8 +70,8 @@
     <div v-if="revokeTarget" class="revoke-overlay" @click.self="closeRevoke" @keydown.esc="closeRevoke">
       <form class="revoke-dialog card" role="dialog" aria-modal="true" aria-labelledby="revoke-title" @submit.prevent="confirmRevoke">
         <h3 id="revoke-title">撤销这笔奖励？</h3>
-        <p><strong>{{ revokeTarget.student_username }}</strong> · {{ revokeTarget.task_name }} · {{ revokeTarget.points }} 分</p>
-        <p class="revoke-hint">将收回这笔积分并修正排行榜，保留原记录。已获得的宠物成长不回退；余额不足时不会扣成负数。</p>
+        <p><strong>{{ revokeTarget.student_username }}</strong> · {{ revokeTarget.task_name }} · {{ rewardLabel(revokeTarget) }}</p>
+        <p class="revoke-hint">将收回这笔积分和旅行券并修正排行榜，保留原记录。已获得的宠物成长不回退；任一余额不足时无法撤销。</p>
         <label for="revoke-reason">撤销原因</label>
         <textarea id="revoke-reason" ref="reasonInput" v-model="revokeReason" class="form-input" maxlength="200" rows="3" required placeholder="例如：选错学生、重复发放" :disabled="revoking" />
         <p v-if="revokeError" role="alert" class="revoke-error">{{ revokeError }}</p>
@@ -87,7 +87,7 @@ import { ref, computed, nextTick, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '../../stores/auth'
 import { useTeacherStore } from '../../stores/teacher'
-import { useTasksStore } from '../../stores/tasks'
+import { useTasksStore, rewardLabel } from '../../stores/tasks'
 import { supabase } from '../../lib/supabase'
 
 const router = useRouter()
@@ -96,6 +96,7 @@ const teacherStore = useTeacherStore()
 const tasksStore = useTasksStore()
 
 interface RecentCompletion {
+  travel_tickets: number
   revoked_at: string | null
   revoke_reason: string | null
   id: string
@@ -137,7 +138,7 @@ async function confirmRevoke() {
   try {
     const result = await tasksStore.revokeAward(revokeTarget.value.id, revokeReason.value.trim())
     Object.assign(revokeTarget.value, result.completion)
-    revokeMessage.value = result.alreadyRevoked ? '这笔奖励已经撤销，没有重复扣分。' : `已撤销奖励，学生当前余额为 ${result.balance} 分。`
+    revokeMessage.value = result.alreadyRevoked ? '这笔奖励已经撤销，没有重复收回奖励。' : `已撤销奖励，学生当前余额为 ${result.balance} 分。`
     revokeTarget.value = null
     await teacherStore.fetchStats()
   } catch (error) {
@@ -165,7 +166,7 @@ async function fetchRecentCompletions(page = 1) {
       const from = (requestedPage.value - 1) * pageSize
       const { data, count, error } = await supabase
         .from('task_completions')
-        .select('id, points, created_at, revoked_at, revoke_reason, student:profiles!task_completions_student_id_fkey(username), task:tasks(name)', { count: 'exact' })
+        .select('id, points, travel_tickets, created_at, revoked_at, revoke_reason, student:profiles!task_completions_student_id_fkey(username), task:tasks(name)', { count: 'exact' })
         .eq('awarded_by', teacherId)
         .order('created_at', { ascending: false })
         .order('id', { ascending: false })
@@ -179,6 +180,7 @@ async function fetchRecentCompletions(page = 1) {
       recentCompletions.value = (data || []).map((d: any) => ({
         id: d.id,
         points: d.points,
+        travel_tickets: d.travel_tickets || 0,
         student_username: d.student?.username || '未知',
         task_name: d.task?.name || '未知任务',
         created_at: d.created_at,

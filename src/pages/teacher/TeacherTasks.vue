@@ -14,7 +14,7 @@
           <span class="task-desc">{{ task.description || '无描述' }}</span>
         </div>
         <div class="task-right">
-          <span class="task-points">+{{ task.points }}</span>
+          <span class="task-points">{{ rewardLabel(task) }}</span>
           <div class="task-actions">
             <router-link :to="`/teacher/tasks/${task.id}/edit`" class="action-btn">编辑</router-link>
             <button class="action-btn danger" @click="handleDelete(task.id)">删除</button>
@@ -27,7 +27,7 @@
 
 <script setup lang="ts">
 import { onMounted } from 'vue'
-import { useTasksStore } from '../../stores/tasks'
+import { useTasksStore, rewardLabel } from '../../stores/tasks'
 
 const tasksStore = useTasksStore()
 

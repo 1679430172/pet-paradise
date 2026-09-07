@@ -16,6 +16,10 @@
       <span class="nav-icon">🛒</span>
       <span>商城</span>
     </router-link>
+    <router-link to="/travel" :class="{ active: route.name === 'travel' }">
+      <span class="nav-icon">🧳</span>
+      <span>旅行</span>
+    </router-link>
     <router-link to="/profile" :class="{ active: route.name === 'profile' }">
       <span class="nav-icon">👤</span>
       <span>我的</span>

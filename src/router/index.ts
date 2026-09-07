@@ -55,6 +55,12 @@ const router = createRouter({
       meta: { requiresAuth: true, role: 'student' },
     },
     {
+      path: '/travel',
+      name: 'travel',
+      component: () => import('../pages/TravelPage.vue'),
+      meta: { requiresAuth: true, role: 'student' },
+    },
+    {
       path: '/shop',
       name: 'shop',
       component: () => import('../pages/ShopPage.vue'),

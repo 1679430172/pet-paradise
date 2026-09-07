@@ -1,0 +1,8 @@
+/* 旅行装扮使用 CSS 绘制，兼容横向与纵向宠物卡片。 */
+.cosmetic-card.cosmetic-frame-travel-forest::after,.cosmetic-card.cosmetic-frame-travel-coast::after,.cosmetic-card.cosmetic-frame-travel-stars::after{content:'';position:absolute;inset:-5px!important;border-radius:inherit;background:none!important;pointer-events:none;z-index:3;opacity:1;mask:none;animation:none}
+.cosmetic-card.cosmetic-frame-travel-forest::after{border:5px double #6b9150;box-shadow:0 0 0 2px #e3e9c7,0 5px 14px #49613918}
+.cosmetic-card.cosmetic-frame-travel-coast::after{border:5px dotted #d8b67e;box-shadow:0 0 0 2px #e9e1c9,0 5px 14px #4e7f9018}
+.cosmetic-card.cosmetic-frame-travel-stars::after{border:4px double #b2a0dc;box-shadow:0 0 0 2px #e9e2f5,0 0 16px #a894d53b}
+.cosmetic-card.cosmetic-background-travel-forest{background:radial-gradient(circle at 18% 30%,#f9ffb5 0 2px,transparent 4px),radial-gradient(circle at 82% 55%,#eaffab 0 2px,transparent 4px),linear-gradient(155deg,#edf0cf,#a6c4a1 65%,#6c9c85)!important}
+.cosmetic-card.cosmetic-background-travel-coast{background:radial-gradient(ellipse at 15% 12%,#fff9ce,transparent 45%),linear-gradient(170deg,#e4f7f5,#96d9df 62%,#d3ebe2 63%,#f1dfb7 76%)!important}
+.cosmetic-card.cosmetic-background-travel-stars{background:radial-gradient(circle at 20% 20%,#fff 0 1px,transparent 3px),radial-gradient(circle at 80% 35%,#fffbe1 0 2px,transparent 4px),radial-gradient(circle at 62% 12%,#fff 0 1px,transparent 3px),linear-gradient(160deg,#d6daf1,#b4b4da 55%,#969dc7)!important}

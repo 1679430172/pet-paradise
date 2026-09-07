@@ -9,6 +9,24 @@ import { useAuthStore } from './auth'
 import type { CosmeticSelection } from '../lib/cosmetics'
 import type { ShopItem } from './shop'
 
+export interface TravelTicketUsage {
+  tickets: number
+  total: number
+  page: number
+  pageSize: number
+  entries: { id: string; pet_name: string; destination_name: string; ticket_cost: number; started_at: string; returns_at: string; status: 'claimed' | 'returned' | 'travelling' }[]
+}
+
+export interface StudentLedger {
+  points: number; tickets: number; total: number; page: number; pageSize: number
+  entries: { id: string; created_at: string; kind: 'award' | 'earning' | 'feeding' | 'shop' | 'travel' | 'revoke'; description: string; points_delta: number; tickets_delta: number; balance_after: number | null; actor_name: string; actor_role: string }[]
+}
+
+export interface PointSpending {
+  points: number; total: number; page: number; pageSize: number
+  entries: { id: string; created_at: string; kind: 'feeding' | 'shop' | 'revoke'; description: string; cost: number; balance_after: number | null; actor_name: string; actor_role: string }[]
+}
+
 export interface TeacherPet {
   id: string
   owner_id?: string
@@ -167,6 +185,22 @@ export const useTeacherStore = defineStore('teacher', () => {
     } finally {
       feedingStudents.delete(studentId)
     }
+  }
+
+  async function fetchStudentLedger(studentId: string, page = 1) {
+    const actorId = teacherId()
+    if (!actorId) throw new Error('未登录')
+    return classroomRpc<StudentLedger>('teacher_student_ledger', { p_actor_id: actorId, p_student_id: studentId, p_page: page })
+  }
+  async function fetchPointSpending(studentId: string, page = 1) {
+    const actorId = teacherId()
+    if (!actorId) throw new Error('未登录')
+    return classroomRpc<PointSpending>('teacher_point_spending', { p_actor_id: actorId, p_student_id: studentId, p_page: page })
+  }
+  async function fetchTravelTicketUsage(studentId: string, page = 1) {
+    const actorId = teacherId()
+    if (!actorId) throw new Error('未登录')
+    return classroomRpc<TravelTicketUsage>('teacher_travel_ticket_usage', { p_actor_id: actorId, p_student_id: studentId, p_page: page })
   }
 
   async function fetchStudentDetail(id: string) {
@@ -471,8 +505,8 @@ export const useTeacherStore = defineStore('teacher', () => {
     ])
     if (catalog.error?.code === '42P01') throw new Error('商城尚未启用，请先执行数据库迁移')
     if (catalog.error || owned.error) throw catalog.error || owned.error
-    cosmeticItems.value = (catalog.data || []) as ShopItem[]
     cosmeticOwnedIds.value = (owned.data || []).map(row => row.item_id)
+    cosmeticItems.value = ((catalog.data || []) as ShopItem[]).filter(item => item.acquisition !== 'travel' || cosmeticOwnedIds.value.includes(item.id))
   }
 
   async function purchaseCosmeticForStudent(studentId: string, petId: string, item: ShopItem) {
@@ -500,7 +534,7 @@ export const useTeacherStore = defineStore('teacher', () => {
     if (pet) pet.cosmetics = { ...pet.cosmetics, [category]: item?.style_key || null }
   }
 
-  return { students, studentsWithPets, leaderboardError, leaderboardLoading, leaderboardWeek, leaderboard, loading, totalStudents, totalPointsGiven, cosmeticItems, cosmeticOwnedIds, fetchStudents, fetchStudentsWithPets, performActionForStudent, fetchStudentDetail, fetchLeaderboard, fetchStats, fetchStudentCosmetics, purchaseCosmeticForStudent, equipCosmeticForStudent, createStudent, renameStudent, resetStudentPassword, adoptPetForStudent, renamePetForStudent, deleteStudent }
+  return { students, studentsWithPets, leaderboardError, leaderboardLoading, leaderboardWeek, leaderboard, loading, totalStudents, totalPointsGiven, cosmeticItems, cosmeticOwnedIds, fetchStudents, fetchStudentsWithPets, performActionForStudent, fetchStudentDetail, fetchTravelTicketUsage, fetchPointSpending, fetchStudentLedger, fetchLeaderboard, fetchStats, fetchStudentCosmetics, purchaseCosmeticForStudent, equipCosmeticForStudent, createStudent, renameStudent, resetStudentPassword, adoptPetForStudent, renamePetForStudent, deleteStudent }
 })
 
 if (import.meta.hot) {

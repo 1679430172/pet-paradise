@@ -37,8 +37,9 @@
             <span v-if="isEquipped(item)" class="equipped-ribbon">使用中</span>
           </div>
           <div class="product-copy"><div class="product-title"><h3>{{ item.name }}</h3><span v-if="isOwned(item) && !isEquipped(item)">已拥有</span></div><p>{{ item.description }}</p></div>
-          <div v-if="!isEquipped(item)" class="product-price"><span>积分</span><strong>{{ item.price }}</strong></div>
-          <button v-if="!isOwned(item)" class="buy-button" :disabled="shopStore.busyItemId !== null || !canAfford(item)" @click="buy(item)">
+          <div v-if="!isEquipped(item)" class="product-price"><template v-if="item.acquisition === 'travel'"><span>旅行专属收藏</span></template><template v-else><span>积分</span><strong>{{ item.price }}</strong></template></div>
+          <RouterLink v-if="!isOwned(item) && item.acquisition === 'travel'" to="/travel" class="buy-button" style="text-align:center">去旅行获取 →</RouterLink>
+          <button v-else-if="!isOwned(item)" class="buy-button" :disabled="shopStore.busyItemId !== null || !canAfford(item)" @click="buy(item)">
             <template v-if="shopStore.busyItemId === item.id">购买中...</template><template v-else>购买并使用</template>
           </button>
           <button v-else-if="!isEquipped(item)" class="equip-button" :disabled="!petStore.currentPet || shopStore.busyItemId !== null" @click="equip(item)">立即装备</button>

@@ -96,7 +96,7 @@
               <span class="task-name">{{ task.name }}</span>
               <span class="task-desc">{{ task.description }}</span>
             </div>
-            <span class="task-points">+{{ task.points }}</span>
+            <span class="task-points">{{ rewardLabel(task) }}</span>
           </div>
         </div>
         <button class="btn btn-cancel" :disabled="awarding" @click="showDialog = false">
@@ -153,7 +153,7 @@ import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useTeacherStore } from '../../stores/teacher'
 import { useAuthStore } from '../../stores/auth'
-import { useTasksStore } from '../../stores/tasks'
+import { useTasksStore, rewardLabel } from '../../stores/tasks'
 import type { Profile } from '../../stores/auth'
 import type { Task } from '../../stores/tasks'
 
@@ -255,7 +255,7 @@ async function confirmAward(task: Task) {
     if (!error) {
       showDialog.value = false
       const targetLabel = selectedStudent.value?.username || `${awardedCount} 名学生`
-      toast.value = `已给 ${targetLabel} 发放 ${task.points} 积分`
+      toast.value = `已给 ${targetLabel} 发放 ${rewardLabel(task)}`
       selectedStudent.value = null
       setTimeout(() => { toast.value = '' }, 2500)
     } else {

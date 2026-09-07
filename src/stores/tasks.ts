@@ -10,12 +10,14 @@ export interface Task {
   name: string
   description: string | null
   points: number
+  travel_tickets?: number
   is_active: boolean
   created_by: string
   created_at: string
 }
 
 export interface TaskCompletion {
+  travel_tickets?: number
   revoked_at?: string | null
   revoked_by?: string | null
   revoke_reason?: string | null
@@ -27,6 +29,10 @@ export interface TaskCompletion {
   created_at: string
   task?: Task
   student?: { username: string }
+}
+
+export function rewardLabel(reward: { points: number; travel_tickets?: number }) {
+  return [reward.points > 0 ? `${reward.points} 积分` : '', (reward.travel_tickets || 0) > 0 ? `${reward.travel_tickets} 张旅行券` : ''].filter(Boolean).join(' + ') || '无奖励'
 }
 
 export const useTasksStore = defineStore('tasks', () => {
@@ -57,14 +63,14 @@ export const useTasksStore = defineStore('tasks', () => {
     if (data) tasks.value = data
   }
 
-  async function createTask(name: string, description: string, points: number) {
+  async function createTask(name: string, description: string, points: number, travelTickets = 0) {
     const authStore = useAuthStore()
     if (!authStore.user) return { error: new Error('未登录') }
     loading.value = true
     try {
       const { data, error } = await supabase
         .from('tasks')
-        .insert({ name, description, points, created_by: authStore.user.id })
+        .insert({ name, description, points, travel_tickets: travelTickets, created_by: authStore.user.id })
         .select()
         .single()
       if (error) throw error
@@ -77,7 +83,7 @@ export const useTasksStore = defineStore('tasks', () => {
     }
   }
 
-  async function updateTask(id: string, updates: Partial<Pick<Task, 'name' | 'description' | 'points' | 'is_active'>>) {
+  async function updateTask(id: string, updates: Partial<Pick<Task, 'name' | 'description' | 'points' | 'travel_tickets' | 'is_active'>>) {
     loading.value = true
     try {
       const { error } = await supabase
@@ -117,7 +123,7 @@ export const useTasksStore = defineStore('tasks', () => {
   async function awardOne(studentId: string, taskId: string) {
     const actor = useAuthStore().user
     if (!actor) throw new Error('未登录')
-    return classroomRpc<{ points: number; balance: number }>('award_task_points', {
+    return classroomRpc<{ points: number; balance: number; travelTickets: number }>('award_task_points', {
       p_actor_id: actor.id, p_student_id: studentId, p_task_id: taskId, p_request_id: crypto.randomUUID(),
     })
   }
@@ -142,6 +148,7 @@ export const useTasksStore = defineStore('tasks', () => {
     const failures: { studentId: string; message: string }[] = []
     const balances: Record<string, number> = {}
     let points = 0
+    let travelTickets = 0
     loading.value = true
     try {
       if (!ids.length) throw new Error('请至少选择一名学生')
@@ -149,6 +156,7 @@ export const useTasksStore = defineStore('tasks', () => {
         try {
           const result = await awardOne(id, taskId)
           points = result.points
+          travelTickets = result.travelTickets || 0
           balances[id] = result.balance
           awardedStudentIds.push(id)
         } catch (error) {
@@ -156,9 +164,9 @@ export const useTasksStore = defineStore('tasks', () => {
         }
       }, onProgress)
       return { error: failures.length ? new Error(failures[0]!.message) : null,
-        points, awardedCount: awardedStudentIds.length, awardedStudentIds, balances, failures }
+        points, travelTickets, awardedCount: awardedStudentIds.length, awardedStudentIds, balances, failures }
     } catch (error: any) {
-      return { error, points, awardedCount: awardedStudentIds.length, awardedStudentIds, balances, failures }
+      return { error, points, travelTickets, awardedCount: awardedStudentIds.length, awardedStudentIds, balances, failures }
     } finally {
       loading.value = false
     }

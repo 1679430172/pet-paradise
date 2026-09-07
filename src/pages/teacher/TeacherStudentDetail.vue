@@ -59,22 +59,23 @@
         <button class="btn btn-primary" @click="showAdoptDialog = true">🐾 为其领养宠物</button>
       </div>
 
-      <div class="history-section">
-        <h3>积分记录</h3>
-        <div v-if="completions.length === 0" class="empty-state">暂无记录</div>
-        <div v-else class="completion-list">
-          <div v-for="c in completions" :key="c.id" class="completion-item card">
-            <div class="completion-info">
-              <span class="completion-task">{{ c.task?.name || '任务' }}</span>
-              <span class="completion-time">{{ formatTime(c.created_at) }}</span>
-              <small v-if="c.revoked_at">已撤销 · {{ c.revoke_reason }}</small>
-            </div>
-            <span class="completion-points" :style="c.revoked_at ? { textDecoration: 'line-through', opacity: .5 } : {}">+{{ c.points }}</span>
+      <section class="history-section ticket-usage-section">
+        <div class="ticket-usage-heading"><h3>收支记录</h3><button class="btn btn-secondary" :disabled="ledgerLoading" @click="loadLedger(ledger?.page || 1)">刷新</button></div>
+        <p v-if="ledgerError" class="usage-error" role="alert">{{ ledgerError }}</p>
+        <p v-else-if="ledgerLoading" class="empty-state" role="status">正在加载收支记录…</p>
+        <template v-else-if="ledger">
+          <p class="usage-summary">当前余额 {{ ledger.points }} 积分 · {{ ledger.tickets }} 张旅行券 · 共 {{ ledger.total }} 条记录</p>
+          <div v-if="!ledger.entries.length" class="empty-state">暂无收支记录</div>
+          <div v-else class="completion-list">
+            <article v-for="entry in ledger.entries" :key="entry.id" class="completion-item card ticket-usage-item">
+              <div class="completion-info"><strong>{{ ledgerKinds[entry.kind] }} · {{ entry.description }}</strong><span class="completion-time">{{ formatTime(entry.created_at) }}</span><small>{{ entry.actor_name }}{{ entry.actor_role === 'teacher' ? '老师' : '' }}<template v-if="entry.balance_after !== null"> · 操作后剩余 {{ entry.balance_after }} 积分</template></small></div>
+              <div class="ledger-amounts"><span v-if="entry.points_delta" :class="entry.points_delta > 0 ? 'ledger-income' : 'ticket-spent'">{{ signed(entry.points_delta) }} 积分</span><span v-if="entry.tickets_delta" :class="entry.tickets_delta > 0 ? 'ledger-income' : 'ticket-spent'">{{ signed(entry.tickets_delta) }} 张旅行券</span></div>
+            </article>
           </div>
-        </div>
-      </div>
+          <div v-if="ledger.total > ledger.pageSize" class="usage-pagination"><button class="btn btn-secondary" :disabled="ledger.page <= 1" @click="loadLedger(ledger.page - 1)">上一页</button><span>{{ ledger.page }} / {{ Math.ceil(ledger.total / ledger.pageSize) }}</span><button class="btn btn-secondary" :disabled="ledger.page * ledger.pageSize >= ledger.total" @click="loadLedger(ledger.page + 1)">下一页</button></div>
+        </template>
+      </section>
     </template>
-
     <!-- 修改学生名字弹窗 -->
     <div v-if="showRenameDialog" class="dialog-overlay" @click.self="closeRenameDialog">
       <div class="dialog card">
@@ -127,9 +128,10 @@
 </template>
 
 <script setup lang="ts">
+
 import { ref, computed, nextTick, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { useTeacherStore, type TeacherPet } from '../../stores/teacher'
+import { useTeacherStore, type TeacherPet, type StudentLedger } from '../../stores/teacher'
 import { PET_COLORS, MAX_LEVEL, LEVEL_THRESHOLDS } from '../../lib/constants'
 import PetAvatar from '../../components/pet/PetAvatar.vue'
 import PetAdoptionFields from '../../components/pet/PetAdoptionFields.vue'
@@ -141,8 +143,19 @@ const teacherStore = useTeacherStore()
 const loading = ref(true)
 const studentProfile = ref<any>(null)
 const pets = ref<TeacherPet[]>([])
-const completions = ref<any[]>([])
-
+const ledger = ref<StudentLedger | null>(null)
+const ledgerLoading = ref(false), ledgerError = ref('')
+const ledgerKinds = { award: '任务奖励', earning: '积分奖励', feeding: '喂养', shop: '商城购买', travel: '旅行出发', revoke: '奖励撤销' }
+const signed = (value: number) => `${value > 0 ? '+' : '−'}${Math.abs(value)}`
+async function loadLedger(page = 1) {
+  if (ledgerLoading.value) return
+  ledgerLoading.value = true; ledgerError.value = ''
+  try {
+    ledger.value = await teacherStore.fetchStudentLedger(route.params.id as string, page)
+    if (studentProfile.value) studentProfile.value.points = ledger.value.points
+  } catch (e) { ledgerError.value = e instanceof Error ? e.message.replace('课堂功能数据库迁移', '收支记录数据库迁移') : '收支记录加载失败，请重试' }
+  finally { ledgerLoading.value = false }
+}
 // 领养宠物状态
 const showAdoptDialog = ref(false)
 const adoptSpecies = ref('')
@@ -185,7 +198,7 @@ onMounted(async () => {
   const result = await teacherStore.fetchStudentDetail(id)
   studentProfile.value = result.profile
   pets.value = result.pets || []
-  completions.value = result.completions || []
+  if (result.profile) void loadLedger()
   loading.value = false
 })
 
@@ -264,6 +277,8 @@ async function handleAdopt() {
 </script>
 
 <style scoped>
+.ledger-amounts{display:flex;flex-direction:column;gap:4px;text-align:right;font-weight:700;white-space:nowrap}.ledger-income{color:#36806a}
+.ticket-usage-section{grid-column:1/-1}.ticket-usage-heading,.usage-pagination{display:flex;align-items:center;justify-content:space-between;gap:12px}.usage-summary{font-size:.85rem;color:#7e8479;margin:10px 0 16px}.ticket-usage-item{gap:14px;flex-wrap:wrap}.ticket-usage-item .completion-info{min-width:0;overflow-wrap:anywhere}.ticket-usage-item small{font-size:.75rem;color:#8d948b}.ticket-spent{color:#b5763f;font-weight:700;white-space:nowrap}.usage-pagination{justify-content:center;margin-top:18px}.usage-error{color:#b14f59;padding:16px 0}
 .teacher-page {
   padding-bottom: 80px;
 }

@@ -32,12 +32,17 @@
           type="number"
           class="form-input"
           placeholder="如：10"
-          min="1"
+          min="0"
           max="100"
           required
         />
       </div>
 
+      <div class="form-group">
+        <label class="form-label" for="task-travel-tickets">奖励旅行券</label>
+        <input id="task-travel-tickets" v-model.number="travelTickets" type="number" class="form-input" min="0" max="100" step="1" required />
+        <small>每次完成发放的张数。积分与旅行券可任选一种，也可同时奖励；每张券可出发一次。</small>
+      </div>
       <p v-if="error" class="form-error">{{ error }}</p>
 
       <button type="submit" class="btn btn-primary form-btn" :disabled="loading">
@@ -60,6 +65,7 @@ const isEdit = computed(() => !!route.params.id)
 const name = ref('')
 const description = ref('')
 const points = ref(10)
+const travelTickets = ref(0)
 const error = ref('')
 const loading = ref(false)
 
@@ -71,12 +77,17 @@ onMounted(async () => {
       name.value = task.name
       description.value = task.description || ''
       points.value = task.points
+      travelTickets.value = task.travel_tickets || 0
     }
   }
 })
 
 async function handleSubmit() {
   error.value = ''
+  if (![points.value, travelTickets.value].every(n => Number.isInteger(n) && n >= 0 && n <= 100) || points.value + travelTickets.value === 0) {
+    error.value = '积分和旅行券需为 0～100 的整数，且至少设置一项奖励'
+    return
+  }
   loading.value = true
 
   if (isEdit.value) {
@@ -84,18 +95,19 @@ async function handleSubmit() {
       name: name.value,
       description: description.value,
       points: points.value,
+      travel_tickets: travelTickets.value,
     })
     loading.value = false
     if (err) {
-      error.value = '保存失败'
+      error.value = err.message || '保存失败'
     } else {
       router.push('/teacher/tasks')
     }
   } else {
-    const { error: err } = await tasksStore.createTask(name.value, description.value, points.value)
+    const { error: err } = await tasksStore.createTask(name.value, description.value, points.value, travelTickets.value)
     loading.value = false
     if (err) {
-      error.value = '创建失败'
+      error.value = err.message || '创建失败'
     } else {
       router.push('/teacher/tasks')
     }

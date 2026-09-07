@@ -15,6 +15,7 @@ export interface ShopItem {
   price: number
   icon: string
   sort_order: number
+  acquisition?: 'shop' | 'travel'
 }
 
 export interface ShopOrder {

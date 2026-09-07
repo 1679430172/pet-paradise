@@ -45,7 +45,7 @@
       <label class="classroom-select-all"><input type="checkbox" :checked="allAwardSelected" :disabled="awarding" @change="toggleAwardAll" />全选筛选结果</label>
       <span class="award-count">已选 <strong>{{ awardStudentIds.length }}</strong> 人</span>
       <select v-model="awardTaskId" class="form-input classroom-task" :disabled="awarding" aria-label="选择奖励任务">
-        <option value="">选择奖励任务</option><option v-for="task in tasksStore.tasks" :key="task.id" :value="task.id">{{ task.name }} +{{ task.points }}分</option>
+        <option value="">选择奖励任务</option><option v-for="task in tasksStore.tasks" :key="task.id" :value="task.id">{{ task.name }} {{ rewardLabel(task) }}</option>
       </select>
       <button class="btn btn-primary" :disabled="!awardTaskId || !awardStudentIds.length || awarding || !!busyKey || batchFeeding" @click="awardSelected">{{ awarding ? '正在发放...' : '发放奖励' }}</button>
       <button v-if="awardStudentIds.length" class="clear-selection" :disabled="awarding" @click="awardStudentIds = []">清空</button>
@@ -346,7 +346,7 @@
 import { ref, computed, nextTick, onMounted, onUnmounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '../../stores/auth'
-import { useTasksStore } from '../../stores/tasks'
+import { useTasksStore, rewardLabel } from '../../stores/tasks'
 import { useTeacherStore, type StudentWithPet, type TeacherPet } from '../../stores/teacher'
 import { usePointsStore } from '../../stores/points'
 import { PET_COLORS, MAX_LEVEL, LEVEL_THRESHOLDS, getFeedingReply } from '../../lib/constants'
@@ -412,7 +412,7 @@ async function awardSelected() {
     for (const id of result.awardedStudentIds) {
       const student = teacherStore.studentsWithPets.find(s => s.id === id)
       if (student) student.points = result.balances[id] ?? student.points
-      awardBubbles.value[id] = `${taskName} +${result.points}`
+      awardBubbles.value[id] = `${taskName} ${rewardLabel({ points: result.points, travel_tickets: result.travelTickets })}`
       clearTimeout(awardTimers.get(id))
       awardTimers.set(id, setTimeout(() => { delete awardBubbles.value[id]; awardTimers.delete(id) }, 3800))
     }

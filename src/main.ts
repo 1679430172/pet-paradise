@@ -4,6 +4,7 @@ import App from './App.vue'
 import router from './router'
 import './styles/global.css'
 import './styles/responsive.css'
+import './styles/travel-cosmetics.css'
 
 const app = createApp(App)
 app.use(createPinia())
