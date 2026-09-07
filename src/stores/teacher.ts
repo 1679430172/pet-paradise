@@ -1,5 +1,6 @@
 import { acceptHMRUpdate, defineStore } from 'pinia'
 import { ref } from 'vue'
+import { readPeriodLeaderboard, type RankingPeriod } from '../lib/leaderboard'
 import { supabase } from '../lib/supabase'
 import { hashPassword } from './auth'
 import { feedPet, classroomRpc } from '../lib/classroomApi'
@@ -234,17 +235,17 @@ export const useTeacherStore = defineStore('teacher', () => {
   const leaderboardError = ref('')
   const leaderboardLoading = ref(false)
   const leaderboardWeek = ref({ start: '', end: '' })
-  async function fetchLeaderboard() {
+  let leaderboardRequest = 0
+  async function fetchLeaderboard(period: RankingPeriod = 'week') {
     const currentTeacherId = teacherId()
-    if (!currentTeacherId || leaderboardLoading.value) return
+    if (!currentTeacherId) return
+    const request = ++leaderboardRequest
     leaderboardLoading.value = true
     leaderboardError.value = ''
     try {
-      const result = await classroomRpc<{ entries: LeaderboardEntry[]; weekStart: string; weekEnd: string }>(
-        'weekly_leaderboard', { p_teacher_id: currentTeacherId },
-      )
-      // The RPC order is deterministic (points, username, id). Assign unique
-      // positions here as well so the UI stays correct before a DB migration is applied.
+      const result = await readPeriodLeaderboard(currentTeacherId, period)
+      if (request !== leaderboardRequest) return
+      // Assign unique positions after deterministic points, username and ID sorting.
       const rankedEntries = result.entries.map((entry, index) => ({
         ...entry,
         rank: entry.points > 0 ? index + 1 : null,
@@ -271,6 +272,7 @@ export const useTeacherStore = defineStore('teacher', () => {
       const cosmeticMap = new Map((cosmeticData || []).map((row: any) => [row.pet_id, {
         frame: row.frame?.style_key || null, background: row.background?.style_key || null,
       }]))
+      if (request !== leaderboardRequest) return
       leaderboard.value = rankedEntries.map(entry => {
         const pet = representativePets.get(entry.id)
         return { ...entry, pet_id: pet?.id, pet_species: pet?.species, pet_name: pet?.name || '未领养', pet_level: pet?.level || 0,
@@ -278,9 +280,9 @@ export const useTeacherStore = defineStore('teacher', () => {
       })
       leaderboardWeek.value = { start: result.weekStart, end: result.weekEnd }
     } catch (error) {
-      leaderboardError.value = error instanceof Error ? error.message : '排行榜加载失败'
+      if (request === leaderboardRequest) leaderboardError.value = error instanceof Error ? error.message : '排行榜加载失败'
     } finally {
-      leaderboardLoading.value = false
+      if (request === leaderboardRequest) leaderboardLoading.value = false
     }
   }
 

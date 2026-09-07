@@ -53,6 +53,7 @@
         :key="student.id"
         class="student-card card"
         :class="{ 'is-selected': selectedStudentIds.includes(student.id) }"
+        @click="toggleStudent(student.id)"
       >
         <label class="student-selector" @click.stop>
           <input
@@ -62,21 +63,29 @@
             @change="toggleStudent(student.id)"
           />
         </label>
-        <button type="button" class="student-info" :aria-label="`查看 ${student.username} 的详情`" @click="goDetail(student.id)">
+        <div class="student-info">
           <div class="student-avatar">{{ student.username.charAt(0) }}</div>
           <div class="student-meta">
             <span class="student-name">{{ student.username }}</span>
-            <span class="detail-hint">查看成长记录 →</span>
           </div>
-        </button>
+        </div>
         <div class="student-points"><strong>{{ student.points }}</strong><span>可用积分</span></div>
         <div class="student-actions">
-          <button class="btn btn-secondary btn-sm password-button" @click="openPasswordDialog(student)">重置密码</button>
-          <button class="btn btn-danger btn-sm" @click="handleDelete(student)">删除</button>
-          <button class="btn btn-primary btn-sm award-button" @click="openAwardDialog(student)">＋ 发积分</button>
+          <button type="button" class="btn btn-secondary btn-sm growth-button" :aria-label="`查看 ${student.username} 的详情`" @click.stop="goDetail(student.id)">学生详情</button>
+          <button class="btn btn-primary btn-sm award-button" @click.stop="openAwardDialog(student)">＋ 发积分</button>
         </div>
       </div>
     </div>
+
+    <dialog ref="detailDialog" class="student-detail-modal" aria-labelledby="student-detail-title" @cancel.prevent="detailView?.requestClose()" @click.self="detailView?.requestClose()">
+      <header class="detail-modal-header">
+        <h2 id="student-detail-title">学生学生详情</h2>
+        <button type="button" class="detail-close" aria-label="关闭学生详情" @click="detailView?.requestClose()">×</button>
+      </header>
+      <div class="detail-modal-body">
+        <TeacherStudentDetail v-if="detailStudentId" :key="detailStudentId" ref="detailView" :student-id="detailStudentId" :embedded="true" @close="closeDetail" @deleted="handleStudentDeleted" />
+      </div>
+    </dialog>
 
     <!-- 发积分弹窗 -->
     <div v-if="showDialog" class="dialog-overlay" @click.self="closeAwardDialog">
@@ -128,36 +137,24 @@
       </div>
     </div>
 
-    <!-- 重置学生密码弹窗 -->
-    <div v-if="passwordStudent" class="dialog-overlay" @click.self="closePasswordDialog">
-      <div class="dialog card">
-        <h3>重置学生密码</h3>
-        <p class="dialog-hint">学生账号：{{ passwordStudent.username }}</p>
-        <div class="form-field"><label>新密码</label><input v-model="resetPassword" class="form-input" type="password" autocomplete="new-password" minlength="4" placeholder="至少 4 位" /></div>
-        <div class="form-field"><label>确认新密码</label><input v-model="resetPasswordConfirm" class="form-input" type="password" autocomplete="new-password" minlength="4" placeholder="再次输入新密码" @keyup.enter="handleResetPassword" /></div>
-        <p v-if="passwordError" class="form-error" role="alert">{{ passwordError }}</p>
-        <div class="dialog-actions">
-          <button class="btn btn-secondary" :disabled="resettingPassword" @click="closePasswordDialog">取消</button>
-          <button class="btn btn-primary" :disabled="resettingPassword" @click="handleResetPassword">{{ resettingPassword ? '正在重置...' : '确认重置' }}</button>
-        </div>
-      </div>
-    </div>
-
     <!-- 成功提示 -->
     <div v-if="toast" class="toast">{{ toast }}</div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
-import { useRouter } from 'vue-router'
+import { ref, computed, nextTick, onMounted, onBeforeUnmount } from 'vue'
+import TeacherStudentDetail from './TeacherStudentDetail.vue'
 import { useTeacherStore } from '../../stores/teacher'
 import { useAuthStore } from '../../stores/auth'
 import { useTasksStore, rewardLabel } from '../../stores/tasks'
 import type { Profile } from '../../stores/auth'
 import type { Task } from '../../stores/tasks'
 
-const router = useRouter()
+const detailStudentId = ref<string | null>(null)
+const detailDialog = ref<HTMLDialogElement | null>(null)
+const detailView = ref<InstanceType<typeof TeacherStudentDetail> | null>(null)
+let previousOverflow = ''
 const teacherStore = useTeacherStore()
 const authStore = useAuthStore()
 const tasksStore = useTasksStore()
@@ -189,11 +186,6 @@ const newUsername = ref('')
 const newPassword = ref('')
 const createError = ref('')
 const creating = ref(false)
-const passwordStudent = ref<Profile | null>(null)
-const resetPassword = ref('')
-const resetPasswordConfirm = ref('')
-const passwordError = ref('')
-const resettingPassword = ref(false)
 
 onMounted(async () => {
   await Promise.all([
@@ -206,9 +198,30 @@ function handleSearch() {
   teacherStore.fetchStudents(searchQuery.value || undefined)
 }
 
-function goDetail(id: string) {
-  router.push(`/teacher/students/${id}`)
+async function goDetail(id: string) {
+  detailStudentId.value = id
+  await nextTick()
+  previousOverflow = document.body.style.overflow
+  document.body.style.overflow = 'hidden'
+  detailDialog.value?.showModal()
 }
+
+function handleStudentDeleted(id: string) {
+  selectedStudentIds.value = selectedStudentIds.value.filter(selected => selected !== id)
+  closeDetail()
+  toast.value = '学生已删除'
+  setTimeout(() => { toast.value = '' }, 2500)
+}
+
+function closeDetail() {
+  detailDialog.value?.close()
+  detailStudentId.value = null
+  document.body.style.overflow = previousOverflow
+}
+
+onBeforeUnmount(() => {
+  if (detailStudentId.value) document.body.style.overflow = previousOverflow
+})
 
 function openAwardDialog(student: Profile) {
   selectedStudent.value = student
@@ -270,45 +283,6 @@ async function confirmAward(task: Task) {
   }
 }
 
-async function handleDelete(student: Profile) {
-  if (!confirm(`确定要删除学生「${student.username}」吗？该操作不可恢复，将同时删除其宠物和日记数据。`)) return
-  const { error } = await teacherStore.deleteStudent(student.id)
-  if (!error) {
-    toast.value = `已删除学生「${student.username}」`
-    setTimeout(() => { toast.value = '' }, 2500)
-  }
-}
-
-function openPasswordDialog(student: Profile) {
-  passwordStudent.value = student
-  resetPassword.value = ''
-  resetPasswordConfirm.value = ''
-  passwordError.value = ''
-}
-
-function closePasswordDialog() {
-  if (resettingPassword.value) return
-  passwordStudent.value = null
-  resetPassword.value = ''
-  resetPasswordConfirm.value = ''
-  passwordError.value = ''
-}
-
-async function handleResetPassword() {
-  if (!passwordStudent.value || resettingPassword.value) return
-  passwordError.value = ''
-  if (resetPassword.value.length < 4) { passwordError.value = '新密码至少 4 位'; return }
-  if (resetPassword.value !== resetPasswordConfirm.value) { passwordError.value = '两次输入的新密码不一致'; return }
-  resettingPassword.value = true
-  const studentName = passwordStudent.value.username
-  const { error } = await teacherStore.resetStudentPassword(passwordStudent.value.id, resetPassword.value)
-  resettingPassword.value = false
-  if (error) { passwordError.value = error.message || '重置失败，请重试'; return }
-  closePasswordDialog()
-  toast.value = `已重置学生「${studentName}」的密码`
-  setTimeout(() => { toast.value = '' }, 2500)
-}
-
 function closeCreateDialog() {
   showCreateDialog.value = false
   newUsername.value = ''
@@ -341,6 +315,18 @@ async function handleCreateStudent() {
 </script>
 
 <style scoped>
+.student-detail-modal { width: min(1100px, calc(100vw - 48px)); max-width: none; max-height: 90dvh; padding: 0; margin: auto; border: 1px solid #e5eae3; border-radius: 22px; background: #fff9f2; color: #344b46; box-shadow: 0 24px 80px #223d4033; overflow: hidden; }
+.student-detail-modal[open] { display: flex; flex-direction: column; }
+.student-detail-modal::backdrop { background: #1c302b66; }
+.detail-modal-header { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 18px 24px; border-bottom: 1px solid #e5eae3; background: white; flex-shrink: 0; }
+.detail-modal-header h2 { margin: 0; font-size: 1.15rem; }
+.detail-close { width: 36px; height: 36px; border: 0; border-radius: 50%; background: #edf4ef; color: #498b74; cursor: pointer; font-size: 24px; }
+.detail-modal-body { overflow-y: auto; min-height: 0; overscroll-behavior: contain; padding: 24px; }
+@media (max-width: 600px) {
+  .student-detail-modal { width: calc(100vw - 16px); max-height: calc(100dvh - 16px); border-radius: 16px; }
+  .detail-modal-header { padding: 12px 16px; }
+  .detail-modal-body { padding: 14px; }
+}
 .teacher-page {
   padding-bottom: 80px;
 }
@@ -423,13 +409,13 @@ async function handleCreateStudent() {
 .student-card:nth-child(3n) .student-avatar { background: #fcf0e5; color: #b18c65; }
 .student-meta { display: flex; flex-direction: column; gap: 5px; }
 .student-name { font-weight: 600; font-size: .95rem; color: #3c5047; overflow-wrap: anywhere; }
-.detail-hint { font-size: .68rem; color: #9aa69e; }
+.student-card { cursor: pointer; }
 .student-points { display: flex; flex-direction: column; gap: 3px; text-align: right; align-self: center; }
 .student-points strong { font-size: 1.2rem; color: #498b74; font-variant-numeric: tabular-nums; }
 .student-points span { font-size: .65rem; color: #96a299; }
 :global(#app .app-shell .students-page .student-actions) { display: flex; align-items: center; justify-content: flex-end; gap:8px; grid-column: 1 / -1; border-top: 1px solid #edf0e9; padding-top: 9px; margin-left: 0; }
-.student-actions .btn { padding: 6px 10px; font-size: .75rem; box-shadow: none; }
-.student-actions .password-button { margin-right:auto; color:#66776e; background:#f2f5f2; border-color:#e1e7e1; }
+.student-actions .btn { padding: 6px 8px; font-size: .75rem; box-shadow: none; white-space: nowrap; }
+.student-actions .growth-button { margin-right: auto; color: #498b74; background: #ecf5ee; border-color: #e1e7e1; }
 .student-actions .award-button { background: #ecf5ee; color: #498b74; }
 .student-actions .award-button:hover { color: white; }
 .btn-danger { background: transparent; color: #b3938b; border: none; }

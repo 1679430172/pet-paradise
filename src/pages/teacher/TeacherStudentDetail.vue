@@ -1,6 +1,6 @@
 <template>
-  <div class="page teacher-page student-detail-page">
-    <div class="page-header">
+  <div class="page teacher-page student-detail-page" :class="{ 'is-embedded': embedded }">
+    <div v-if="!embedded" class="page-header">
       <button class="btn-back" @click="router.back()">← 返回</button>
       <h1 class="page-title">学生详情</h1>
     </div>
@@ -11,8 +11,9 @@
         <div class="student-avatar-lg">{{ studentProfile.username.charAt(0) }}</div>
         <div class="student-name-row">
           <h2>{{ studentProfile.username }}</h2>
-          <button class="rename-student-btn" type="button" title="修改学生名字" @click="openRenameDialog">✎</button>
+
         </div>
+        <div class="account-actions"><button type="button" @click="openRenameDialog">修改名字</button><button type="button" @click="openPasswordDialog(studentProfile)">重置密码</button></div>
         <div class="points-badge">{{ studentProfile.points }} 积分</div>
       </div>
 
@@ -75,7 +76,24 @@
           <div v-if="ledger.total > ledger.pageSize" class="usage-pagination"><button class="btn btn-secondary" :disabled="ledger.page <= 1" @click="loadLedger(ledger.page - 1)">上一页</button><span>{{ ledger.page }} / {{ Math.ceil(ledger.total / ledger.pageSize) }}</span><button class="btn btn-secondary" :disabled="ledger.page * ledger.pageSize >= ledger.total" @click="loadLedger(ledger.page + 1)">下一页</button></div>
         </template>
       </section>
+      <section class="delete-student-section"><p>删除学生将同时删除其宠物和日记，操作不可恢复。</p><p v-if="deleteError" class="form-error" role="alert">{{ deleteError }}</p><button type="button" :disabled="deleting" @click="handleDelete">{{ deleting ? '删除中…' : '删除学生' }}</button></section>
     </template>
+    <div v-else-if="!loading" class="empty-state">{{ detailError || '未找到该学生' }}</div>
+    <!-- 重置学生密码弹窗 -->
+    <div v-if="passwordStudent" class="dialog-overlay" @click.self="closePasswordDialog">
+      <div class="dialog card">
+        <h3>重置学生密码</h3>
+        <p class="dialog-hint">学生账号：{{ passwordStudent.username }}</p>
+        <div class="form-field"><label>新密码</label><input v-model="resetPassword" class="form-input" type="password" autocomplete="new-password" minlength="4" placeholder="至少 4 位" /></div>
+        <div class="form-field"><label>确认新密码</label><input v-model="resetPasswordConfirm" class="form-input" type="password" autocomplete="new-password" minlength="4" placeholder="再次输入新密码" @keyup.enter="handleResetPassword" /></div>
+        <p v-if="passwordError" class="form-error" role="alert">{{ passwordError }}</p>
+        <div class="dialog-actions">
+          <button class="btn btn-secondary" :disabled="resettingPassword" @click="closePasswordDialog">取消</button>
+          <button class="btn btn-primary" :disabled="resettingPassword" @click="handleResetPassword">{{ resettingPassword ? '正在重置...' : '确认重置' }}</button>
+        </div>
+      </div>
+    </div>
+
     <!-- 修改学生名字弹窗 -->
     <div v-if="showRenameDialog" class="dialog-overlay" @click.self="closeRenameDialog">
       <div class="dialog card">
@@ -129,14 +147,23 @@
 
 <script setup lang="ts">
 
-import { ref, computed, nextTick, onMounted } from 'vue'
+import { ref, computed, nextTick, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useTeacherStore, type TeacherPet, type StudentLedger } from '../../stores/teacher'
-import { PET_COLORS, MAX_LEVEL, LEVEL_THRESHOLDS } from '../../lib/constants'
+import type { Profile } from '../../stores/auth'
+import { xpProgress, xpLabel } from '../../lib/petExperience'
+import { PET_COLORS, MAX_LEVEL } from '../../lib/constants'
 import PetAvatar from '../../components/pet/PetAvatar.vue'
 import PetAdoptionFields from '../../components/pet/PetAdoptionFields.vue'
 
 const route = useRoute()
+const props = defineProps({
+  studentId: { type: String, default: '' },
+  embedded: { type: Boolean, default: false },
+})
+const emit = defineEmits<{ close: []; deleted: [id: string] }>()
+const currentStudentId = computed(() => props.studentId || route.params.id as string)
+const detailError = ref('')
 const router = useRouter()
 const teacherStore = useTeacherStore()
 
@@ -151,7 +178,7 @@ async function loadLedger(page = 1) {
   if (ledgerLoading.value) return
   ledgerLoading.value = true; ledgerError.value = ''
   try {
-    ledger.value = await teacherStore.fetchStudentLedger(route.params.id as string, page)
+    ledger.value = await teacherStore.fetchStudentLedger(currentStudentId.value, page)
     if (studentProfile.value) studentProfile.value.points = ledger.value.points
   } catch (e) { ledgerError.value = e instanceof Error ? e.message.replace('课堂功能数据库迁移', '收支记录数据库迁移') : '收支记录加载失败，请重试' }
   finally { ledgerLoading.value = false }
@@ -172,35 +199,104 @@ const renameError = ref('')
 const renaming = ref(false)
 const renameInput = ref<HTMLInputElement | null>(null)
 
+const passwordStudent = ref<Profile | null>(null)
+const resetPassword = ref('')
+const resetPasswordConfirm = ref('')
+const passwordError = ref('')
+const resettingPassword = ref(false)
+
+const deleting = ref(false)
+const deleteError = ref('')
+
+function openPasswordDialog(student: Profile) {
+  passwordStudent.value = student
+  resetPassword.value = ''
+  resetPasswordConfirm.value = ''
+  passwordError.value = ''
+}
+
+function closePasswordDialog() {
+  if (resettingPassword.value) return
+  passwordStudent.value = null
+  resetPassword.value = ''
+  resetPasswordConfirm.value = ''
+  passwordError.value = ''
+}
+
+async function handleResetPassword() {
+  if (!passwordStudent.value || resettingPassword.value) return
+  passwordError.value = ''
+  if (resetPassword.value.length < 4) { passwordError.value = '新密码至少 4 位'; return }
+  if (resetPassword.value !== resetPasswordConfirm.value) { passwordError.value = '两次输入的新密码不一致'; return }
+  resettingPassword.value = true
+  const studentName = passwordStudent.value.username
+  const { error } = await teacherStore.resetStudentPassword(passwordStudent.value.id, resetPassword.value)
+  resettingPassword.value = false
+  if (error) { passwordError.value = error.message || '重置失败，请重试'; return }
+  closePasswordDialog()
+  toast.value = `已重置学生「${studentName}」的密码`
+  setTimeout(() => { toast.value = '' }, 2500)
+}
+
+
 const canAdoptNew = computed(() => {
   return pets.value.length === 0 || pets.value.every(p => (p.level || 1) >= MAX_LEVEL)
 })
-
-function xpProgress(pet: TeacherPet): number {
-  if (pet.level >= MAX_LEVEL) return 100
-  const previous = pet.level > 1 ? LEVEL_THRESHOLDS[pet.level - 1] : 0
-  const next = LEVEL_THRESHOLDS[pet.level] || previous
-  if (next <= previous) return 100
-  return Math.max(0, Math.min(100, (((pet.xp || 0) - previous) / (next - previous)) * 100))
-}
-
-function xpLabel(pet: TeacherPet): string {
-  return pet.level >= MAX_LEVEL ? '已满级' : `${pet.xp || 0}/${LEVEL_THRESHOLDS[pet.level]} XP`
-}
 
 function formatTime(dateStr: string) {
   const d = new Date(dateStr)
   return `${d.getMonth() + 1}/${d.getDate()} ${d.getHours()}:${String(d.getMinutes()).padStart(2, '0')}`
 }
 
-onMounted(async () => {
-  const id = route.params.id as string
-  const result = await teacherStore.fetchStudentDetail(id)
-  studentProfile.value = result.profile
-  pets.value = result.pets || []
-  if (result.profile) void loadLedger()
-  loading.value = false
-})
+let detailRequest = 0
+watch(currentStudentId, async (id) => {
+  const request = ++detailRequest
+  loading.value = true
+  detailError.value = ''
+  studentProfile.value = null
+  pets.value = []
+  ledger.value = null
+  if (!id) {
+    detailError.value = '缺少学生信息，请关闭后重新打开'
+    loading.value = false
+    return
+  }
+  try {
+    const result = await teacherStore.fetchStudentDetail(id)
+    if (request !== detailRequest) return
+    studentProfile.value = result.profile
+    pets.value = result.pets || []
+    if (result.profile) void loadLedger()
+  } catch {
+    if (request === detailRequest) detailError.value = '学生详情加载失败，请关闭后重试'
+  } finally {
+    if (request === detailRequest) loading.value = false
+  }
+}, { immediate: true })
+
+async function handleDelete() {
+  if (!studentProfile.value || deleting.value) return
+  const student = studentProfile.value
+  if (!confirm(`确定要删除学生「${student.username}」吗？该操作不可恢复，将同时删除其宠物和日记数据。`)) return
+  deleting.value = true
+  deleteError.value = ''
+  try {
+    const { error } = await teacherStore.deleteStudent(student.id)
+    if (error) { deleteError.value = error.message || '删除失败，请重试'; return }
+    if (props.embedded) emit('deleted', student.id)
+    else router.replace('/teacher/students')
+  } catch { deleteError.value = '删除失败，请重试' }
+  finally { deleting.value = false }
+}
+
+function requestClose() {
+  if (renaming.value || adopting.value || resettingPassword.value || deleting.value) return
+  if (passwordStudent.value) { closePasswordDialog(); return }
+  if (showRenameDialog.value) { closeRenameDialog(); return }
+  if (showAdoptDialog.value) { closeAdoptDialog(); return }
+  emit('close')
+}
+defineExpose({ requestClose })
 
 function openRenameDialog() {
   if (!studentProfile.value) return
@@ -277,6 +373,20 @@ async function handleAdopt() {
 </script>
 
 <style scoped>
+.account-actions { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; margin-bottom: 12px; }
+.account-actions button { padding: 6px 10px; border: 1px solid #dfe7e1; border-radius: 8px; background: #f2f6f2; color: #587466; cursor: pointer; }
+.delete-student-section { grid-column: 1 / -1; border-top: 1px solid #e8dfd7; padding-top: 20px; margin-top: 24px; }
+.delete-student-section p { font-size: .8rem; color: #93857e; margin-bottom: 10px; }
+.delete-student-section button { padding: 8px 14px; border: 1px solid #ead1cc; border-radius: 8px; color: #ac5c50; background: #fff5f2; cursor: pointer; }
+.form-field { display: flex; flex-direction: column; gap: 6px; margin-bottom: 12px; }
+.dialog-hint { color: #7e8479; margin-bottom: 12px; font-size: .85rem; }
+
+:global(#app .app-shell .student-detail-page.is-embedded) { width: 100%; max-width: none; padding: 0; margin: 0; }
+:global(#app .app-shell .student-detail-page.is-embedded .completion-list) { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+@media (max-width: 767px) {
+  :global(#app .app-shell .student-detail-page.is-embedded) { display: block; }
+  :global(#app .app-shell .student-detail-page.is-embedded .completion-list) { grid-template-columns: minmax(0, 1fr); }
+}
 .ledger-amounts{display:flex;flex-direction:column;gap:4px;text-align:right;font-weight:700;white-space:nowrap}.ledger-income{color:#36806a}
 .ticket-usage-section{grid-column:1/-1}.ticket-usage-heading,.usage-pagination{display:flex;align-items:center;justify-content:space-between;gap:12px}.usage-summary{font-size:.85rem;color:#7e8479;margin:10px 0 16px}.ticket-usage-item{gap:14px;flex-wrap:wrap}.ticket-usage-item .completion-info{min-width:0;overflow-wrap:anywhere}.ticket-usage-item small{font-size:.75rem;color:#8d948b}.ticket-spent{color:#b5763f;font-weight:700;white-space:nowrap}.usage-pagination{justify-content:center;margin-top:18px}.usage-error{color:#b14f59;padding:16px 0}
 .teacher-page {

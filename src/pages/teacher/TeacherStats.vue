@@ -1,12 +1,13 @@
 <template>
   <div class="page teacher-page stats-page">
-    <div class="ranking-heading"><div><h1 class="page-title">本周成长榜</h1>
+    <div class="ranking-heading"><div><h1 class="page-title">{{ periodLabel }}成长榜</h1>
       <p class="ranking-note">{{ weekLabel }} · 北京时间</p></div>
-      <button class="btn btn-secondary" :disabled="teacherStore.leaderboardLoading" @click="teacherStore.fetchLeaderboard()">刷新</button>
+      <button class="btn btn-secondary" :disabled="teacherStore.leaderboardLoading" @click="teacherStore.fetchLeaderboard(period)">刷新</button>
     </div>
-    <p class="ranking-rule">按本周获得的任务与日记奖励积分排名，喂食消费不影响排名。同分时按学生名称排序，每周一重新统计。</p>
+    <div class="period-switch" role="group" aria-label="排行榜统计周期"><button v-for="option in RANKING_PERIODS" :key="option.value" type="button" :aria-pressed="period === option.value" :class="{ active: period === option.value }" @click="period = option.value">{{ option.label }}</button></div>
+    <p class="ranking-rule">按{{ periodLabel }}获得的任务与日记奖励积分排名，消费不影响排名，已撤销奖励不计入。同分按学生名称、学生 ID 排序。{{ period === 'all' ? '统计全部历史奖励记录。' : '按北京时间自然周期统计。' }}</p>
     <div v-if="teacherStore.leaderboardError" role="alert" class="ranking-error">{{ teacherStore.leaderboardError }}</div>
-    <div v-else-if="teacherStore.leaderboardLoading" class="loading-state">正在统计本周成长...</div>
+    <div v-else-if="teacherStore.leaderboardLoading" class="loading-state">正在统计{{ periodLabel }}成长...</div>
     <div v-else>
       <section v-for="group in rankingGroups" :key="group.title" class="ranking-section">
       <div class="section-heading"><h2>{{ group.title }}</h2><span>{{ group.honor ? '每一份努力，都值得闪耀' : '一起积累，继续成长' }}</span></div>
@@ -32,44 +33,52 @@
           <span v-if="group.honor" class="honor-label">{{ entry.rank === 1 ? '第一名 · 闪耀之星' : entry.rank === 2 ? '第二名 · 成长之星' : '第三名 · 活力之星' }}</span>
           <span class="rank-pet">{{ entry.pet_name }}<template v-if="entry.pet_level"> · Lv.{{ entry.pet_level }}</template></span>
         </div>
-        <div class="rank-points">{{ entry.points }} <small>本周获得</small></div>
+        <div class="rank-points">{{ entry.points }} <small>{{ period === 'all' ? '累计获得' : periodLabel + '获得' }}</small></div>
         <div v-if="group.honor" class="podium-plinth" aria-hidden="true"><span>{{ entry.rank === 1 ? '✦' : '✧' }}</span><strong>{{ entry.rank }}</strong><span>{{ entry.rank === 1 ? '✦' : '✧' }}</span></div>
       </div>
       </div>
       </div>
       </section>
       <div v-if="teacherStore.leaderboard.length === 0" class="empty-state">班级里还没有学生</div>
-      <p v-else-if="teacherStore.leaderboard.every(entry => entry.points === 0)" class="empty-state">新的一周开始啦，完成任务就能点亮本周成长榜。</p>
+      <p v-else-if="teacherStore.leaderboard.every(entry => entry.points === 0)" class="empty-state">该周期暂无奖励积分，完成任务就能点亮成长榜。</p>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { useTeacherStore } from '../../stores/teacher'
 import PetAvatar from '../../components/pet/PetAvatar.vue'
 import { cosmeticClasses } from '../../lib/cosmetics'
+import { RANKING_PERIODS, type RankingPeriod } from '../../lib/leaderboard'
+const period = ref<RankingPeriod>('week')
+const periodLabel = computed(() => RANKING_PERIODS.find(option => option.value === period.value)!.label)
 const teacherStore = useTeacherStore()
 const podiumLanes = computed(() => [1, 2, 3].map(rank => ({
   rank, entries: teacherStore.leaderboard.filter(entry => entry.rank === rank),
 })))
 const rankingGroups = computed(() => [
-  { title: '本周荣誉榜', honor: true, entries: teacherStore.leaderboard.filter(entry => entry.rank !== null && entry.rank <= 3) },
+  { title: periodLabel.value + '荣誉榜', honor: true, entries: teacherStore.leaderboard.filter(entry => entry.rank !== null && entry.rank <= 3) },
   { title: '班级成长足迹', honor: false, entries: teacherStore.leaderboard.filter(entry => entry.rank === null || entry.rank > 3) },
 ].filter(group => group.entries.length > 0))
 const weekLabel = computed(() => {
   const { start, end } = teacherStore.leaderboardWeek
-  if (!start || !end) return '本周'
-  const format = (date: Date) => date.toLocaleDateString('zh-CN', { timeZone: 'Asia/Shanghai', month: 'numeric', day: 'numeric' })
+  if (period.value === 'all') return '全部历史记录'
+  if (!start || !end) return periodLabel.value
+  const format = (date: Date) => date.toLocaleDateString('zh-CN', { timeZone: 'Asia/Shanghai', year: 'numeric', month: 'numeric', day: 'numeric' })
   return `${format(new Date(start))} — ${format(new Date(new Date(end).getTime() - 1))}`
 })
-onMounted(() => teacherStore.fetchLeaderboard())
+watch(period, value => teacherStore.fetchLeaderboard(value), { immediate: true })
 function getRankClass(rank: number | null) {
   return rank === 1 ? 'gold' : rank === 2 ? 'silver' : rank === 3 ? 'bronze' : ''
 }
 </script>
 
 <style scoped>
+.period-switch { display:flex; gap:4px; padding:4px; margin-top:18px; width:fit-content; border-radius:12px; background:#efece7; }
+.period-switch button { border:0; border-radius:9px; padding:9px 20px; background:transparent; color:#72786f; cursor:pointer; }
+.period-switch button.active { background:#fff; color:#d45e91; box-shadow:0 2px 8px #45382b10; }
+.period-switch button:focus-visible { outline:2px solid #d45e91; outline-offset:2px; }
 .ranking-heading { display: flex; justify-content: space-between; align-items: center; gap: 16px; }
 .ranking-heading .page-title { margin-bottom: 6px; }
 .ranking-note, .ranking-rule { color: #666; line-height: 1.7; }

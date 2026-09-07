@@ -348,7 +348,8 @@ import { useAuthStore } from '../../stores/auth'
 import { useTasksStore, rewardLabel } from '../../stores/tasks'
 import { useTeacherStore, type StudentWithPet, type TeacherPet } from '../../stores/teacher'
 import { usePointsStore } from '../../stores/points'
-import { PET_COLORS, MAX_LEVEL, LEVEL_THRESHOLDS, getFeedingReply } from '../../lib/constants'
+import { xpProgress, xpLabel } from '../../lib/petExperience'
+import { PET_COLORS, MAX_LEVEL, getFeedingReply } from '../../lib/constants'
 import { getPetThemeStyle } from '../../lib/petTheme'
 import { cosmeticClasses } from '../../lib/cosmetics'
 import { classroomRpc } from '../../lib/classroomApi'
@@ -537,20 +538,6 @@ const someVisibleSelected = computed(() => !allVisibleSelected.value && batchPet
 
 function canAdoptFor(s: StudentWithPet) {
   return s.pets.length === 0 || s.pets.every(p => (p.level || 1) >= MAX_LEVEL)
-}
-
-function xpProgress(pet: TeacherPet): number {
-  if (pet.level >= MAX_LEVEL) return 100
-  const xp = pet.xp || 0
-  const previous = pet.level > 1 ? LEVEL_THRESHOLDS[pet.level - 1] : 0
-  const next = LEVEL_THRESHOLDS[pet.level] || previous
-  if (next <= previous) return 100
-  return Math.max(0, Math.min(100, ((xp - previous) / (next - previous)) * 100))
-}
-
-function xpLabel(pet: TeacherPet): string {
-  if (pet.level >= MAX_LEVEL) return '已满级'
-  return `${pet.xp || 0}/${LEVEL_THRESHOLDS[pet.level]} XP`
 }
 
 function getIdx(s: StudentWithPet): number {

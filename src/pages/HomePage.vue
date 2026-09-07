@@ -57,7 +57,7 @@
             </div>
             <span class="xp-text">
               <template v-if="petStore.currentPet.level >= MAX_LEVEL">已进化为完全体</template>
-              <template v-else>{{ petStore.currentPet.xp }} / {{ nextLevelXp }} XP</template>
+              <template v-else>{{ xpLabel(petStore.currentPet) }}</template>
             </span>
           </div>
         </div>
@@ -153,7 +153,8 @@ import { useAuthStore } from '../stores/auth'
 import { usePointsStore } from '../stores/points'
 import { useShopStore } from '../stores/shop'
 import { cosmeticClasses } from '../lib/cosmetics'
-import { LEVEL_THRESHOLDS, MAX_LEVEL } from '../lib/constants'
+import { MAX_LEVEL } from '../lib/constants'
+import { xpProgress, xpLabel } from '../lib/petExperience'
 import { getPetThemeStyle } from '../lib/petTheme'
 import PetAvatar from '../components/pet/PetAvatar.vue'
 
@@ -170,23 +171,7 @@ const message = ref('')
 const isError = ref(false)
 const petCosmeticClasses = computed(() => cosmeticClasses(shopStore.selectionForPet(petStore.currentPet?.id)))
 
-const nextLevelXp = computed(() => {
-  if (!petStore.currentPet) return 50
-  const level = petStore.currentPet.level
-  if (level >= LEVEL_THRESHOLDS.length) return LEVEL_THRESHOLDS[LEVEL_THRESHOLDS.length - 1]
-  return LEVEL_THRESHOLDS[level]
-})
-
-const xpPercent = computed(() => {
-  if (!petStore.currentPet) return 0
-  const current = petStore.currentPet.xp
-  const level = petStore.currentPet.level
-  if (level >= MAX_LEVEL) return 100
-  const prevThreshold = level > 1 ? LEVEL_THRESHOLDS[level - 1] : 0
-  const next = nextLevelXp.value
-  if (next === prevThreshold) return 100
-  return Math.min(100, ((current - prevThreshold) / (next - prevThreshold)) * 100)
-})
+const xpPercent = computed(() => petStore.currentPet ? xpProgress(petStore.currentPet) : 0)
 
 function canAfford(action: 'basic' | 'nice' | 'luxury') {
   return (authStore.user?.points || 0) >= pointsStore.actionCosts[action]
