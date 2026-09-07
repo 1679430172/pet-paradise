@@ -99,17 +99,18 @@
             @mouseenter="showHoverReply(activePet(s)!)"
             @mouseleave="hideHoverReply"
             @click="handlePetStageClick(s, activePet(s)!)"
-            @keydown.enter.prevent="handlePetStageClick(s, activePet(s)!)"
-            @keydown.space.prevent="handlePetStageClick(s, activePet(s)!)"
+            @keydown.enter.self.prevent="handlePetStageClick(s, activePet(s)!)"
+            @keydown.space.self.prevent="handlePetStageClick(s, activePet(s)!)"
           >
             <button
               v-if="s.pets.length > 1"
               class="nav-arrow left"
+
               type="button"
               title="上一只"
               aria-label="上一只宠物"
               @click.stop="prev(s)"
-            >‹</button>
+            ><PetSpeciesMark class="switch-species-mark" :species="activePet(s)!.species" /><svg class="switch-chevron" viewBox="0 0 24 24" aria-hidden="true"><path d="m14 7-5 5 5 5" /></svg></button>
             <PetAvatar
               :species="activePet(s)!.species"
               :level="activePet(s)!.level"
@@ -124,14 +125,17 @@
             <button
               v-if="s.pets.length > 1"
               class="nav-arrow right"
+
               type="button"
               title="下一只"
               aria-label="下一只宠物"
               @click.stop="next(s)"
-            >›</button>
+            ><PetSpeciesMark class="switch-species-mark" :species="activePet(s)!.species" /><svg class="switch-chevron" viewBox="0 0 24 24" aria-hidden="true"><path d="m10 7 5 5-5 5" /></svg></button>
+
+
           </div>
           <!-- 主标题：学生姓名 -->
-          <h2 class="pet-name">{{ s.username }}</h2>
+          <h2 class="pet-name">{{ s.username }}<span v-if="s.pets.length > 1" class="pet-page-count"  aria-label="当前宠物页码"><PetSpeciesMark :species="activePet(s)!.species" />{{ getIdx(s) + 1 }} / {{ s.pets.length }}</span></h2>
 
           <div class="pet-stats">
             <div class="pet-stat">
@@ -175,23 +179,6 @@
             </button>
           </div>
 
-          <!-- 页码指示点 -->
-          <div v-if="s.pets.length > 1" class="pet-dots">
-            <span
-              v-for="(p, idx) in s.pets"
-              :key="p.id"
-              class="dot"
-              :class="{ active: idx === getIdx(s) }"
-              @click="petIdx[s.id] = idx"
-            />
-          </div>
-
-          <!-- 所有宠物已满级：可领养新宠物 -->
-          <button
-            v-if="canAdoptFor(s)"
-            class="adopt-mini-btn"
-            @click="openAdoptDialog(s)"
-          >➕ 领养新宠物</button>
         </template>
 
         <!-- 无宠物 -->
@@ -218,9 +205,18 @@
     <div v-if="showCosmeticDialog" class="dialog-overlay" @click.self="closeCosmeticDialog">
       <div class="dialog cosmetic-dialog card">
         <div class="cosmetic-dialog-head">
-          <div><h3>为 {{ cosmeticTargetStudent?.username }} 更换装扮</h3><p>{{ cosmeticTargetPet?.name }} · 使用学生积分购买</p></div>
-          <strong>{{ cosmeticTargetStudent?.points || 0 }} 积分</strong>
+          <div><h3>为 {{ cosmeticTargetStudent?.username }} 更换装扮</h3><p>{{ cosmeticTargetPet?.name }} · 商城与旅行装扮</p></div>
+          <div class="cosmetic-balances" aria-label="学生资源余额">
+            <strong>{{ cosmeticTargetStudent?.points || 0 }} 积分</strong>
+            <strong class="stamp-balance">✉ {{ cosmeticTravelBalance?.stamps ?? '—' }} 印章</strong>
+            <strong class="ticket-balance">🎫 {{ cosmeticTravelBalance?.tickets ?? '—' }} 旅行券</strong>
+            <small v-if="cosmeticBalanceError" role="status">{{ cosmeticBalanceError }}</small>
+          </div>
         </div>
+        <button v-if="cosmeticTargetStudent && cosmeticTargetPet" class="cosmetic-travel-entry" :disabled="!!cosmeticBusyId" :aria-label="`管理 ${cosmeticTargetStudent.username} 的宠物旅行`" @click="travelTarget = { student: cosmeticTargetStudent, pet: cosmeticTargetPet }">
+          <span><strong>🧳 {{ cosmeticTargetPet.name }}的旅行</strong><small>{{ travelCardLabel(cosmeticTargetPet.id) === '旅行' ? '选择目的地，每次消耗 1 张旅行券' : travelCardLabel(cosmeticTargetPet.id) }}</small></span><b>管理旅行 →</b>
+        </button>
+        <button v-if="cosmeticTargetStudent && canAdoptFor(cosmeticTargetStudent)" class="adopt-mini-btn" @click="openAdoptFromCosmetics">➕ 领养新宠物</button>
         <div class="cosmetic-tabs" role="tablist">
           <button :class="{ active: cosmeticTab === 'frame' }" @click="cosmeticTab = 'frame'">卡片边框</button>
           <button :class="{ active: cosmeticTab === 'background' }" @click="cosmeticTab = 'background'">背景主题</button>
@@ -232,13 +228,14 @@
             <div class="teacher-cosmetic-preview cosmetic-card" :class="cosmeticClasses({ [item.category]: item.style_key })" :style="item.category === 'frame' ? getPetThemeStyle(cosmeticTargetPet?.appearance?.color) : undefined">
               <PetAvatar v-if="cosmeticTargetPet" :species="cosmeticTargetPet.species" :level="cosmeticTargetPet.level" :size="74" show-stage />
             </div>
-            <div class="teacher-cosmetic-copy"><strong>{{ item.name }}</strong><small>{{ item.description }}</small><span>{{ cosmeticOwned(item) ? '已拥有' : `${item.price} 积分` }}</span></div>
+            <div class="teacher-cosmetic-copy"><strong>{{ item.name }}</strong><small>{{ item.description }}</small><span>{{ cosmeticOwned(item) ? (item.acquisition === 'travel' ? '旅行专属 · 已拥有' : '已拥有') : item.acquisition === 'travel' ? '旅行专属 · 未获得' : `${item.price} 积分` }}</span></div>
             <button v-if="isCosmeticEquipped(item)" class="cosmetic-remove" :disabled="!!cosmeticBusyId" @click="removeStudentCosmetic(item)">卸下</button>
             <button v-else-if="cosmeticOwned(item)" class="cosmetic-equip" :disabled="!!cosmeticBusyId" @click="equipStudentCosmetic(item)">装备</button>
+            <span v-else-if="item.acquisition === 'travel'" class="cosmetic-travel-locked">旅行获取<br />或印章兑换</span>
             <button v-else class="cosmetic-buy" :disabled="!!cosmeticBusyId || (cosmeticTargetStudent?.points || 0) < item.price" @click="buyStudentCosmetic(item)">{{ cosmeticBusyId === item.id ? '处理中...' : '购买并装备' }}</button>
           </article>
         </div>
-        <p class="cosmetic-dialog-note">购买将扣除该学生积分；教师只能操作自己班级的学生。</p>
+        <p class="cosmetic-dialog-note">商城装扮使用学生积分购买；旅行专属装扮需由学生旅行获得或用印章兑换，获得后老师可协助装备。</p>
         <div class="dialog-actions"><button class="btn-cancel" :disabled="!!cosmeticBusyId" @click="closeCosmeticDialog">完成</button></div>
       </div>
     </div>
@@ -340,9 +337,11 @@
 
     <div v-if="toast" class="toast">{{ toast }}</div>
   </div>
+  <TeacherTravelDialog v-if="travelTarget" :key="travelTarget.student.id + travelTarget.pet.id" :student-id="travelTarget.student.id" :student-name="travelTarget.student.username" :pet-id="travelTarget.pet.id" :pet-name="travelTarget.pet.name" @close="travelTarget = null; refreshTravelOverview()" @updated="refreshCosmeticTravel" />
 </template>
 
 <script setup lang="ts">
+import TeacherTravelDialog from '../../components/teacher/TeacherTravelDialog.vue'
 import { ref, computed, nextTick, onMounted, onUnmounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '../../stores/auth'
@@ -352,8 +351,10 @@ import { usePointsStore } from '../../stores/points'
 import { PET_COLORS, MAX_LEVEL, LEVEL_THRESHOLDS, getFeedingReply } from '../../lib/constants'
 import { getPetThemeStyle } from '../../lib/petTheme'
 import { cosmeticClasses } from '../../lib/cosmetics'
+import { classroomRpc } from '../../lib/classroomApi'
 import type { ShopItem } from '../../stores/shop'
 import PetAvatar from '../../components/pet/PetAvatar.vue'
+import PetSpeciesMark from '../../components/pet/PetSpeciesMark.vue'
 import PetAdoptionFields from '../../components/pet/PetAdoptionFields.vue'
 
 const teacherStore = useTeacherStore()
@@ -444,6 +445,30 @@ const cosmeticTargetStudent = ref<StudentWithPet | null>(null)
 const cosmeticTargetPet = ref<TeacherPet | null>(null)
 const cosmeticTab = ref<'frame' | 'background'>('frame')
 const cosmeticLoading = ref(false)
+const travelTarget = ref<{ student: StudentWithPet; pet: TeacherPet } | null>(null)
+const travelOverview = ref<Record<string, { pet_name: string; returns_at: string }>>({})
+const travelClock = ref(0)
+let travelClockTimer: ReturnType<typeof setInterval> | undefined
+let travelServerAt = 0, travelReceivedAt = 0
+async function refreshTravelOverview() {
+  if (!authStore.user) return
+  try {
+    const result = await classroomRpc<{ serverNow: string; entries: { student_id: string; pet_id: string; pet_name: string; returns_at: string }[] }>('teacher_travel_overview', { p_actor_id: authStore.user.id })
+    travelOverview.value = Object.fromEntries(result.entries.map(entry => [entry.pet_id, entry]))
+    travelServerAt = Date.parse(result.serverNow); travelReceivedAt = performance.now(); travelClock.value = travelServerAt
+  } catch { travelOverview.value = {} }
+}
+function travelCardLabel(petId: string) {
+  const trip = travelOverview.value[petId]
+  if (!trip) return '旅行'
+  const minutes = Math.ceil((Date.parse(trip.returns_at) - travelClock.value) / 60000)
+  return minutes <= 0 ? `${trip.pet_name} · 待领取` : `旅行中 · ${Math.floor(minutes / 60)}时${minutes % 60}分`
+}
+function refreshVisibleTravel() { if (document.visibilityState === 'visible') void refreshTravelOverview() }
+onMounted(() => { void refreshTravelOverview(); travelClockTimer = setInterval(() => { travelClock.value = travelServerAt + performance.now() - travelReceivedAt }, 1000); document.addEventListener('visibilitychange', refreshVisibleTravel) })
+onUnmounted(() => { clearInterval(travelClockTimer); document.removeEventListener('visibilitychange', refreshVisibleTravel) })
+const cosmeticTravelBalance = ref<{ stamps: number | null; tickets: number | null } | null>(null)
+const cosmeticBalanceError = ref('')
 const cosmeticBusyId = ref<string | null>(null)
 const cosmeticError = ref('')
 const visibleCosmeticItems = computed(() => teacherStore.cosmeticItems.filter(item => item.category === cosmeticTab.value))
@@ -670,14 +695,34 @@ function showPetReply(petId: string, reply: string) {
   }, 3200))
 }
 
+async function refreshCosmeticTravel() {
+  await refreshTravelOverview()
+  if (cosmeticTargetStudent.value && cosmeticTargetPet.value) {
+    const tab = cosmeticTab.value
+    await openCosmeticDialog(cosmeticTargetStudent.value, cosmeticTargetPet.value)
+    cosmeticTab.value = tab
+  }
+}
+
 async function openCosmeticDialog(student: StudentWithPet, pet: TeacherPet) {
+  cosmeticTravelBalance.value = null
+  cosmeticBalanceError.value = ''
   cosmeticTargetStudent.value = student
   cosmeticTargetPet.value = pet
   cosmeticTab.value = 'frame'
   cosmeticError.value = ''
   cosmeticLoading.value = true
   showCosmeticDialog.value = true
-  try { await teacherStore.fetchStudentCosmetics(student.id) }
+  try { await Promise.all([
+    refreshTravelOverview(),
+    teacherStore.fetchStudentCosmetics(student.id),
+    classroomRpc<{ stamps: number; tickets: number }>('travel_state', { p_user_id: student.id })
+      .then(balance => {
+        if (cosmeticTargetStudent.value?.id !== student.id) return
+        cosmeticTravelBalance.value = { stamps: Number.isInteger(balance.stamps) ? balance.stamps : null, tickets: Number.isInteger(balance.tickets) ? balance.tickets : null }
+      })
+      .catch(() => { if (cosmeticTargetStudent.value?.id === student.id) cosmeticBalanceError.value = '旅行余额暂时无法加载，请重新打开重试' }),
+  ]) }
   catch (error) { cosmeticError.value = error instanceof Error ? error.message : '装扮加载失败' }
   finally { cosmeticLoading.value = false }
 }
@@ -685,6 +730,13 @@ async function openCosmeticDialog(student: StudentWithPet, pet: TeacherPet) {
 function handlePetStageClick(student: StudentWithPet, pet: TeacherPet) {
   if (classroomMode.value || busyKey.value || batchFeeding.value || awarding.value) return
   void openCosmeticDialog(student, pet)
+}
+
+function openAdoptFromCosmetics() {
+  const student = cosmeticTargetStudent.value
+  if (!student || cosmeticBusyId.value) return
+  closeCosmeticDialog()
+  openAdoptDialog(student)
 }
 
 function closeCosmeticDialog() {
@@ -872,8 +924,12 @@ async function handleAdopt() {
 :global(#app .app-shell .classroom-mode .pet-list) { grid-template-columns: repeat(auto-fill, minmax(min(100%, var(--classroom-card-width)), 1fr)); gap: 62px; padding: 28px; }
 .pets-page .pet-card { border: 2px solid #ffffff; border-radius: 22px; box-shadow: 0 4px 18px #233d3210; }
 .classroom-mode .pet-card { width: 100%; height: var(--classroom-card-height); box-sizing: border-box; }
-.pets-page .pet-card[class*="cosmetic-frame-"] { overflow: visible; padding-inline: 28px; padding-bottom: 24px; }
+.pets-page .pet-card[class*="cosmetic-frame-"] { overflow: visible; }
 .pets-page .pet-card[class*="cosmetic-frame-"]::after { inset: -5.56%; border-radius: 30px; }
+.pets-page:not(.classroom-mode) .pet-card .action-row { position: relative; z-index: 4; }
+.pets-page:not(.classroom-mode) .pet-card .pet-name-top,
+.pets-page:not(.classroom-mode) .pet-card .points-badge,
+.pets-page:not(.classroom-mode) .pet-card .level-badge { z-index: 4; }
 .pets-page .pet-card.cosmetic-frame-leaf { --cosmetic-frame-image: url('/assets/shop/frame-leaf-portrait-v3.png'); }
 .pets-page .pet-card.cosmetic-frame-candy { --cosmetic-frame-image: url('/assets/shop/frame-candy-portrait-v3.png'); }
 .pets-page .pet-card.cosmetic-frame-starlight { --cosmetic-frame-image: url('/assets/shop/frame-starlight-portrait-v3.png'); }
@@ -985,6 +1041,7 @@ async function handleAdopt() {
 
 .pet-list {
   display: grid;
+  align-items: start;
   grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
   gap: 14px;
 }
@@ -1272,63 +1329,35 @@ async function handleAdopt() {
   border: 1.5px dashed #e0e0e0;
 }
 
+.pets-page .pet-card { --pet-control-ink:#596b66;--control-top:#ffffff52;--control-bottom:#ffffff26;--control-line:#60766b26;--control-glint:#ffffff50; }
+.pets-page .pet-card.cosmetic-background-night { --pet-control-ink:#eeebff;--control-top:#d6cfff24;--control-bottom:#bcb1f010;--control-line:#e1d9ff30;--control-glint:#e8e1ff20; }
+.pets-page .pet-card.cosmetic-background-night .pet-name,
+.pets-page .pet-card.cosmetic-background-night .pet-name-top { color: #f7f5ff; }
 .nav-arrow {
-  position: absolute;
-  top: 50%;
-  transform: translateY(-50%);
-  width: 26px;
-  height: 26px;
-  padding: 0;
-  border-radius: 50%;
-  border: 1px solid rgba(255, 255, 255, 0.72);
-  background: rgba(255, 255, 255, 0.68);
-  color: rgba(45, 36, 41, 0.72);
-  cursor: pointer;
-  font-family: Arial, sans-serif;
-  font-size: 1.05rem;
-  line-height: 23px;
-  display: grid;
-  place-items: center;
-  box-shadow: 0 2px 5px rgba(42, 30, 36, 0.12);
-  z-index: 2;
-  transition: background 0.2s, transform 0.15s;
+  position:absolute;top:50%;transform:translateY(-50%);width:42px;height:40px;padding:0;
+  border-radius:55% 45% 43% 57% / 52% 48% 52% 48%;border:1px solid var(--control-line);
+  background:linear-gradient(155deg,var(--control-top),var(--control-bottom));backdrop-filter:blur(6px);color:var(--pet-control-ink);
+  cursor:pointer;display:grid;place-items:center;z-index:2;
+  box-shadow:inset 0 1px 0 var(--control-glint),0 2px 5px #1513290c;
+  transition:box-shadow .18s,filter .18s;
 }
-
-.nav-arrow:hover {
-  background: rgba(255, 255, 255, 0.92);
-  color: #333;
-  transform: translateY(-50%) scale(1.05);
-}
-
-.nav-arrow:focus-visible {
-  outline: 3px solid rgba(255, 255, 255, 0.65);
-  outline-offset: 2px;
-}
+.nav-arrow.right { border-radius:45% 55% 57% 43% / 48% 52% 48% 52%; }
+.nav-arrow::before { content:'';position:absolute;top:5px;left:12px;width:12px;height:3px;border-radius:50%;background:var(--control-glint);transform:rotate(-12deg);pointer-events:none; }
+.nav-arrow .switch-species-mark { width:24px;height:24px;transform:translateX(3px) rotate(-8deg); }
+.nav-arrow.right .switch-species-mark { transform:translateX(-3px) rotate(8deg); }
+.nav-arrow .switch-chevron { position:absolute;top:15px;right:3px;width:10px;height:10px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;opacity:.75; }
+.nav-arrow.left .switch-chevron { left:3px;right:auto; }
+.nav-arrow:hover { filter:brightness(1.04);box-shadow:inset 0 1px 0 var(--control-glint),0 3px 8px #15132918; }
+.nav-arrow:focus-visible { outline:2px solid var(--pet-control-ink);outline-offset:3px; }
+.nav-arrow:active { filter:brightness(.98);box-shadow:inset 0 2px 4px #59364c20,0 1px 2px #59364c12; }
+@media(prefers-reduced-motion:reduce) { .nav-arrow { transition:none; } }
 
 .nav-arrow.left { left: -2px; }
 .nav-arrow.right { right: -2px; }
 
-.pet-dots {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  margin-top: 4px;
-}
-
-.pet-dots .dot {
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background: rgba(0, 0, 0, 0.25);
-  cursor: pointer;
-  transition: all 0.2s;
-}
-
-.pet-dots .dot.active {
-  background: rgba(0, 0, 0, 0.65);
-  width: 14px;
-  border-radius: 3px;
-}
+.pets-page:not(.classroom-mode) .pet-card .pet-stage { width: calc(100% - 12px); }
+.pet-page-count svg { display:inline-block;width:13px;height:13px;vertical-align:-2px;margin-right:4px; }
+.pet-page-count { display:inline-block;margin-left:8px;vertical-align:middle;padding:4px 9px;border:1px solid var(--control-line);border-radius:12px 15px 12px 15px;background:linear-gradient(125deg,var(--control-top),var(--control-bottom));color:var(--pet-control-ink);font-size:.62rem;font-weight:700;line-height:1.2;letter-spacing:.06em;font-variant-numeric:tabular-nums;box-shadow:inset 0 1px 0 var(--control-glint); }
 
 .adopt-mini-btn {
   margin-top: 4px;
@@ -1508,6 +1537,75 @@ async function handleAdopt() {
 }
 
 .pet-stage.can-open-cosmetics { cursor:pointer; border-radius:18px; }
+.pets-page:not(.classroom-mode) .pet-card {
+  --card-ink: #334941;
+  --card-muted: #637c70;
+  --card-surface: #ffffff66;
+  --card-action: #f3f6f4d9;
+  --card-line: #667e701c;
+  --card-track: #617b6c13;
+  --card-hunger: #86b6a4;
+  --card-xp: #b1a0ce;
+}
+.pets-page:not(.classroom-mode) .pet-card.cosmetic-background-night {
+  --card-ink: #f6f3ff;
+  --card-muted: #c6c3e2;
+  --card-surface: #dbd6ff0d;
+  --card-action: #4b4679d9;
+  --card-line: #e4dfff24;
+  --card-track: #15152d36;
+  --card-hunger: #a3cec6;
+  --card-xp: #c6b3ee;
+}
+.pets-page:not(.classroom-mode) .pet-card .points-badge,
+.pets-page:not(.classroom-mode) .pet-card .level-badge {
+  background: var(--card-surface);
+  color: var(--card-muted);
+  box-shadow: inset 0 0 0 1px var(--card-line);
+  backdrop-filter: none;
+  font-variant-numeric: tabular-nums;
+}
+.pets-page:not(.classroom-mode) .pet-card .pet-name-top { color: var(--card-muted); font-weight: 500; }
+.pets-page:not(.classroom-mode) .pet-card.cosmetic-background-night .points-badge,
+.pets-page:not(.classroom-mode) .pet-card.cosmetic-background-night .level-badge {
+  background: #252b5833;
+  color: #f7f5ff;
+  box-shadow: inset 0 0 0 1px #eeeaff26;
+  text-shadow: 0 1px 2px #171632b3;
+}
+.pets-page:not(.classroom-mode) .pet-card .rename-pet-btn {
+  background: var(--card-surface); color: var(--card-muted); opacity: 1;
+  box-shadow: inset 0 0 0 1px var(--card-line);
+}
+.pets-page:not(.classroom-mode) .pet-card .pet-name { color: var(--card-ink); font-weight: 700; letter-spacing: .025em; }
+.pets-page:not(.classroom-mode) .pet-card .pet-page-count { font-weight: 600; letter-spacing: .025em; }
+.pets-page:not(.classroom-mode) .pet-card .pet-stats {
+  position: relative; z-index: 4;
+  opacity: 1; background: var(--card-surface); border-radius: 12px;
+  box-shadow: inset 0 0 0 1px var(--card-line);
+}
+.pets-page:not(.classroom-mode) .pet-card .stat-label { opacity: .8; font-size: .7rem; }
+.pets-page:not(.classroom-mode) .pet-card .stat-bar { height: 5px; background: var(--card-track); border-radius: 8px; }
+.pets-page:not(.classroom-mode) .pet-card .stat-fill { background: var(--card-hunger); border-radius: 8px; }
+.pets-page:not(.classroom-mode) .pet-card .xp-fill { background: var(--card-xp); }
+.pets-page:not(.classroom-mode) .pet-card .stat-value { color: var(--card-muted); font-variant-numeric: tabular-nums; }
+.pets-page:not(.classroom-mode) .pet-card .action-row { gap: 6px; }
+.pets-page:not(.classroom-mode) .pet-card .btn-action {
+  border-color: var(--card-line); border-radius: 13px;
+  background: var(--card-action); color: var(--card-ink);
+  box-shadow: inset 0 1px 0 #ffffff0a;
+  transition: background .18s, border-color .18s, box-shadow .18s;
+}
+.pets-page:not(.classroom-mode) .pet-card .btn-action .cost { color: var(--card-muted); font-weight: 500; font-variant-numeric: tabular-nums; }
+.pets-page:not(.classroom-mode) .pet-card .btn-action:hover:not(:disabled) {
+  transform: none; background: color-mix(in srgb, var(--card-action), white 12%);
+  border-color: var(--card-muted); box-shadow: 0 2px 8px #17132812;
+}
+.pets-page:not(.classroom-mode) .pet-card .btn-action:focus-visible { outline: 2px solid var(--card-hunger); outline-offset: 2px; }
+.pets-page:not(.classroom-mode) .pet-card .btn-action:active:not(:disabled) { box-shadow: inset 0 2px 4px #17132820; }
+.pets-page:not(.classroom-mode) .pet-card .btn-action:disabled { opacity: 1; }
+.pets-page:not(.classroom-mode) .pet-card .btn-action:disabled .action-icon,
+.pets-page:not(.classroom-mode) .pet-card .btn-action:disabled .cost { opacity: .4; }
 .pet-stage.can-open-cosmetics:focus-visible { outline:3px solid #a85879; outline-offset:3px; }
 
 .adopt-btn {
@@ -1587,7 +1685,19 @@ async function handleAdopt() {
 .cosmetic-dialog-head { display:flex; align-items:flex-start; justify-content:space-between; gap:20px; }
 .cosmetic-dialog-head h3 { margin:0 0 4px; }
 .cosmetic-dialog-head p { margin:0; color:var(--color-text-muted); font-size:.78rem; }
-.cosmetic-dialog-head > strong { flex:none; padding:8px 12px; border:1px solid #eadba9; border-radius:999px; background:#fff9df; color:#986b18; font-size:.8rem; }
+.cosmetic-dialog-head > div:first-child { min-width:0; }
+.cosmetic-balances { display:flex; flex-wrap:wrap; justify-content:flex-end; gap:6px; max-width:270px; flex-shrink:0; }
+.cosmetic-balances strong { padding:7px 10px; border:1px solid #eadba9; border-radius:999px; background:#fff9df; color:#986b18; font-size:.75rem; white-space:nowrap; }
+.cosmetic-balances .stamp-balance { background:#f0f4e5; border-color:#d7e2be; color:#697d3e; }
+.cosmetic-balances .ticket-balance { background:#eeedf9; border-color:#d9d3ef; color:#7a65a2; }
+.cosmetic-balances small { flex-basis:100%; color:#a25c60; font-size:.65rem; }
+@media(max-width:600px) { .cosmetic-dialog-head { flex-wrap:wrap; gap:12px; } .cosmetic-balances { max-width:100%; justify-content:flex-start; flex-shrink:1; } }
+.cosmetic-travel-entry { display:flex;align-items:center;justify-content:space-between;gap:12px;width:100%;margin-top:18px;padding:12px 16px;border:1px solid #dce5d2;border-radius:12px;background:#f0f4e8;color:#526b49;text-align:left;cursor:pointer; }
+.cosmetic-travel-entry span { display:flex;flex-direction:column;gap:5px;min-width:0; }
+.cosmetic-travel-entry strong { font-size:.85rem;overflow-wrap:anywhere; }
+.cosmetic-travel-entry small { font-size:.72rem;color:#7b8871; }
+.cosmetic-travel-entry b { font-size:.78rem;white-space:nowrap; }
+.cosmetic-travel-entry:disabled { opacity:.5;cursor:not-allowed; }
 .cosmetic-tabs { display:flex; gap:4px; margin:18px 0 14px; padding:4px; border-radius:12px; background:#f0ede9; }
 .cosmetic-tabs button { flex:1; padding:8px; border-radius:9px; color:#777; background:transparent; font-size:.78rem; font-weight:700; }
 .cosmetic-tabs button.active { color:#a14f6d; background:#fff; box-shadow:0 2px 8px #382d240d; }
@@ -1595,6 +1705,7 @@ async function handleAdopt() {
 .teacher-cosmetic-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:12px; max-height:53vh; overflow-y:auto; padding:4px 12px 8px 4px; }
 .teacher-cosmetic-item { display:grid; grid-template-columns:82px minmax(0,1fr) auto; align-items:center; gap:12px; min-width:0; padding:12px; border:1.5px solid #ebe5df; border-radius:16px; background:#fffdfa; }
 .teacher-cosmetic-item.equipped { border-color:#718d68; box-shadow:0 0 0 3px #718d6815; }
+.cosmetic-travel-locked { padding:8px; border-radius:10px; background:#f1f0e8; color:#7c806f; font-size:.7rem; text-align:center; line-height:1.6; }
 .teacher-cosmetic-preview { width:70px; height:100px; display:grid; place-items:center; border-radius:12px; }
 .teacher-cosmetic-preview[class*="cosmetic-frame-"]::after { inset:-5.56%; }
 .teacher-cosmetic-preview.cosmetic-frame-leaf { --cosmetic-frame-image:url('/assets/shop/frame-leaf-portrait-v3.png'); }

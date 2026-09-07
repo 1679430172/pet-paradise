@@ -25,7 +25,11 @@ export async function createFixture({ tickets = false } = {}) {
     const ledgerMigration = await readFile(new URL('../supabase-migration-student-ledger.sql', import.meta.url), 'utf8')
     await db.exec(ledgerMigration)
     await db.exec(ledgerMigration)
+    const teacherTravelMigration = await readFile(new URL('../supabase-migration-teacher-travel.sql', import.meta.url), 'utf8')
+    await db.exec(teacherTravelMigration)
+    await db.exec(teacherTravelMigration)
   }
+  if (tickets) { const perPet = await readFile(new URL('../supabase-migration-per-pet-travel.sql', import.meta.url), 'utf8'); await db.exec(perPet); await db.exec(perPet) }
   const student = randomUUID(), other = randomUUID(), teacher = randomUUID(), pet = randomUUID(), otherPet = randomUUID()
   await db.query(`INSERT INTO profiles(id,username,password,role,points) VALUES ($1,'旅行同学','test','student',100),($2,'另一位同学','test','student',100),($3,'旅行老师','test','teacher',0)`, [student, other, teacher])
   await db.query('UPDATE profiles SET teacher_id=$1 WHERE id=$2', [teacher, student])

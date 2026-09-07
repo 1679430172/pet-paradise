@@ -1113,3 +1113,118 @@ END $$;
 REVOKE ALL ON FUNCTION teacher_student_ledger(UUID,UUID,INTEGER) FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION teacher_student_ledger(UUID,UUID,INTEGER) TO anon,authenticated;
 COMMIT;
+
+-- 老师代旅行；先执行旅行券和统一收支迁移。可重复执行。
+BEGIN;
+ALTER TABLE pet_trips ADD COLUMN IF NOT EXISTS started_by UUID;
+ALTER TABLE pet_trips ADD COLUMN IF NOT EXISTS claimed_by UUID;
+
+CREATE OR REPLACE FUNCTION teacher_travel_state(p_actor_id UUID,p_student_id UUID) RETURNS JSONB
+LANGUAGE plpgsql SECURITY DEFINER SET search_path=public AS $$
+BEGIN
+ IF NOT EXISTS(SELECT 1 FROM profiles WHERE id=p_actor_id AND role='teacher')
+ OR NOT EXISTS(SELECT 1 FROM profiles WHERE id=p_student_id AND role='student' AND teacher_id=p_actor_id) THEN RAISE EXCEPTION '只能操作本班学生的旅行'; END IF;
+ RETURN travel_state(p_student_id);
+END $$;
+
+CREATE OR REPLACE FUNCTION teacher_start_pet_trip(p_actor_id UUID,p_student_id UUID,p_pet_id UUID,p_destination_id TEXT,p_request_id UUID) RETURNS JSONB
+LANGUAGE plpgsql SECURITY DEFINER SET search_path=public AS $$
+DECLARE result JSONB;
+BEGIN
+ PERFORM 1 FROM profiles WHERE id=p_student_id AND role='student' AND teacher_id=p_actor_id FOR UPDATE;
+ IF NOT FOUND OR NOT EXISTS(SELECT 1 FROM profiles WHERE id=p_actor_id AND role='teacher') THEN RAISE EXCEPTION '只能操作本班学生的旅行'; END IF;
+ IF EXISTS(SELECT 1 FROM pet_trips WHERE id=p_request_id AND COALESCE(started_by,user_id) IS DISTINCT FROM p_actor_id) THEN RAISE EXCEPTION '请求编号已用于其他操作'; END IF;
+ result:=start_pet_trip(p_student_id,p_pet_id,p_destination_id,p_request_id);
+ UPDATE pet_trips SET started_by=p_actor_id WHERE id=p_request_id;
+ RETURN result||jsonb_build_object('started_by',p_actor_id);
+END $$;
+
+CREATE OR REPLACE FUNCTION teacher_claim_pet_trip(p_actor_id UUID,p_student_id UUID,p_trip_id UUID) RETURNS JSONB
+LANGUAGE plpgsql SECURITY DEFINER SET search_path=public AS $$
+DECLARE result JSONB; was_claimed BOOLEAN;
+BEGIN
+ PERFORM 1 FROM profiles WHERE id=p_student_id AND role='student' AND teacher_id=p_actor_id FOR UPDATE;
+ IF NOT FOUND OR NOT EXISTS(SELECT 1 FROM profiles WHERE id=p_actor_id AND role='teacher') THEN RAISE EXCEPTION '只能操作本班学生的旅行'; END IF;
+ SELECT claimed_at IS NOT NULL INTO was_claimed FROM pet_trips WHERE id=p_trip_id AND user_id=p_student_id;
+ result:=claim_pet_trip(p_student_id,p_trip_id);
+ IF NOT was_claimed THEN UPDATE pet_trips SET claimed_by=p_actor_id WHERE id=p_trip_id; END IF;
+ RETURN result;
+END $$;
+
+CREATE OR REPLACE FUNCTION teacher_travel_overview(p_actor_id UUID) RETURNS JSONB
+LANGUAGE plpgsql SECURITY DEFINER SET search_path=public AS $$
+BEGIN
+ IF NOT EXISTS(SELECT 1 FROM profiles WHERE id=p_actor_id AND role='teacher') THEN RAISE EXCEPTION '仅老师可查看班级旅行'; END IF;
+ RETURN jsonb_build_object('serverNow',now(),'entries',COALESCE((SELECT jsonb_agg(jsonb_build_object('student_id',t.user_id,'pet_id',t.pet_id,'pet_name',t.pet_name,'returns_at',t.returns_at)) FROM pet_trips t JOIN profiles p ON p.id=t.user_id WHERE p.teacher_id=p_actor_id AND t.claimed_at IS NULL),'[]'::jsonb));
+END $$;
+REVOKE ALL ON FUNCTION teacher_travel_state(UUID,UUID),teacher_start_pet_trip(UUID,UUID,UUID,TEXT,UUID),teacher_claim_pet_trip(UUID,UUID,UUID),teacher_travel_overview(UUID) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION teacher_travel_state(UUID,UUID),teacher_start_pet_trip(UUID,UUID,UUID,TEXT,UUID),teacher_claim_pet_trip(UUID,UUID,UUID),teacher_travel_overview(UUID) TO anon,authenticated;
+CREATE OR REPLACE VIEW student_resource_ledger AS
+ SELECT 'award:'||c.id AS id,c.student_id,c.created_at,'award'::text AS kind,COALESCE(t.name,'任务奖励') AS description,
+ c.points AS points_delta,c.travel_tickets AS tickets_delta,c.awarded_by AS actor_id,NULL::integer AS balance_after
+ FROM task_completions c LEFT JOIN tasks t ON t.id=c.task_id WHERE c.points<>0 OR c.travel_tickets<>0
+ UNION ALL
+ SELECT 'earning:'||e.source_id,e.student_id,e.created_at,'earning',e.reason,e.points,0,e.student_id,NULL::integer
+ FROM point_earnings e WHERE NOT EXISTS(SELECT 1 FROM task_completions c WHERE e.source_id='task:'||c.id)
+ UNION ALL
+ SELECT 'feed:'||e.request_id,e.student_id,e.created_at,'feeding',COALESCE(e.result->'pet'->>'name','宠物')||' · '||CASE e.action WHEN 'basic' THEN '普通粮' WHEN 'nice' THEN '营养粮' WHEN 'luxury' THEN '豪华粮' ELSE e.action END,
+ -(e.result->>'cost')::integer,0,e.actor_id,(e.result->>'points')::integer FROM feeding_events e WHERE (e.result->>'cost')::integer>0
+ UNION ALL
+ SELECT 'shop:'||o.id,o.buyer_id,o.created_at,'shop',COALESCE(i.name,'装扮商品'),-o.price,0,o.actor_id,o.balance_after
+ FROM shop_orders o LEFT JOIN shop_items i ON i.id=o.item_id WHERE o.price>0
+ UNION ALL
+ SELECT 'trip:'||t.id,t.user_id,t.started_at,'travel',t.pet_name||' · '||d.name,0,-t.ticket_cost,COALESCE(t.started_by,t.user_id),NULL::integer
+ FROM pet_trips t JOIN travel_destinations d ON d.id=t.destination_id WHERE t.ticket_cost>0
+ UNION ALL
+ SELECT 'revoke:'||c.id,c.student_id,c.revoked_at,'revoke',COALESCE(t.name,'任务奖励')||' · '||COALESCE(c.revoke_reason,'撤销奖励'),-c.points,-c.travel_tickets,c.revoked_by,NULL::integer
+ FROM task_completions c LEFT JOIN tasks t ON t.id=c.task_id WHERE c.revoked_at IS NOT NULL AND (c.points>0 OR c.travel_tickets>0);
+
+COMMIT;
+
+-- 每只宠物独立旅行；在老师代旅行迁移之后执行，可重复执行。
+BEGIN;
+DROP INDEX IF EXISTS pet_trips_one_active;
+CREATE UNIQUE INDEX IF NOT EXISTS pet_trips_one_active_per_pet ON pet_trips(pet_id) WHERE claimed_at IS NULL;
+CREATE OR REPLACE FUNCTION travel_state(p_user_id UUID) RETURNS JSONB
+LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
+BEGIN
+ IF NOT EXISTS(SELECT 1 FROM profiles WHERE id=p_user_id AND role='student') THEN RAISE EXCEPTION '学生不存在'; END IF;
+ RETURN jsonb_build_object(
+  'serverNow',now(),
+  'canDepart',COALESCE((SELECT tickets FROM travel_wallets WHERE user_id=p_user_id),0)>0 AND EXISTS(SELECT 1 FROM pets p WHERE p.owner_id=p_user_id AND NOT EXISTS(SELECT 1 FROM pet_trips t WHERE t.pet_id=p.id AND t.claimed_at IS NULL)),
+  'tickets',COALESCE((SELECT tickets FROM travel_wallets WHERE user_id=p_user_id),0),
+  'stamps',COALESCE((SELECT stamps FROM travel_wallets WHERE user_id=p_user_id),0),
+  'destinations',(SELECT jsonb_agg(to_jsonb(d) ORDER BY sort_order) FROM travel_destinations d),
+  'items',COALESCE((SELECT jsonb_agg(to_jsonb(i)||jsonb_build_object('destination_id',r.destination_id,'stamp_cost',r.stamp_cost,'owned',EXISTS(SELECT 1 FROM user_items u WHERE u.user_id=p_user_id AND u.item_id=i.id)) ORDER BY i.sort_order) FROM travel_rewards r JOIN shop_items i ON i.id=r.item_id),'[]'::jsonb),
+  'active',(SELECT to_jsonb(t) FROM pet_trips t WHERE user_id=p_user_id AND claimed_at IS NULL ORDER BY started_at,id LIMIT 1),
+  'activeTrips',COALESCE((SELECT jsonb_agg(to_jsonb(t) ORDER BY started_at,id) FROM pet_trips t WHERE user_id=p_user_id AND claimed_at IS NULL),'[]'::jsonb),
+  'history',COALESCE((SELECT jsonb_agg(to_jsonb(h) ORDER BY started_at DESC) FROM (SELECT * FROM pet_trips WHERE user_id=p_user_id AND claimed_at IS NOT NULL ORDER BY started_at DESC LIMIT 20) h),'[]'::jsonb),
+  'postcards',COALESCE((SELECT jsonb_agg(c) FROM (SELECT DISTINCT destination_id,reward->>'story' AS story FROM pet_trips WHERE user_id=p_user_id AND claimed_at IS NOT NULL) c),'[]'::jsonb)
+ );
+END $$;
+
+CREATE OR REPLACE FUNCTION start_pet_trip(p_user_id UUID,p_pet_id UUID,p_destination_id TEXT,p_request_id UUID) RETURNS JSONB
+LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
+DECLARE d travel_destinations%ROWTYPE; t pet_trips%ROWTYPE; pet_name_value TEXT;
+BEGIN
+ PERFORM 1 FROM profiles WHERE id=p_user_id AND role='student' FOR UPDATE;
+ IF NOT FOUND OR p_request_id IS NULL THEN RAISE EXCEPTION '无效的出发请求'; END IF;
+ SELECT * INTO t FROM pet_trips WHERE id=p_request_id;
+ IF FOUND THEN
+  IF t.user_id IS DISTINCT FROM p_user_id OR t.pet_id IS DISTINCT FROM p_pet_id OR t.destination_id IS DISTINCT FROM p_destination_id THEN RAISE EXCEPTION '请求编号已被使用'; END IF;
+  RETURN to_jsonb(t);
+ END IF;
+ SELECT name INTO pet_name_value FROM pets WHERE id=p_pet_id AND owner_id=p_user_id FOR SHARE;
+ IF NOT FOUND THEN RAISE EXCEPTION '请选择自己的宠物'; END IF;
+ IF EXISTS(SELECT 1 FROM pet_trips WHERE pet_id=p_pet_id AND claimed_at IS NULL) THEN RAISE EXCEPTION '请先等待宠物归来并领取行李'; END IF;
+ SELECT * INTO d FROM travel_destinations WHERE id=p_destination_id;
+ IF NOT FOUND THEN RAISE EXCEPTION '目的地不存在'; END IF;
+ UPDATE travel_wallets SET tickets=tickets-1 WHERE user_id=p_user_id AND tickets>=1;
+ IF NOT FOUND THEN RAISE EXCEPTION '旅行券不足，完成老师指定的任务后再来出发吧'; END IF;
+ INSERT INTO pet_trips(id,user_id,pet_id,pet_name,destination_id,returns_at,ticket_cost)
+ VALUES(p_request_id,p_user_id,p_pet_id,pet_name_value,d.id,now()+make_interval(hours=>d.hours),1) RETURNING * INTO t;
+ RETURN to_jsonb(t);
+END $$;
+
+
+COMMIT;

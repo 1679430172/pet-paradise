@@ -506,10 +506,11 @@ export const useTeacherStore = defineStore('teacher', () => {
     if (catalog.error?.code === '42P01') throw new Error('商城尚未启用，请先执行数据库迁移')
     if (catalog.error || owned.error) throw catalog.error || owned.error
     cosmeticOwnedIds.value = (owned.data || []).map(row => row.item_id)
-    cosmeticItems.value = ((catalog.data || []) as ShopItem[]).filter(item => item.acquisition !== 'travel' || cosmeticOwnedIds.value.includes(item.id))
+    cosmeticItems.value = (catalog.data || []) as ShopItem[]
   }
 
   async function purchaseCosmeticForStudent(studentId: string, petId: string, item: ShopItem) {
+    if (item.acquisition === 'travel') throw new Error('旅行专属装扮需通过旅行获得或印章兑换')
     const currentTeacherId = teacherId()
     if (!currentTeacherId) throw new Error('未登录')
     const result = await classroomRpc<{ balance: number; alreadyOwned: boolean }>('teacher_purchase_shop_item', {

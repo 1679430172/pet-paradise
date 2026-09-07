@@ -6,7 +6,7 @@ import path from 'node:path'
 import { randomUUID } from 'node:crypto'
 import { createFixture, seedDrop } from './travel-test-fixture.mjs'
 const { chromium } = await import(process.env.PLAYWRIGHT_MODULE ? pathToFileURL(process.env.PLAYWRIGHT_MODULE).href : 'playwright')
-const { db, scalar, student, teacher, pet } = await createFixture({tickets:true})
+const { db, scalar, student, teacher, pet, other, otherPet } = await createFixture({tickets:true})
 const ticketTask=randomUUID()
 await db.query("INSERT INTO tasks(id,name,points,travel_tickets,created_by) VALUES ($1,'阅读周任务',0,1,$2)",[ticketTask,teacher])
 const output = process.env.ARTIFACT_DIR || 'artifacts/travel'
@@ -22,6 +22,10 @@ const rpcArgs={travel_state:['p_user_id'],start_pet_trip:['p_user_id','p_pet_id'
 rpcArgs.teacher_travel_ticket_usage=['p_actor_id','p_student_id','p_page']
 rpcArgs.teacher_point_spending=['p_actor_id','p_student_id','p_page']
 rpcArgs.teacher_student_ledger=['p_actor_id','p_student_id','p_page']
+rpcArgs.teacher_travel_state=['p_actor_id','p_student_id']
+rpcArgs.teacher_start_pet_trip=['p_actor_id','p_student_id','p_pet_id','p_destination_id','p_request_id']
+rpcArgs.teacher_claim_pet_trip=['p_actor_id','p_student_id','p_trip_id']
+rpcArgs.teacher_travel_overview=['p_actor_id']
 await page.route('**/rest/v1/**',async route=>{
   const req=route.request(),url=new URL(req.url()),resource=url.pathname.split('/rest/v1/')[1]
   const json=(body,status=200)=>route.fulfill({status,contentType:'application/json',body:JSON.stringify(body)})
@@ -35,7 +39,7 @@ await page.route('**/rest/v1/**',async route=>{
       if(name==='claim_pet_trip' && loseClaim){loseClaim=false;return json({message:'response lost after commit'},503)}
       return json(result)
     }
-    assert.ok(['profiles','pets','shop_items','user_items','shop_orders','pet_cosmetics','tasks','task_completions'].includes(resource),resource)
+    assert.ok(['profiles','pets','shop_items','user_items','shop_orders','pet_cosmetics','tasks','task_completions','settings'].includes(resource),resource)
     if(resource==='tasks' && ['POST','PATCH'].includes(req.method())) {
       const data=req.postDataJSON(),keys=Object.keys(data)
       assert.ok(keys.every(k=>['name','description','points','travel_tickets','created_by','is_active'].includes(k)))
@@ -50,7 +54,7 @@ await page.route('**/rest/v1/**',async route=>{
     }
     assert.equal(req.method(),'GET')
     const clauses=[],args=[]
-    for(const column of ['id','owner_id','user_id','buyer_id','is_active','created_by','teacher_id','student_id']) {
+    for(const column of ['id','owner_id','user_id','buyer_id','is_active','created_by','teacher_id','student_id','key','role']) {
       const value=url.searchParams.get(column)
       if(value?.startsWith('eq.')) {args.push(value.slice(3));clauses.push(`${column}=$${args.length}`)}
     }
@@ -166,6 +170,91 @@ await page.screenshot({path:path.join(output,'teacher-ticket-usage.png'),fullPag
 await page.setViewportSize({width:390,height:844})
 assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),'student detail mobile overflow')
 await page.screenshot({path:path.join(output,'teacher-ticket-usage-mobile.png'),fullPage:true})
+await scalar('SELECT award_task_points($1,$2,$3,$4)',[teacher,student,ticketTask,randomUUID()])
+// Capture mixed card states: a framed max-level pet and a growing pet.
+await db.query('UPDATE profiles SET teacher_id=$1 WHERE id=$2',[teacher,other])
+await db.query('UPDATE pets SET level=20 WHERE id=$1',[pet])
+await db.query('UPDATE pets SET level=7 WHERE id=$1',[otherPet])
+await db.query("INSERT INTO pets(id,owner_id,name,species,level) VALUES($1,$2,'同行','孔雀',1)",[randomUUID(),student])
+await scalar('SELECT equip_pet_cosmetic($1,$2,$3,$4)',[student,pet,'frame',purchaseItem])
+const nightItem=await scalar("SELECT id FROM shop_items WHERE style_key='night' AND category='background'")
+await db.query('INSERT INTO user_items(user_id,item_id) VALUES($1,$2) ON CONFLICT DO NOTHING',[student,nightItem])
+await scalar('SELECT equip_pet_cosmetic($1,$2,$3,$4)',[student,pet,'background',nightItem])
+await page.setViewportSize({width:1440,height:1050})
+await page.goto(app+'/#/teacher/pets')
+await page.getByRole('button',{name:'打开 另一位同学 的宠物装扮'}).waitFor()
+const cardHeights=await page.locator('.pet-list > .pet-card').evaluateAll(cards=>cards.map(card=>card.getBoundingClientRect().height))
+assert.ok(Math.max(...cardHeights)-Math.min(...cardHeights)<1,'framed multiple-pet and single-pet cards have equal height')
+const arrowPosition = () => page.getByRole('button',{name:'下一只宠物'}).evaluate(button => {
+  const rect=button.getBoundingClientRect(), card=button.closest('.pet-card').getBoundingClientRect()
+  return [rect.x-card.x,rect.y-card.y,rect.width,rect.height]
+})
+const framedArrow=await arrowPosition()
+const contentSizes=()=>page.getByRole('button',{name:'下一只宠物'}).evaluate(button=>{
+  const card=button.closest('.pet-card')
+  return ['.pet-stage','.pet-stats','.action-row','.btn-action'].map(selector=>{
+    const rect=card.querySelector(selector).getBoundingClientRect()
+    return [rect.width,rect.height]
+  })
+})
+const framedContent=await contentSizes()
+await page.getByRole('button',{name:'下一只宠物'}).click()
+await page.getByText('2 / 2',{exact:true}).waitFor()
+const plainArrow=await arrowPosition()
+const plainContent=await contentSizes()
+assert.ok(plainContent.every((size,i)=>size.every((value,j)=>Math.abs(value-framedContent[i][j])<.1)),'frame must not squeeze pet stage, stats or feeding controls')
+await page.mouse.move(0,0)
+await page.screenshot({path:path.join(output,'pet-switch-feather-desktop.png'),fullPage:true})
+assert.ok(framedArrow.every((value,i)=>Math.abs(value-plainArrow[i])<1),'switching cosmetics preserves arrow position and size: '+JSON.stringify({framedArrow,plainArrow}))
+await page.getByRole('button',{name:'上一只宠物'}).click()
+await page.waitForFunction(()=>{
+  const button=document.querySelector('.pet-card.cosmetic-background-night .btn-action')
+  return button && getComputedStyle(button).backgroundColor==='rgba(75, 70, 121, 0.85)'
+})
+await page.screenshot({path:path.join(output,'teacher-pet-cards-desktop.png'),fullPage:true})
+await page.setViewportSize({width:390,height:844})
+await page.screenshot({path:path.join(output,'teacher-pet-cards-mobile.png'),fullPage:true})
+await page.setViewportSize({width:1440,height:1050})
+await page.getByRole('button',{name:'打开 旅行同学 的宠物装扮'}).click()
+await page.getByRole('button',{name:'管理 旅行同学 的宠物旅行'}).waitFor()
+await page.screenshot({path:path.join(output,'cosmetic-travel-entry.png')})
+await page.getByRole('button',{name:'管理 旅行同学 的宠物旅行'}).click()
+const travelDialog=page.getByRole('dialog',{name:'旅行同学的宠物旅行'})
+await travelDialog.getByRole('button',{name:/森林营地/}).waitFor()
+await page.screenshot({path:path.join(output,'teacher-travel-destinations.png')})
+await travelDialog.getByRole('button',{name:/森林营地/}).click()
+await page.setViewportSize({width:390,height:844})
+await page.screenshot({path:path.join(output,'teacher-travel-confirm-mobile.png')})
+assert.equal(await scalar('SELECT tickets FROM travel_wallets WHERE user_id=$1',[student]),1)
+await travelDialog.getByRole('button',{name:'确认代为出发'}).click()
+await travelDialog.getByRole('button',{name:'等待宠物归来'}).waitFor()
+const teacherTrip=(await scalar('SELECT travel_state($1)',[student])).active
+assert.equal(teacherTrip.started_by,teacher)
+assert.equal(await scalar('SELECT tickets FROM travel_wallets WHERE user_id=$1',[student]),0)
+await db.query("UPDATE pet_trips SET started_at=now()-interval '5 hours',returns_at=now()-interval '1 minute' WHERE id=$1",[teacherTrip.id])
+await travelDialog.getByRole('button',{name:'刷新',exact:true}).click()
+await travelDialog.getByRole('button',{name:'代领旅行行李'}).click()
+await travelDialog.getByRole('status').filter({hasText:'已为旅行同学领取行李'}).waitFor()
+assert.equal(await scalar('SELECT claimed_by FROM pet_trips WHERE id=$1',[teacherTrip.id]),teacher)
+await page.screenshot({path:path.join(output,'teacher-travel-claimed-mobile.png')})
+await travelDialog.getByRole('button',{name:'完成',exact:true}).click()
+const companion=randomUUID()
+await db.query("INSERT INTO pets(id,owner_id,name,species) VALUES($1,$2,'小风','云朵猫')",[companion,student])
+await db.query('UPDATE travel_wallets SET tickets=2 WHERE user_id=$1',[student])
+await page.evaluate(id=>localStorage.setItem('pet_user_id',id),student)
+await page.goto(app+'/?multi-pet=1#/travel')
+await page.getByLabel('旅行伙伴').selectOption(pet)
+await page.getByRole('button',{name:'使用 1 张旅行券出发 →'}).first().click()
+await page.getByRole('button',{name:'确认出发',exact:true}).click()
+await page.getByRole('heading',{name:'小云正在森林营地'}).waitFor()
+await page.getByLabel('旅行伙伴').selectOption(companion)
+await page.getByRole('button',{name:'使用 1 张旅行券出发 →'}).nth(1).click()
+await page.getByRole('button',{name:'确认出发',exact:true}).click()
+await page.getByRole('heading',{name:'小风正在贝壳海湾'}).waitFor()
+assert.equal((await scalar('SELECT travel_state($1)',[student])).activeTrips.length,2)
+await page.getByLabel('旅行伙伴').selectOption(pet)
+await page.getByRole('heading',{name:'小云正在森林营地'}).waitFor()
+await page.screenshot({path:path.join(output,'independent-pet-travel-mobile.png'),fullPage:true})
 assert.deepEqual(errors,[])
 await browser.close();await db.close()
 console.log('PASS: four viewport sizes, no-ticket gating, task-issued tickets, departure spending, reload persistence, client-clock tampering, claim retry, equipment, redemption, migration recovery, teacher ticket-only task creation and mixed-reward editing; '+output)

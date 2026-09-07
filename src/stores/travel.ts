@@ -10,7 +10,7 @@ export interface TravelReward { story: string; stamps: number; duplicate: boolea
 export interface Trip { id: string; pet_id: string | null; pet_name: string; destination_id: string; started_at: string; returns_at: string; claimed_at: string | null; reward: TravelReward | null }
 export interface TravelState {
   serverNow: string; canDepart: boolean; stamps: number; tickets: number
-  destinations: Destination[]; items: TravelItem[]; active: Trip | null; history: Trip[]
+  destinations: Destination[]; items: TravelItem[]; active: Trip | null; activeTrips?: Trip[]; history: Trip[]
   postcards: { destination_id: string; story: string }[]
 }
 
