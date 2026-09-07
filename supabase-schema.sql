@@ -1228,3 +1228,132 @@ END $$;
 
 
 COMMIT;
+
+-- 独立的明信片赠送记录，不伪造旅行或发放其他奖励。
+-- 在多宠物旅行迁移之后执行；可重复执行。
+BEGIN;
+CREATE TABLE IF NOT EXISTS travel_postcard_unlocks (
+  user_id UUID NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
+  destination_id TEXT NOT NULL REFERENCES travel_destinations(id),
+  story TEXT NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  PRIMARY KEY(user_id,destination_id,story)
+);
+ALTER TABLE travel_postcard_unlocks ENABLE ROW LEVEL SECURITY;
+REVOKE ALL ON travel_postcard_unlocks FROM anon,authenticated;
+DO $$
+DECLARE
+  definition TEXT := pg_get_functiondef('public.travel_state(uuid)'::regprocedure);
+  original TEXT := 'SELECT DISTINCT destination_id,reward->>''story'' AS story FROM pet_trips WHERE user_id=p_user_id AND claimed_at IS NOT NULL';
+BEGIN
+  IF strpos(definition,'travel_postcard_unlocks')=0 THEN
+    IF strpos(definition,original)=0 THEN
+      RAISE EXCEPTION 'travel_state has changed; review postcard query before migration';
+    END IF;
+    EXECUTE replace(definition,original,original || ' UNION SELECT destination_id,story FROM travel_postcard_unlocks WHERE user_id=p_user_id');
+  END IF;
+END $$;
+COMMIT;
+
+-- 明信片扩充：每站新增 9 张；保留原故事及已有收藏，可重复执行。
+BEGIN;
+WITH additions(id,stories) AS (VALUES
+ ('forest',ARRAY[
+  '啄木鸟敲响了早饭铃。我把面包屑收好，没有留在草地上。',
+  '下雨啦！我躲在一片大叶子下面，听雨滴把森林敲成一首歌。',
+  '过独木桥时腿有点抖，数着你教我的一二三，竟然就走过去了。',
+  '小蜗牛带我认路。它走得很慢，却记得每一朵花住在哪里。',
+  '发现一颗长得像帽子的橡果！试戴失败，它只肯待在我的口袋里。',
+  '追着一片落叶转了三圈，最后发现：它比我更会跳舞。',
+  '清晨的蜘蛛网上挂满露珠。我绕了个弯，没碰坏这串小水晶。',
+  '野餐时给你留了一个位置。风坐了一会儿，又跑去找树叶玩了。',
+  '收帐篷时找到一片金黄的叶子，夹进明信片，给你当秋天的书签。'
+ ]),
+ ('coast',ARRAY[
+  '海浪把我的脚印擦掉了。我又认真走了一遍，这次留了两排给你。',
+  '堆了一座有三扇窗的沙堡，最大那扇，留着看你来接我。',
+  '寄居蟹换了一间新房子。我在旁边等它搬完家，才继续赶路。',
+  '海风把遮阳帽吹跑了！追到栈桥边才发现，它正在长椅上休息。',
+  '在潮水退去的小水洼里，看见一只海星。我只看了看，让它留在家里。',
+  '浪花送来一根弯弯的海草，像在明信片上画了一个大大的笑脸。',
+  '灯塔亮起来的时候，我也打开了小手电。我们一起给夜晚指路。',
+  '今天学会分辨海浪声：哗啦是打招呼，沙沙是说晚安。',
+  '回程前捡走了沙滩上的空瓶子。装故事的背包，也能帮大海一个忙。'
+ ]),
+ ('stars',ARRAY[
+  '爬坡时停下来喘了三次气，每次回头，山下的灯光都更像星星。',
+  '给最亮的那颗星起了个名字，叫作“你记得抬头看呀”。',
+  '帐篷外传来窸窣声，原来是风在翻地图。它大概也想知道明天去哪。',
+  '把热可可捧在手心，鼻尖却还是凉凉的。今晚的月亮像一块小饼干。',
+  '认错了三个星座，最后认出了自己的小帐篷。方向感也算进步了吧？',
+  '山谷里有回声。我轻轻喊了一声你的名字，远处也轻轻回答了。',
+  '月亮躲进云里，我们就关掉手电，听了一会儿草丛里的虫鸣。',
+  '拍星空时手抖了，照片里全是弯弯的小光点，像星星在偷偷写字。',
+  '天快亮时，星星一颗颗收起了灯。我把毯子叠好，准备带故事回家。'
+ ])
+)
+UPDATE travel_destinations d SET stories=(
+ SELECT array_agg(story ORDER BY first_position)
+ FROM (SELECT story,min(position) AS first_position
+       FROM unnest(d.stories || a.stories) WITH ORDINALITY AS s(story,position)
+       GROUP BY story) unique_stories
+) FROM additions a WHERE d.id=a.id;
+COMMIT;
+
+-- After postcard-unlocks and per-pet-travel. Safe to run repeatedly.
+BEGIN;
+ALTER TABLE pet_trips ADD COLUMN IF NOT EXISTS pet_snapshot JSONB;
+
+CREATE OR REPLACE FUNCTION capture_trip_pet_snapshot() RETURNS TRIGGER
+LANGUAGE plpgsql SET search_path=public AS $$
+DECLARE p pets%ROWTYPE; stage_name TEXT;
+BEGIN
+ IF TG_OP='UPDATE' THEN
+  -- Never replace historical identity during claim, rename, evolution or pet deletion.
+  NEW.pet_snapshot := OLD.pet_snapshot;
+  RETURN NEW;
+ END IF;
+ SELECT * INTO p FROM pets WHERE id=NEW.pet_id AND owner_id=NEW.user_id FOR SHARE;
+ IF NOT FOUND THEN RAISE EXCEPTION '请选择自己的宠物'; END IF;
+ stage_name := CASE WHEN p.level>=20 THEN 'final' WHEN p.level>=14 THEN 'adult'
+                    WHEN p.level>=9 THEN 'teen' WHEN p.level>=4 THEN 'baby' ELSE 'egg' END;
+ NEW.pet_snapshot := jsonb_build_object('id',p.id,'name',p.name,'species',p.species,
+   'level',p.level,'stage',stage_name,'appearance',p.appearance);
+ RETURN NEW;
+END $$;
+DROP TRIGGER IF EXISTS pet_trip_snapshot ON pet_trips;
+CREATE TRIGGER pet_trip_snapshot BEFORE INSERT OR UPDATE ON pet_trips
+ FOR EACH ROW EXECUTE FUNCTION capture_trip_pet_snapshot();
+REVOKE ALL ON FUNCTION capture_trip_pet_snapshot() FROM PUBLIC;
+
+-- Earlier trips did not record species/stage at departure. Do not invent them
+-- from the current pet. Keep the recorded name/ID and mark them historical.
+CREATE OR REPLACE FUNCTION travel_state(p_user_id UUID) RETURNS JSONB
+LANGUAGE plpgsql SECURITY DEFINER SET search_path=public AS $$
+BEGIN
+ IF NOT EXISTS(SELECT 1 FROM profiles WHERE id=p_user_id AND role='student') THEN RAISE EXCEPTION '学生不存在'; END IF;
+ RETURN jsonb_build_object(
+  'serverNow',now(),
+  'canDepart',COALESCE((SELECT tickets FROM travel_wallets WHERE user_id=p_user_id),0)>0 AND EXISTS(SELECT 1 FROM pets p WHERE p.owner_id=p_user_id AND NOT EXISTS(SELECT 1 FROM pet_trips t WHERE t.pet_id=p.id AND t.claimed_at IS NULL)),
+  'tickets',COALESCE((SELECT tickets FROM travel_wallets WHERE user_id=p_user_id),0),
+  'stamps',COALESCE((SELECT stamps FROM travel_wallets WHERE user_id=p_user_id),0),
+  'destinations',(SELECT jsonb_agg(to_jsonb(d) ORDER BY sort_order) FROM travel_destinations d),
+  'items',COALESCE((SELECT jsonb_agg(to_jsonb(i)||jsonb_build_object('destination_id',r.destination_id,'stamp_cost',r.stamp_cost,'owned',EXISTS(SELECT 1 FROM user_items u WHERE u.user_id=p_user_id AND u.item_id=i.id)) ORDER BY i.sort_order) FROM travel_rewards r JOIN shop_items i ON i.id=r.item_id),'[]'::jsonb),
+  'active',(SELECT to_jsonb(t) FROM pet_trips t WHERE user_id=p_user_id AND claimed_at IS NULL ORDER BY started_at,id LIMIT 1),
+  'activeTrips',COALESCE((SELECT jsonb_agg(to_jsonb(t) ORDER BY started_at,id) FROM pet_trips t WHERE user_id=p_user_id AND claimed_at IS NULL),'[]'::jsonb),
+  'history',COALESCE((SELECT jsonb_agg(to_jsonb(h) ORDER BY started_at DESC) FROM (SELECT * FROM pet_trips WHERE user_id=p_user_id AND claimed_at IS NOT NULL ORDER BY started_at DESC LIMIT 20) h),'[]'::jsonb),
+  'postcards',COALESCE((SELECT jsonb_agg(c ORDER BY c.collected_at DESC,c.id) FROM (
+    SELECT t.id::TEXT AS id,t.destination_id,t.reward->>'story' AS story,t.pet_snapshot,
+      COALESCE(t.pet_snapshot->>'id',t.pet_id::TEXT) AS pet_id,
+      COALESCE(t.pet_snapshot->>'name',t.pet_name) AS pet_name,
+      CASE WHEN t.pet_snapshot IS NULL THEN 'legacy' ELSE 'trip' END AS source,
+      t.claimed_at AS collected_at
+    FROM pet_trips t WHERE t.user_id=p_user_id AND t.claimed_at IS NOT NULL AND t.reward->>'story' IS NOT NULL
+    UNION ALL
+    SELECT 'gift:'||u.destination_id||':'||md5(u.story),u.destination_id,u.story,NULL::JSONB,
+      NULL::TEXT,NULL::TEXT,'gift',u.created_at
+    FROM travel_postcard_unlocks u WHERE u.user_id=p_user_id
+  ) c),'[]'::jsonb)
+ );
+END $$;
+COMMIT;

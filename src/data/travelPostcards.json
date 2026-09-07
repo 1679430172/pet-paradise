@@ -1,0 +1,218 @@
+[
+  {
+    "destination": "forest",
+    "number": 1,
+    "story": "今天遇见了一只松鼠，它送给我一片心形的叶子。",
+    "image": "/assets/travel/scenes/forest-01.webp"
+  },
+  {
+    "destination": "forest",
+    "number": 2,
+    "story": "在溪水边歇了歇脚，把森林清晨的声音带回来给你。",
+    "image": "/assets/travel/scenes/forest-02.webp"
+  },
+  {
+    "destination": "forest",
+    "number": 3,
+    "story": "搭好小帐篷后，看见萤火虫在树间点起了灯。",
+    "image": "/assets/travel/scenes/forest-03.webp"
+  },
+  {
+    "destination": "forest",
+    "number": 4,
+    "story": "啄木鸟敲响了早饭铃。我把面包屑收好，没有留在草地上。",
+    "image": "/assets/travel/scenes/forest-04.webp"
+  },
+  {
+    "destination": "forest",
+    "number": 5,
+    "story": "下雨啦！我躲在一片大叶子下面，听雨滴把森林敲成一首歌。",
+    "image": "/assets/travel/scenes/forest-05.webp"
+  },
+  {
+    "destination": "forest",
+    "number": 6,
+    "story": "过独木桥时腿有点抖，数着你教我的一二三，竟然就走过去了。",
+    "image": "/assets/travel/scenes/forest-06.webp"
+  },
+  {
+    "destination": "forest",
+    "number": 7,
+    "story": "小蜗牛带我认路。它走得很慢，却记得每一朵花住在哪里。",
+    "image": "/assets/travel/scenes/forest-07.webp"
+  },
+  {
+    "destination": "forest",
+    "number": 8,
+    "story": "发现一颗长得像帽子的橡果！试戴失败，它只肯待在我的口袋里。",
+    "image": "/assets/travel/scenes/forest-08.webp"
+  },
+  {
+    "destination": "forest",
+    "number": 9,
+    "story": "追着一片落叶转了三圈，最后发现：它比我更会跳舞。",
+    "image": "/assets/travel/scenes/forest-09.webp"
+  },
+  {
+    "destination": "forest",
+    "number": 10,
+    "story": "清晨的蜘蛛网上挂满露珠。我绕了个弯，没碰坏这串小水晶。",
+    "image": "/assets/travel/scenes/forest-10.webp"
+  },
+  {
+    "destination": "forest",
+    "number": 11,
+    "story": "野餐时给你留了一个位置。风坐了一会儿，又跑去找树叶玩了。",
+    "image": "/assets/travel/scenes/forest-11.webp"
+  },
+  {
+    "destination": "forest",
+    "number": 12,
+    "story": "收帐篷时找到一片金黄的叶子，夹进明信片，给你当秋天的书签。",
+    "image": "/assets/travel/scenes/forest-12.webp"
+  },
+  {
+    "destination": "coast",
+    "number": 1,
+    "story": "今天在海边捡到一枚漂亮的贝壳，想带回来送给你。",
+    "image": "/assets/travel/scenes/coast-01.webp"
+  },
+  {
+    "destination": "coast",
+    "number": 2,
+    "story": "小螃蟹教我在沙滩上画画，我画的是你！",
+    "image": "/assets/travel/scenes/coast-02.webp"
+  },
+  {
+    "destination": "coast",
+    "number": 3,
+    "story": "等到了橘子色的日落，把这一刻寄给最想念的你。",
+    "image": "/assets/travel/scenes/coast-03.webp"
+  },
+  {
+    "destination": "coast",
+    "number": 4,
+    "story": "海浪把我的脚印擦掉了。我又认真走了一遍，这次留了两排给你。",
+    "image": "/assets/travel/scenes/coast-04.webp"
+  },
+  {
+    "destination": "coast",
+    "number": 5,
+    "story": "堆了一座有三扇窗的沙堡，最大那扇，留着看你来接我。",
+    "image": "/assets/travel/scenes/coast-05.webp"
+  },
+  {
+    "destination": "coast",
+    "number": 6,
+    "story": "寄居蟹换了一间新房子。我在旁边等它搬完家，才继续赶路。",
+    "image": "/assets/travel/scenes/coast-06.webp"
+  },
+  {
+    "destination": "coast",
+    "number": 7,
+    "story": "海风把遮阳帽吹跑了！追到栈桥边才发现，它正在长椅上休息。",
+    "image": "/assets/travel/scenes/coast-07.webp"
+  },
+  {
+    "destination": "coast",
+    "number": 8,
+    "story": "在潮水退去的小水洼里，看见一只海星。我只看了看，让它留在家里。",
+    "image": "/assets/travel/scenes/coast-08.webp"
+  },
+  {
+    "destination": "coast",
+    "number": 9,
+    "story": "浪花送来一根弯弯的海草，像在明信片上画了一个大大的笑脸。",
+    "image": "/assets/travel/scenes/coast-09.webp"
+  },
+  {
+    "destination": "coast",
+    "number": 10,
+    "story": "灯塔亮起来的时候，我也打开了小手电。我们一起给夜晚指路。",
+    "image": "/assets/travel/scenes/coast-10.webp"
+  },
+  {
+    "destination": "coast",
+    "number": 11,
+    "story": "今天学会分辨海浪声：哗啦是打招呼，沙沙是说晚安。",
+    "image": "/assets/travel/scenes/coast-11.webp"
+  },
+  {
+    "destination": "coast",
+    "number": 12,
+    "story": "回程前捡走了沙滩上的空瓶子。装故事的背包，也能帮大海一个忙。",
+    "image": "/assets/travel/scenes/coast-12.webp"
+  },
+  {
+    "destination": "stars",
+    "number": 1,
+    "story": "抬头数星星的时候，每一颗都像你给我的鼓励。",
+    "image": "/assets/travel/scenes/stars-01.webp"
+  },
+  {
+    "destination": "stars",
+    "number": 2,
+    "story": "在山顶看见一颗流星，偷偷许了和你有关的愿望。",
+    "image": "/assets/travel/scenes/stars-02.webp"
+  },
+  {
+    "destination": "stars",
+    "number": 3,
+    "story": "裹着小毯子等天亮，把第一缕晨光装进了背包。",
+    "image": "/assets/travel/scenes/stars-03.webp"
+  },
+  {
+    "destination": "stars",
+    "number": 4,
+    "story": "爬坡时停下来喘了三次气，每次回头，山下的灯光都更像星星。",
+    "image": "/assets/travel/scenes/stars-04.webp"
+  },
+  {
+    "destination": "stars",
+    "number": 5,
+    "story": "给最亮的那颗星起了个名字，叫作“你记得抬头看呀”。",
+    "image": "/assets/travel/scenes/stars-05.webp"
+  },
+  {
+    "destination": "stars",
+    "number": 6,
+    "story": "帐篷外传来窸窣声，原来是风在翻地图。它大概也想知道明天去哪。",
+    "image": "/assets/travel/scenes/stars-06.webp"
+  },
+  {
+    "destination": "stars",
+    "number": 7,
+    "story": "把热可可捧在手心，鼻尖却还是凉凉的。今晚的月亮像一块小饼干。",
+    "image": "/assets/travel/scenes/stars-07.webp"
+  },
+  {
+    "destination": "stars",
+    "number": 8,
+    "story": "认错了三个星座，最后认出了自己的小帐篷。方向感也算进步了吧？",
+    "image": "/assets/travel/scenes/stars-08.webp"
+  },
+  {
+    "destination": "stars",
+    "number": 9,
+    "story": "山谷里有回声。我轻轻喊了一声你的名字，远处也轻轻回答了。",
+    "image": "/assets/travel/scenes/stars-09.webp"
+  },
+  {
+    "destination": "stars",
+    "number": 10,
+    "story": "月亮躲进云里，我们就关掉手电，听了一会儿草丛里的虫鸣。",
+    "image": "/assets/travel/scenes/stars-10.webp"
+  },
+  {
+    "destination": "stars",
+    "number": 11,
+    "story": "拍星空时手抖了，照片里全是弯弯的小光点，像星星在偷偷写字。",
+    "image": "/assets/travel/scenes/stars-11.webp"
+  },
+  {
+    "destination": "stars",
+    "number": 12,
+    "story": "天快亮时，星星一颗颗收起了灯。我把毯子叠好，准备带故事回家。",
+    "image": "/assets/travel/scenes/stars-12.webp"
+  }
+]

@@ -7,11 +7,13 @@ import type { ShopItem } from './shop'
 export interface Destination { id: string; name: string; icon: string; description: string; hours: number; stories: string[] }
 export interface TravelItem extends ShopItem { destination_id: string; stamp_cost: number; owned: boolean }
 export interface TravelReward { story: string; stamps: number; duplicate: boolean; item: ShopItem | null }
-export interface Trip { id: string; pet_id: string | null; pet_name: string; destination_id: string; started_at: string; returns_at: string; claimed_at: string | null; reward: TravelReward | null }
+export interface TravelPetSnapshot { id: string; name: string; species: string; level: number; stage: 'egg' | 'baby' | 'teen' | 'adult' | 'final'; appearance?: unknown }
+export interface TravelPostcard { id?: string; destination_id: string; story: string; pet_snapshot?: TravelPetSnapshot | null; pet_id?: string | null; pet_name?: string | null; source?: 'trip' | 'gift' | 'legacy'; collected_at?: string }
+export interface Trip { id: string; pet_id: string | null; pet_name: string; pet_snapshot?: TravelPetSnapshot | null; destination_id: string; started_at: string; returns_at: string; claimed_at: string | null; reward: TravelReward | null }
 export interface TravelState {
   serverNow: string; canDepart: boolean; stamps: number; tickets: number
   destinations: Destination[]; items: TravelItem[]; active: Trip | null; activeTrips?: Trip[]; history: Trip[]
-  postcards: { destination_id: string; story: string }[]
+  postcards: TravelPostcard[]
 }
 
 export const useTravelStore = defineStore('travel', () => {
