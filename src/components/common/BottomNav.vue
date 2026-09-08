@@ -8,13 +8,9 @@
       <span class="nav-icon">📷</span>
       <span>打卡</span>
     </router-link>
-    <router-link to="/diary" :class="{ active: route.name === 'diary' || route.name === 'diary-new' }">
+    <router-link to="/diary" :class="{ active: route.name === 'diary' || route.name === 'diary-new' || route.name === 'diary-detail' }">
       <span class="nav-icon">📖</span>
       <span>日记</span>
-    </router-link>
-    <router-link to="/feed" :class="{ active: route.name === 'feed' }">
-      <span class="nav-icon">🌍</span>
-      <span>广场</span>
     </router-link>
     <router-link v-if="auth.hasFeature('shop')" to="/shop" :class="{ active: route.name === 'shop' }">
       <span class="nav-icon">🛒</span>

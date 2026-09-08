@@ -61,7 +61,7 @@ const router = createRouter({
     {
       path: '/feed',
       name: 'feed',
-      component: () => import('../pages/FeedPage.vue'),
+      redirect: { path: '/diary', query: { tab: 'square' } },
       meta: { requiresAuth: true, role: 'student' },
     },
     {
@@ -117,6 +117,12 @@ const router = createRouter({
       path: '/teacher/tasks/:id/edit',
       name: 'teacher-task-edit',
       component: () => import('../pages/teacher/TeacherTaskForm.vue'),
+      meta: { requiresAuth: true, role: 'teacher' },
+    },
+    {
+      path: '/teacher/diary',
+      name: 'teacher-diary',
+      component: () => import('../pages/FeedPage.vue'),
       meta: { requiresAuth: true, role: 'teacher' },
     },
     {
