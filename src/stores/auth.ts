@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import { supabase } from '../lib/supabase'
+import { establishCheckinSession, checkinToken, sessionKey, sessionErrorKey } from '../lib/photoCheckins'
 
 export interface Profile {
   id: string
@@ -133,6 +134,7 @@ export const useAuthStore = defineStore('auth', () => {
 
       user.value = data
       localStorage.setItem('pet_user_id', data.id)
+      await establishCheckinSession(data.id, password)
       return { data, error: null }
     } catch (error: any) {
       return { data: null, error }
@@ -164,6 +166,7 @@ export const useAuthStore = defineStore('auth', () => {
 
       user.value = data[0]
       localStorage.setItem('pet_user_id', data[0].id)
+      if (!data[0].is_admin) await establishCheckinSession(data[0].id, password)
       return { data: data[0], error: null }
     } catch (error: any) {
       return { data: null, error }
@@ -173,6 +176,16 @@ export const useAuthStore = defineStore('auth', () => {
   }
 
   async function signOut() {
+    if (user.value) {
+      const key = sessionKey(user.value.id)
+      const token = checkinToken(user.value.id)
+      sessionStorage.removeItem(key)
+      localStorage.removeItem(key)
+      localStorage.removeItem(sessionErrorKey(user.value.id))
+      if (token) void supabase.functions.invoke('photo-checkins', {
+        body: { action: 'logout' }, headers: { 'x-checkin-token': token },
+      }).catch(() => {})
+    }
     user.value = null
     localStorage.removeItem('pet_user_id')
   }

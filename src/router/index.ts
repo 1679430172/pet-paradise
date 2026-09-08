@@ -4,6 +4,16 @@ import { useAuthStore } from '../stores/auth'
 const router = createRouter({
   history: createWebHashHistory(),
   routes: [
+    {
+      path: '/checkins', name: 'photo-checkins',
+      component: () => import('../pages/PhotoCheckinsPage.vue'),
+      meta: { requiresAuth: true, role: 'student' },
+    },
+    {
+      path: '/teacher/checkins', name: 'teacher-photo-checkins',
+      component: () => import('../pages/PhotoCheckinsPage.vue'),
+      meta: { requiresAuth: true, role: 'teacher' },
+    },
     // 公开页面
     {
       path: '/login',

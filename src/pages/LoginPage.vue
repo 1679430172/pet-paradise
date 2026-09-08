@@ -38,6 +38,7 @@
         </div>
       </Transition>
 
+      <p v-if="route.query.reason === 'session'" class="auth-switch">登录状态已更新或过期，请重新登录，完成后会返回打卡页。</p>
       <p v-if="error" class="auth-error">{{ error }}</p>
 
       <button type="submit" class="btn btn-primary auth-btn" :disabled="loading">
@@ -54,10 +55,11 @@
 
 <script setup lang="ts">
 import { onMounted, ref } from 'vue'
-import { useRouter } from 'vue-router'
+import { useRouter, useRoute } from 'vue-router'
 import { useAuthStore } from '../stores/auth'
 
 const router = useRouter()
+const route = useRoute()
 const authStore = useAuthStore()
 
 const username = ref('')
@@ -102,7 +104,9 @@ async function handleSubmit() {
       error.value = err.message || '用户名或密码错误'
     }
   } else {
-    router.push(authStore.isAdmin ? '/admin' : authStore.isTeacher ? '/teacher' : '/')
+    const destination = authStore.isAdmin ? '/admin' : authStore.isTeacher ? '/teacher' : '/'
+    const checkins = authStore.isTeacher ? '/teacher/checkins' : '/checkins'
+    router.push(!authStore.isAdmin && route.query.redirect === checkins ? checkins : destination)
   }
 }
 </script>

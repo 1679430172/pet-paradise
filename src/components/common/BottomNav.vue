@@ -4,6 +4,10 @@
       <span class="nav-icon">🏠</span>
       <span>宠物</span>
     </router-link>
+    <router-link to="/checkins" :class="{ active: route.name === 'photo-checkins' }">
+      <span class="nav-icon">📷</span>
+      <span>打卡</span>
+    </router-link>
     <router-link to="/diary" :class="{ active: route.name === 'diary' || route.name === 'diary-new' }">
       <span class="nav-icon">📖</span>
       <span>日记</span>

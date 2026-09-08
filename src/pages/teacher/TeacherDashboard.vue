@@ -182,7 +182,7 @@ async function fetchRecentCompletions(page = 1) {
         points: d.points,
         travel_tickets: d.travel_tickets || 0,
         student_username: d.student?.username || '未知',
-        task_name: d.task?.name || '未知任务',
+        task_name: d.task?.name || '自主打卡 / 历史任务',
         created_at: d.created_at,
         revoked_at: d.revoked_at,
         revoke_reason: d.revoke_reason,

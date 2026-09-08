@@ -26,6 +26,7 @@ const teacherItems = [
   { icon: '👥', label: '学生', route: '/teacher/students' },
   { icon: '🐾', label: '宠物', route: '/teacher/pets' },
   { icon: '📋', label: '任务', route: '/teacher/tasks' },
+  { icon: '📷', label: '打卡', route: '/teacher/checkins' },
   { icon: '🏆', label: '排行', route: '/teacher/stats' },
   { icon: '⚙️', label: '设置', route: '/teacher/settings' },
 ]

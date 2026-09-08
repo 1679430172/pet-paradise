@@ -204,3 +204,9 @@ npm run preview  # 预览构建产物
 - `VITE_SUPABASE_URL` / `VITE_SUPABASE_ANON_KEY`
 
 push 到 main 分支即自动构建并发布。
+
+## 九、自主照片打卡
+
+学生每天最多自主上传三张照片，教师逐张审核并自定奖励积分。照片自动压缩，审核后保留七天，待审核最多保留十五天。
+
+该功能需要额外部署私有 Storage、Edge Function 和定时清理任务；仅发布前端不会启用。迁移顺序、配置、测试及现有登录权限限制见 [照片打卡部署说明](docs/photo-checkins.md)。

@@ -1,0 +1,3 @@
+[functions.photo-checkins]
+# 现有项目未使用 Supabase Auth；函数内部验证独立的照片访问会话。
+verify_jwt = false
