@@ -4,7 +4,7 @@
       <span class="nav-icon">🏠</span>
       <span>宠物</span>
     </router-link>
-    <router-link to="/checkins" :class="{ active: route.name === 'photo-checkins' }">
+    <router-link v-if="auth.hasFeature('photo_checkin')" to="/checkins" :class="{ active: route.name === 'photo-checkins' }">
       <span class="nav-icon">📷</span>
       <span>打卡</span>
     </router-link>
@@ -16,11 +16,11 @@
       <span class="nav-icon">🌍</span>
       <span>广场</span>
     </router-link>
-    <router-link to="/shop" :class="{ active: route.name === 'shop' }">
+    <router-link v-if="auth.hasFeature('shop')" to="/shop" :class="{ active: route.name === 'shop' }">
       <span class="nav-icon">🛒</span>
       <span>商城</span>
     </router-link>
-    <router-link to="/travel" :class="{ active: route.name === 'travel' }">
+    <router-link v-if="auth.hasFeature('travel')" to="/travel" :class="{ active: route.name === 'travel' }">
       <span class="nav-icon">🧳</span>
       <span>旅行</span>
     </router-link>
@@ -33,5 +33,7 @@
 
 <script setup lang="ts">
 import { useRoute } from 'vue-router'
+import { useAuthStore } from '../../stores/auth'
 const route = useRoute()
+const auth = useAuthStore()
 </script>

@@ -16,6 +16,9 @@ export interface Profile {
   created_at: string
 }
 
+export type TenantFeature = 'travel' | 'photo_checkin' | 'shop'
+export const tenantFeatureKeys: TenantFeature[] = ['travel', 'photo_checkin', 'shop']
+
 export async function hashPassword(password: string): Promise<string> {
   const encoder = new TextEncoder()
   const data = encoder.encode(password + 'pet-paradise-salt')
@@ -28,11 +31,40 @@ export const useAuthStore = defineStore('auth', () => {
   const user = ref<Profile | null>(null)
   const initialized = ref(false)
   const loading = ref(false)
+  const tenantFeatures = ref<Record<TenantFeature, boolean>>({ travel: false, photo_checkin: false, shop: false })
+  const tenantFeaturesLoadedFor = ref<string | null>(null)
 
   const profile = computed(() => user.value)
   const isTeacher = computed(() => user.value?.role === 'teacher')
   const isStudent = computed(() => user.value?.role === 'student')
   const isAdmin = computed(() => user.value?.role === 'teacher' && user.value?.is_admin === true)
+
+  function tenantId(profile = user.value) {
+    if (!profile || profile.is_admin) return null
+    return profile.role === 'teacher' ? profile.id : profile.teacher_id
+  }
+
+  async function fetchTenantFeatures(force = false) {
+    const id = tenantId()
+    if (!id) return { data: tenantFeatures.value, error: null }
+    if (!force && tenantFeaturesLoadedFor.value === id) return { data: tenantFeatures.value, error: null }
+    tenantFeatures.value = { travel: false, photo_checkin: false, shop: false }
+    const { data, error } = await supabase.rpc('get_tenant_features', { p_tenant_id: id })
+    if (!error && user.value && tenantId() === id) {
+      const enabled = new Set((data || []).filter((row: any) => row.enabled).map((row: any) => row.feature_key))
+      tenantFeatures.value = {
+        travel: enabled.has('travel'),
+        photo_checkin: enabled.has('photo_checkin'),
+        shop: enabled.has('shop'),
+      }
+      tenantFeaturesLoadedFor.value = id
+    }
+    return { data: tenantFeatures.value, error }
+  }
+
+  function hasFeature(feature: TenantFeature) {
+    return tenantFeaturesLoadedFor.value === tenantId() && tenantFeatures.value[feature] === true
+  }
 
   async function init() {
     const savedUserId = localStorage.getItem('pet_user_id')
@@ -44,6 +76,7 @@ export const useAuthStore = defineStore('auth', () => {
         .single()
       if (data) {
         user.value = data
+        await fetchTenantFeatures()
       } else {
         localStorage.removeItem('pet_user_id')
       }
@@ -134,6 +167,7 @@ export const useAuthStore = defineStore('auth', () => {
 
       user.value = data
       localStorage.setItem('pet_user_id', data.id)
+      await fetchTenantFeatures(true)
       await establishCheckinSession(data.id, password)
       return { data, error: null }
     } catch (error: any) {
@@ -166,6 +200,7 @@ export const useAuthStore = defineStore('auth', () => {
 
       user.value = data[0]
       localStorage.setItem('pet_user_id', data[0].id)
+      await fetchTenantFeatures(true)
       if (!data[0].is_admin) await establishCheckinSession(data[0].id, password)
       return { data: data[0], error: null }
     } catch (error: any) {
@@ -187,6 +222,8 @@ export const useAuthStore = defineStore('auth', () => {
       }).catch(() => {})
     }
     user.value = null
+    tenantFeatures.value = { travel: false, photo_checkin: false, shop: false }
+    tenantFeaturesLoadedFor.value = null
     localStorage.removeItem('pet_user_id')
   }
 
@@ -265,6 +302,18 @@ export const useAuthStore = defineStore('auth', () => {
       .select('id, username, role, class_name, created_at')
       .single()
     return { data, error }
+  }
+
+  async function fetchManagedTenantFeatures(teacherId: string) {
+    if (!user.value || !isAdmin.value) return { data: [], error: new Error('仅管理员可查看班级功能') }
+    return await supabase.rpc('get_tenant_features', { p_tenant_id: teacherId })
+  }
+
+  async function updateManagedTenantFeature(teacherId: string, feature: TenantFeature, enabled: boolean) {
+    if (!user.value || !isAdmin.value) return { data: null, error: new Error('仅管理员可修改班级功能') }
+    return await supabase.rpc('set_tenant_feature', {
+      p_admin_id: user.value.id, p_tenant_id: teacherId, p_feature_key: feature, p_enabled: enabled,
+    })
   }
 
   async function fetchTeachers() {
@@ -367,5 +416,5 @@ export const useAuthStore = defineStore('auth', () => {
     return { error }
   }
 
-  return { user, profile, initialized, loading, isTeacher, isStudent, isAdmin, init, signUp, fetchRegistrationClasses, fetchRegistrationEnabled, updateRegistrationEnabled, signIn, signOut, refreshProfile, changeOwnPassword, updateClassName, createTeacher, fetchTeachers, deleteTeacher, fetchTeacherStudents, updateTeacherClass, resetAccountPassword, deleteManagedStudent }
+  return { user, profile, initialized, loading, isTeacher, isStudent, isAdmin, tenantFeatures, fetchTenantFeatures, hasFeature, init, signUp, fetchRegistrationClasses, fetchRegistrationEnabled, updateRegistrationEnabled, signIn, signOut, refreshProfile, changeOwnPassword, updateClassName, createTeacher, fetchManagedTenantFeatures, updateManagedTenantFeature, fetchTeachers, deleteTeacher, fetchTeacherStudents, updateTeacherClass, resetAccountPassword, deleteManagedStudent }
 })

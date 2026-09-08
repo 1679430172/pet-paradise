@@ -42,6 +42,7 @@ export const useShopStore = defineStore('shop', () => {
   async function fetchAll(force = false) {
     const auth = useAuthStore()
     if (!auth.user) return
+    if (!auth.hasFeature('shop')) throw new Error('本班级尚未开通宠物商城')
     if (!force && loadedUserId.value === auth.user.id && items.value.length) return
     loading.value = true
     try {
@@ -75,6 +76,7 @@ export const useShopStore = defineStore('shop', () => {
 
   async function purchase(item: ShopItem) {
     const auth = useAuthStore()
+    if (!auth.hasFeature('shop')) throw new Error('本班级尚未开通宠物商城')
     if (!auth.user || busyItemId.value) return
     busyItemId.value = item.id
     try {
@@ -90,6 +92,7 @@ export const useShopStore = defineStore('shop', () => {
   async function equip(petId: string, category: CosmeticCategory, item: ShopItem | null) {
     const auth = useAuthStore()
     if (!auth.user) throw new Error('未登录')
+    if (!auth.hasFeature('shop')) throw new Error('本班级尚未开通宠物商城')
     busyItemId.value = item?.id || `remove-${category}`
     try {
       await classroomRpc('equip_pet_cosmetic', {

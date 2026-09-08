@@ -87,6 +87,8 @@ Deno.serve(async req => {
       checked(await db.from('photo_checkin_sessions').delete().eq('token_hash', session.token_hash))
       return respond({ ok: true })
     }
+    const checkinsEnabled = checked(await db.rpc('tenant_feature_enabled', { p_profile_id: actor.id, p_feature_key: 'photo_checkin' }))
+    if (!checkinsEnabled) throw new HttpError('本班级尚未开通照片打卡功能', 403)
     if (input.action === 'upload') {
       if (actor.role !== 'student') throw new HttpError('仅学生可以上传', 403)
       const requestId = id(input.id); const description = note(input.description)

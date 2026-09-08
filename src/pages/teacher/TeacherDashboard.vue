@@ -1,5 +1,6 @@
 <template>
   <div class="page teacher-page dashboard-page">
+    <p v-if="route.query.featureUnavailable" class="feature-unavailable" role="status">本班级尚未开通该功能，请联系管理员。</p>
     <div class="teacher-header">
       <div><p class="dashboard-eyebrow">{{ authStore.user?.class_name || '班级管理' }}</p><h1>班级总览</h1></div>
       <button class="btn-logout" @click="handleLogout">退出</button>
@@ -84,13 +85,14 @@
 
 <script setup lang="ts">
 import { ref, computed, nextTick, onMounted } from 'vue'
-import { useRouter } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '../../stores/auth'
 import { useTeacherStore } from '../../stores/teacher'
 import { useTasksStore, rewardLabel } from '../../stores/tasks'
 import { supabase } from '../../lib/supabase'
 
 const router = useRouter()
+const route = useRoute()
 const authStore = useAuthStore()
 const teacherStore = useTeacherStore()
 const tasksStore = useTasksStore()
@@ -223,6 +225,7 @@ async function handleLogout() {
 .teacher-page {
   padding-bottom: 80px;
 }
+.feature-unavailable { margin:0 0 16px; padding:12px 14px; border-radius:10px; color:#805d22; background:#fff3d6; }
 
 .teacher-header {
   display: flex;

@@ -1,5 +1,6 @@
 <template>
   <div class="page home-page">
+    <p v-if="route.query.featureUnavailable" class="feature-unavailable" role="status">本班级尚未开通该功能，请联系管理员。</p>
     <div v-if="petStore.loading && petStore.pets.length === 0" class="loading">
       <span class="animate-bounce">🐾</span>
       <p>加载中...</p>
@@ -148,7 +149,7 @@
 <script setup lang="ts">
 import { isPetTravelling } from '../lib/petTravel'
 import { ref, computed, onMounted, onUnmounted } from 'vue'
-import { useRouter } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { usePetStore } from '../stores/pet'
 import { useAuthStore } from '../stores/auth'
 import { usePointsStore } from '../stores/points'
@@ -160,6 +161,7 @@ import { getPetThemeStyle } from '../lib/petTheme'
 import PetAvatar from '../components/pet/PetAvatar.vue'
 
 const router = useRouter()
+const route = useRoute()
 const petStore = usePetStore()
 const authStore = useAuthStore()
 const pointsStore = usePointsStore()
@@ -220,6 +222,7 @@ onMounted(async () => {
 </script>
 
 <style scoped>
+.feature-unavailable { margin:0 0 16px; padding:12px 14px; border-radius:10px; color:#805d22; background:#fff3d6; }
 .loading {
   display: flex;
   flex-direction: column;

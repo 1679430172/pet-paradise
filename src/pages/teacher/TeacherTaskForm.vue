@@ -38,7 +38,7 @@
         />
       </div>
 
-      <div class="form-group">
+      <div v-if="authStore.hasFeature('travel')" class="form-group">
         <label class="form-label" for="task-travel-tickets">奖励旅行券</label>
         <input id="task-travel-tickets" v-model.number="travelTickets" type="number" class="form-input" min="0" max="100" step="1" required />
         <small>每次完成发放的张数。积分与旅行券可任选一种，也可同时奖励；每张券可出发一次。</small>
@@ -56,10 +56,12 @@
 import { ref, onMounted, computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useTasksStore } from '../../stores/tasks'
+import { useAuthStore } from '../../stores/auth'
 
 const route = useRoute()
 const router = useRouter()
 const tasksStore = useTasksStore()
+const authStore = useAuthStore()
 
 const isEdit = computed(() => !!route.params.id)
 const name = ref('')

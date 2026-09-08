@@ -224,7 +224,7 @@
             <small v-if="cosmeticBalanceError" role="status">{{ cosmeticBalanceError }}</small>
           </div>
         </div>
-        <button v-if="cosmeticTargetStudent && cosmeticTargetPet" class="cosmetic-travel-entry" :disabled="!!cosmeticBusyId" :aria-label="`管理 ${cosmeticTargetStudent.username} 的宠物旅行`" @click="travelTarget = { student: cosmeticTargetStudent, pet: cosmeticTargetPet }">
+        <button v-if="authStore.hasFeature('travel') && cosmeticTargetStudent && cosmeticTargetPet" class="cosmetic-travel-entry" :disabled="!!cosmeticBusyId" :aria-label="`管理 ${cosmeticTargetStudent.username} 的宠物旅行`" @click="travelTarget = { student: cosmeticTargetStudent, pet: cosmeticTargetPet }">
           <span><strong>🧳 {{ cosmeticTargetPet.name }}的旅行</strong><small>{{ travelCardLabel(cosmeticTargetPet.id) === '旅行' ? '选择目的地，每次消耗 1 张旅行券' : travelCardLabel(cosmeticTargetPet.id) }}</small></span><b>管理旅行 →</b>
         </button>
         <button v-if="cosmeticTargetStudent && canAdoptFor(cosmeticTargetStudent)" class="adopt-mini-btn" @click="openAdoptFromCosmetics">➕ 领养新宠物</button>
@@ -464,7 +464,7 @@ const travelClock = ref(0)
 let travelClockTimer: ReturnType<typeof setInterval> | undefined
 let travelServerAt = 0, travelReceivedAt = 0
 async function refreshTravelOverview() {
-  if (!authStore.user) return
+  if (!authStore.user || !authStore.hasFeature('travel')) return
   try {
     const result = await classroomRpc<{ serverNow: string; entries: { student_id: string; pet_id: string; pet_name: string; returns_at: string }[] }>('teacher_travel_overview', { p_actor_id: authStore.user.id })
     travelOverview.value = Object.fromEntries(result.entries.map(entry => [entry.pet_id, entry]))
@@ -484,13 +484,15 @@ function travelCardLabel(petId: string) {
   return minutes <= 0 ? `${trip.pet_name} · 待领取` : `旅行中 · ${Math.floor(minutes / 60)}时${minutes % 60}分`
 }
 function refreshVisibleTravel() { if (document.visibilityState === 'visible') void refreshTravelOverview() }
-onMounted(() => { void refreshTravelOverview(); travelClockTimer = setInterval(() => { travelClock.value = travelServerAt ? travelServerAt + performance.now() - travelReceivedAt : Date.now() }, 1000); document.addEventListener('visibilitychange', refreshVisibleTravel) })
+onMounted(() => { if (authStore.hasFeature('travel')) { void refreshTravelOverview(); travelClockTimer = setInterval(() => { travelClock.value = travelServerAt ? travelServerAt + performance.now() - travelReceivedAt : Date.now() }, 1000); document.addEventListener('visibilitychange', refreshVisibleTravel) } })
 onUnmounted(() => { clearInterval(travelClockTimer); document.removeEventListener('visibilitychange', refreshVisibleTravel) })
 const cosmeticTravelBalance = ref<{ stamps: number | null; tickets: number | null } | null>(null)
 const cosmeticBalanceError = ref('')
 const cosmeticBusyId = ref<string | null>(null)
 const cosmeticError = ref('')
-const visibleCosmeticItems = computed(() => teacherStore.cosmeticItems.filter(item => item.category === cosmeticTab.value))
+const visibleCosmeticItems = computed(() => teacherStore.cosmeticItems.filter(item =>
+  item.category === cosmeticTab.value && (item.acquisition === 'travel' ? authStore.hasFeature('travel') : authStore.hasFeature('shop'))
+))
 const batchFoods = [
   { action: 'basic' as const, label: '普通粮', icon: '🍖', gain: 20 },
   { action: 'nice' as const, label: '营养粮', icon: '🍗', gain: 50 },
@@ -711,6 +713,7 @@ async function refreshCosmeticTravel() {
 }
 
 async function openCosmeticDialog(student: StudentWithPet, pet: TeacherPet) {
+  if (!authStore.hasFeature('shop') && !authStore.hasFeature('travel')) return
   cosmeticTravelBalance.value = null
   cosmeticBalanceError.value = ''
   cosmeticTargetStudent.value = student
@@ -720,14 +723,14 @@ async function openCosmeticDialog(student: StudentWithPet, pet: TeacherPet) {
   cosmeticLoading.value = true
   showCosmeticDialog.value = true
   try { await Promise.all([
-    refreshTravelOverview(),
+    authStore.hasFeature('travel') ? refreshTravelOverview() : Promise.resolve(),
     teacherStore.fetchStudentCosmetics(student.id),
-    classroomRpc<{ stamps: number; tickets: number }>('travel_state', { p_user_id: student.id })
+    authStore.hasFeature('travel') ? classroomRpc<{ stamps: number; tickets: number }>('travel_state', { p_user_id: student.id })
       .then(balance => {
         if (cosmeticTargetStudent.value?.id !== student.id) return
         cosmeticTravelBalance.value = { stamps: Number.isInteger(balance.stamps) ? balance.stamps : null, tickets: Number.isInteger(balance.tickets) ? balance.tickets : null }
       })
-      .catch(() => { if (cosmeticTargetStudent.value?.id === student.id) cosmeticBalanceError.value = '旅行余额暂时无法加载，请重新打开重试' }),
+      .catch(() => { if (cosmeticTargetStudent.value?.id === student.id) cosmeticBalanceError.value = '旅行余额暂时无法加载，请重新打开重试' }) : Promise.resolve(),
   ]) }
   catch (error) { cosmeticError.value = error instanceof Error ? error.message : '装扮加载失败' }
   finally { cosmeticLoading.value = false }
@@ -757,6 +760,7 @@ function cosmeticOwned(item: ShopItem) { return teacherStore.cosmeticOwnedIds.in
 function isCosmeticEquipped(item: ShopItem) { return cosmeticTargetPet.value?.cosmetics?.[item.category] === item.style_key }
 
 async function buyStudentCosmetic(item: ShopItem) {
+  if (!authStore.hasFeature('shop')) return
   if (!cosmeticTargetStudent.value || !cosmeticTargetPet.value || cosmeticBusyId.value) return
   cosmeticBusyId.value = item.id
   cosmeticError.value = ''

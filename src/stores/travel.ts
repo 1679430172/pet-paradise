@@ -28,6 +28,7 @@ export const useTravelStore = defineStore('travel', () => {
   // 使用服务器时间和单调时钟，系统时钟调整不会改变旅行倒计时。
   function serverTime() { return state.value ? Date.parse(state.value.serverNow) + performance.now() - receivedAt : 0 }
   async function refresh() {
+    if (!useAuthStore().hasFeature('travel')) throw new Error('本班级尚未开通旅游功能')
     const id = userId()
     if (loadedUserId !== id) state.value = null
     loading.value = true
@@ -41,6 +42,7 @@ export const useTravelStore = defineStore('travel', () => {
     finally { loading.value = false }
   }
   async function act<T>(name: string, args: Record<string, unknown>) {
+    if (!useAuthStore().hasFeature('travel')) throw new Error('本班级尚未开通旅游功能')
     if (busy.value) throw new Error('正在处理，请稍候')
     busy.value = true
     try {

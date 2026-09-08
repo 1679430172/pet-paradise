@@ -17,23 +17,24 @@
 import { useRoute } from 'vue-router'
 import { computed } from 'vue'
 import { useAuthStore } from '../../stores/auth'
+import type { TenantFeature } from '../../stores/auth'
 
 const route = useRoute()
 const authStore = useAuthStore()
 
-const teacherItems = [
+const teacherItems: { icon: string; label: string; route: string; feature?: TenantFeature }[] = [
   { icon: '📊', label: '总览', route: '/teacher' },
   { icon: '👥', label: '学生', route: '/teacher/students' },
   { icon: '🐾', label: '宠物', route: '/teacher/pets' },
   { icon: '📋', label: '任务', route: '/teacher/tasks' },
-  { icon: '📷', label: '打卡', route: '/teacher/checkins' },
+  { icon: '📷', label: '打卡', route: '/teacher/checkins', feature: 'photo_checkin' },
   { icon: '🏆', label: '排行', route: '/teacher/stats' },
   { icon: '⚙️', label: '设置', route: '/teacher/settings' },
 ]
 
 const navItems = computed(() => authStore.isAdmin
   ? [{ icon: '🏫', label: '班级管理', route: '/admin' }]
-  : teacherItems)
+  : teacherItems.filter(item => !item.feature || authStore.hasFeature(item.feature)))
 
 function isActive(path: string) {
   if (path === '/teacher') return route.path === '/teacher'

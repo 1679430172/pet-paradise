@@ -7,12 +7,12 @@ const router = createRouter({
     {
       path: '/checkins', name: 'photo-checkins',
       component: () => import('../pages/PhotoCheckinsPage.vue'),
-      meta: { requiresAuth: true, role: 'student' },
+      meta: { requiresAuth: true, role: 'student', feature: 'photo_checkin' },
     },
     {
       path: '/teacher/checkins', name: 'teacher-photo-checkins',
       component: () => import('../pages/PhotoCheckinsPage.vue'),
-      meta: { requiresAuth: true, role: 'teacher' },
+      meta: { requiresAuth: true, role: 'teacher', feature: 'photo_checkin' },
     },
     // 公开页面
     {
@@ -68,13 +68,13 @@ const router = createRouter({
       path: '/travel',
       name: 'travel',
       component: () => import('../pages/TravelPage.vue'),
-      meta: { requiresAuth: true, role: 'student' },
+      meta: { requiresAuth: true, role: 'student', feature: 'travel' },
     },
     {
       path: '/shop',
       name: 'shop',
       component: () => import('../pages/ShopPage.vue'),
-      meta: { requiresAuth: true, role: 'student' },
+      meta: { requiresAuth: true, role: 'student', feature: 'shop' },
     },
     {
       path: '/profile',
@@ -180,6 +180,13 @@ router.beforeEach(async (to) => {
     }
     if (to.meta.role === 'student' && authStore.isTeacher) {
       return authStore.isAdmin ? { name: 'admin-classes' } : { name: 'teacher-dashboard' }
+    }
+  }
+
+  if (to.meta.feature && authStore.user && !authStore.isAdmin) {
+    await authStore.fetchTenantFeatures()
+    if (!authStore.hasFeature(to.meta.feature as 'travel' | 'photo_checkin' | 'shop')) {
+      return authStore.isTeacher ? { name: 'teacher-dashboard', query: { featureUnavailable: '1' } } : { name: 'home', query: { featureUnavailable: '1' } }
     }
   }
 })

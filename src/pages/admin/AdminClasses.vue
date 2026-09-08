@@ -143,6 +143,19 @@
               <button class="small-btn primary" @click="resetTeacherPassword(managingTeacher)">重置</button>
             </div>
           </section>
+          <section class="manage-box feature-box">
+            <div class="feature-heading"><div><h3>增值功能</h3><p>按班级开通，学生和老师会同步生效</p></div><span v-if="featuresLoading">加载中…</span></div>
+            <div class="feature-list">
+              <label v-for="feature in featureOptions" :key="feature.key" class="feature-row">
+                <span><b>{{ feature.icon }} {{ feature.label }}</b><small>{{ feature.description }}</small></span>
+                <span class="switch" :class="{ disabled: featuresLoading || featureSaving === feature.key }">
+                  <input type="checkbox" :checked="managedFeatures[feature.key]" :disabled="featuresLoading || !!featureSaving" @change="toggleTenantFeature(feature.key)" />
+                  <span class="switch-track"><span></span></span>
+                </span>
+              </label>
+            </div>
+            <p v-if="featureError" class="message error" role="alert">{{ featureError }}</p>
+          </section>
           <section class="student-section">
             <div class="student-heading"><h3>学生账号</h3><span>{{ students.length }} 人</span></div>
             <div v-if="studentsLoading" class="student-empty">正在加载学生...</div>
@@ -182,7 +195,7 @@
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
-import { useAuthStore } from '../../stores/auth'
+import { tenantFeatureKeys, useAuthStore, type TenantFeature } from '../../stores/auth'
 
 interface TeacherItem {
   id: string
@@ -220,6 +233,15 @@ const registrationEnabled = ref(true)
 const registrationLoading = ref(true)
 const registrationMessage = ref('')
 const registrationError = ref('')
+const featureOptions: { key: TenantFeature; icon: string; label: string; description: string }[] = [
+  { key: 'travel', icon: '🧳', label: '旅游', description: '旅行券、明信片和教师代管' },
+  { key: 'photo_checkin', icon: '📷', label: '照片打卡', description: '学生上传与老师审核奖励' },
+  { key: 'shop', icon: '🛒', label: '宠物商城', description: '购买和更换宠物装扮' },
+]
+const managedFeatures = reactive<Record<TenantFeature, boolean>>({ travel: false, photo_checkin: false, shop: false })
+const featuresLoading = ref(false)
+const featureSaving = ref<TenantFeature | null>(null)
+const featureError = ref('')
 const showCreateForm = ref(false)
 const searchQuery = ref('')
 const totalStudents = computed(() => teachers.value.reduce((sum, teacher) => sum + teacher.student_count, 0))
@@ -311,13 +333,37 @@ async function openManage(teacher: TeacherItem) {
   expandedTeacherId.value = teacher.id
   manageClassName.value = teacher.class_name || ''
   teacherPassword.value = ''
-  await loadStudents(teacher.id)
+  await Promise.all([loadStudents(teacher.id), loadTenantFeatures(teacher.id)])
 }
 
 function closeManage() {
   expandedTeacherId.value = null
   students.value = []
   teacherPassword.value = ''
+  featureError.value = ''
+}
+
+async function loadTenantFeatures(teacherId: string) {
+  featuresLoading.value = true
+  featureError.value = ''
+  tenantFeatureKeys.forEach(key => { managedFeatures[key] = false })
+  const result = await authStore.fetchManagedTenantFeatures(teacherId)
+  if (result.error) featureError.value = '班级功能加载失败，请稍后重试。'
+  else (result.data || []).forEach((row: any) => {
+    if (tenantFeatureKeys.includes(row.feature_key)) managedFeatures[row.feature_key as TenantFeature] = row.enabled === true
+  })
+  featuresLoading.value = false
+}
+
+async function toggleTenantFeature(feature: TenantFeature) {
+  if (!managingTeacher.value || featureSaving.value) return
+  const next = !managedFeatures[feature]
+  featureSaving.value = feature
+  featureError.value = ''
+  const result = await authStore.updateManagedTenantFeature(managingTeacher.value.id, feature, next)
+  if (result.error) featureError.value = result.error.message || '功能设置保存失败'
+  else managedFeatures[feature] = next
+  featureSaving.value = null
 }
 
 async function loadStudents(teacherId: string) {
@@ -430,10 +476,11 @@ async function handleLogout() {
 .student-count { color:#8c8492; font-size:.73rem; white-space:nowrap; }.student-count strong { color:#443c4d; font-size:.98rem; }
 .manage-btn { border:1px solid #ded5f3; border-radius:9px; padding:7px 12px; color:#7054c4; background:#f5f2fd; cursor:pointer; font-weight:700; }
 .drawer-overlay { position:fixed; inset:0; z-index:200; display:grid; place-items:center; padding:24px; background:rgba(35,28,43,.42); backdrop-filter:blur(3px); }.manage-drawer { width:min(760px,100%); max-height:calc(100dvh - 48px); display:flex; flex-direction:column; overflow:hidden; border:1px solid #e5dfeb; border-radius:18px; background:#f8f7fb; box-shadow:0 24px 70px rgba(40,30,50,.24); animation:modal-in .18s ease-out; }.drawer-header { flex-shrink:0; display:flex; justify-content:space-between; align-items:flex-start; padding:22px 24px 18px; border-bottom:1px solid #e9e4ed; background:white; }.drawer-label { color:#8066ca; font-size:.68rem; font-weight:800; letter-spacing:.12em; }.drawer-header h2 { margin:5px 0 3px; font-size:1.35rem; }.drawer-header p { margin:0; color:#8e8794; font-size:.78rem; }.drawer-close { width:36px; height:36px; border:1px solid #e5e0e9; border-radius:10px; color:#766e7d; background:white; cursor:pointer; font-size:1.35rem; }.drawer-body { display:grid; grid-template-columns:1fr 1fr; gap:14px; padding:20px 24px 26px; overflow-y:auto; }.manage-box { padding:17px; border:1px solid #e8e3ec; border-radius:13px; background:white; }.manage-box h3,.student-heading h3 { margin:0 0 13px; font-size:.9rem; }.manage-box label { display:block; margin-bottom:7px; color:#857d8a; font-size:.74rem; }.inline-form { display:flex; gap:8px; }.inline-form .form-input { min-width:0; }.small-btn { border:1px solid #e0dae6; background:#fff; color:#6e6477; border-radius:9px; padding:8px 13px; cursor:pointer; white-space:nowrap; }.small-btn.primary { border-color:#7657d5; color:white; background:#7657d5; }
+.feature-box { grid-column:1/-1; }.feature-heading { display:flex; align-items:flex-start; justify-content:space-between; gap:12px; }.feature-heading h3 { margin-bottom:4px; }.feature-heading p,.feature-heading>span { margin:0; color:#918998; font-size:.72rem; }.feature-list { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:10px; margin-top:14px; }.manage-box .feature-row { display:flex; align-items:center; justify-content:space-between; gap:10px; margin:0; padding:12px; border:1px solid #ece7f0; border-radius:11px; color:#51485a; }.feature-row>span:first-child { display:grid; gap:4px; min-width:0; }.feature-row b { font-size:.8rem; }.feature-row small { color:#918998; font-size:.67rem; line-height:1.45; }.feature-row .switch { flex:none; }
 .student-section { grid-column:1/-1; }.student-heading { display:flex; justify-content:space-between; align-items:center; }.student-heading span { color:#999; font-size:.75rem; }.student-list { border:1px solid #ebe6ef; border-radius:12px; overflow:hidden; }.student-row { display:flex; align-items:center; gap:11px; padding:11px 13px; background:white; }.student-row + .student-row { border-top:1px solid #f0ecf2; }.student-avatar { width:32px; height:32px; display:grid; place-items:center; flex-shrink:0; border-radius:9px; background:#f3eaf0; color:#b24f7c; font-weight:700; }.student-info { flex:1; display:flex; flex-direction:column; min-width:0; }.student-info strong { font-size:.82rem; }.student-info span { color:#999; font-size:.7rem; margin-top:2px; }.student-action { border:0; background:#f1eef6; color:#6d6377; border-radius:8px; padding:6px 9px; cursor:pointer; font-size:.72rem; }.student-action.danger { color:#cf5064; background:#fff0f2; }.student-empty,.empty-state { padding:34px 20px; text-align:center; color:#999; background:white; border:1px dashed #ded9e3; border-radius:12px; font-size:.8rem; }
 .danger-zone { grid-column:1/-1; padding-top:16px; border-top:1px solid #e5e0e9; display:flex; align-items:center; justify-content:space-between; gap:14px; }.danger-zone div { display:flex; flex-direction:column; gap:3px; }.danger-zone strong { color:#b74759; font-size:.78rem; }.danger-zone span { color:#a39ca8; font-size:.7rem; }.delete-btn { border:1px solid #f0cbd1; background:white; border-radius:9px; padding:7px 11px; color:#cf4e63; cursor:pointer; }.delete-btn:disabled { opacity:.4; cursor:not-allowed; }
 .dialog-overlay { position:fixed; inset:0; z-index:300; display:grid; place-items:center; padding:20px; background:rgba(36,28,43,.5); backdrop-filter:blur(3px); }.password-dialog { width:min(380px,100%); padding:22px; }.password-dialog h3 { margin:0 0 7px; }.password-dialog p { color:#777; font-size:.84rem; margin-bottom:15px; }.dialog-actions { display:flex; justify-content:flex-end; gap:9px; margin-top:16px; }
 @keyframes modal-in { from { transform:translateY(10px) scale(.985); opacity:.4; } to { transform:translateY(0) scale(1); opacity:1; } }
 @media (max-width:900px) { .overview-grid { grid-template-columns:repeat(2,1fr); }.registration-card { grid-column:1/-1; }.class-grid { grid-template-columns:1fr; }.class-card.expanded { grid-column:auto; } }
-@media (max-width:700px) { .admin-page { padding:24px 16px 90px; }.admin-header { align-items:flex-start; }.admin-header h1 { font-size:1.6rem; }.header-actions { flex-direction:column; }.overview-grid { grid-template-columns:1fr 1fr; }.metric-card { padding:14px; }.registration-card { flex-direction:row; }.form-grid,.manage-grid { grid-template-columns:1fr; }.list-heading { align-items:stretch; flex-direction:column; }.search-box { box-sizing:border-box; width:100%; }.class-summary { flex-wrap:wrap; }.class-content { min-width:150px; }.student-count { order:4; margin-left:58px; }.student-row { flex-wrap:wrap; }.student-info { min-width:140px; }.drawer-overlay { padding:12px; }.manage-drawer { max-height:calc(100dvh - 24px); }.drawer-body { grid-template-columns:1fr; padding:16px; }.student-section,.danger-zone { grid-column:auto; }.danger-zone { align-items:flex-start; } }
+@media (max-width:700px) { .admin-page { padding:24px 16px 90px; }.admin-header { align-items:flex-start; }.admin-header h1 { font-size:1.6rem; }.header-actions { flex-direction:column; }.overview-grid { grid-template-columns:1fr 1fr; }.metric-card { padding:14px; }.registration-card { flex-direction:row; }.form-grid,.manage-grid { grid-template-columns:1fr; }.list-heading { align-items:stretch; flex-direction:column; }.search-box { box-sizing:border-box; width:100%; }.class-summary { flex-wrap:wrap; }.class-content { min-width:150px; }.student-count { order:4; margin-left:58px; }.student-row { flex-wrap:wrap; }.student-info { min-width:140px; }.drawer-overlay { padding:12px; }.manage-drawer { max-height:calc(100dvh - 24px); }.drawer-body { grid-template-columns:1fr; padding:16px; }.feature-box,.student-section,.danger-zone { grid-column:auto; }.feature-list { grid-template-columns:1fr; }.danger-zone { align-items:flex-start; } }
 </style>

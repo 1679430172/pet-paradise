@@ -75,7 +75,9 @@ const authStore = useAuthStore(), petStore = usePetStore(), shopStore = useShopS
 const activeTab = ref<'frame' | 'background' | 'orders'>('frame')
 const notice = ref(''), noticeError = ref(false)
 const tabs = [{ key: 'frame', label: '卡片边框' }, { key: 'background', label: '背景' }, { key: 'orders', label: '购买记录' }] as const
-const visibleItems = computed(() => shopStore.items.filter(item => item.category === activeTab.value))
+const visibleItems = computed(() => shopStore.items.filter(item =>
+  item.category === activeTab.value && (item.acquisition !== 'travel' || authStore.hasFeature('travel'))
+))
 const selection = computed(() => shopStore.selectionForPet(petStore.currentPet?.id))
 const previewClasses = computed(() => cosmeticClasses(selection.value))
 const equippedLabel = computed(() => {
