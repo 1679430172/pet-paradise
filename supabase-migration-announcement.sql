@@ -1,4 +1,4 @@
--- 公告记录、自动结束时间与历史记录。
+-- 公告记录、自动结束时间与历史记录。前端按每次登录展示一次。
 CREATE TABLE IF NOT EXISTS announcements (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   type TEXT NOT NULL DEFAULT 'notice' CHECK (type IN ('notice', 'celebration', 'reminder', 'maintenance', 'other')),

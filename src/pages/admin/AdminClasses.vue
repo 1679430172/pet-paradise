@@ -53,7 +53,7 @@
 
     <section class="announcement-card card">
       <div class="announcement-heading">
-        <div><span class="eyebrow">SITE ANNOUNCEMENT</span><h2>公告弹窗</h2><p>启用后，老师和学生每次登录或刷新页面都会看到公告，直至管理员停用。</p></div>
+        <div><span class="eyebrow">SITE ANNOUNCEMENT</span><h2>公告弹窗</h2><p>启用后，老师和学生每次登录会看到一次；刷新不重复，新公告会重新展示。</p></div>
         <label class="switch" :class="{ disabled: announcementLoading || announcementSaving }">
           <input v-model="announcementForm.enabled" type="checkbox" :disabled="announcementLoading || announcementSaving" />
           <span class="switch-track"><span></span></span>

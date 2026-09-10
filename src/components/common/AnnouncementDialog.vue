@@ -19,6 +19,7 @@ import { useAuthStore, type AnnouncementSetting } from '../../stores/auth'
 const authStore = useAuthStore()
 const announcement = ref<AnnouncementSetting | null>(null)
 const dismissed = ref(false)
+const seenKey = computed(() => authStore.user ? `announcement_seen:${authStore.user.id}` : '')
 const visible = computed(() => !!authStore.user && !authStore.isAdmin && announcement.value?.enabled === true && !!announcement.value.content && !dismissed.value)
 const appearances = {
   notice: { icon: '📣', label: '最新通知' },
@@ -36,10 +37,12 @@ watch(() => authStore.user?.id, async (userId) => {
   const result = await authStore.fetchAnnouncement()
   if (result.error || !result.data) return
   announcement.value = result.data
+  dismissed.value = !!seenKey.value && sessionStorage.getItem(seenKey.value) === result.data.id
 }, { immediate: true })
 
 function dismiss() {
   dismissed.value = true
+  if (seenKey.value && announcement.value?.id) sessionStorage.setItem(seenKey.value, announcement.value.id)
 }
 </script>
 

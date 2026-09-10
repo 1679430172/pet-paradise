@@ -355,6 +355,7 @@ export const useAuthStore = defineStore('auth', () => {
   async function signOut() {
     clearExpiryTimer()
     if (user.value) {
+      sessionStorage.removeItem(`announcement_seen:${user.value.id}`)
       const key = sessionKey(user.value.id)
       const token = checkinToken(user.value.id)
       sessionStorage.removeItem(key)
