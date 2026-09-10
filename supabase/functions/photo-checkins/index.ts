@@ -73,7 +73,7 @@ Deno.serve(async req => {
       const profile = checked(await db.from('profiles').select('id,password,role,is_admin').eq('id', profileId).maybeSingle())
       if (!profile || profile.is_admin || !['student', 'teacher'].includes(profile.role) || await hash(input.password + 'pet-paradise-salt') !== profile.password) throw new HttpError('密码错误', 401)
       const token = crypto.randomUUID() + crypto.randomUUID()
-      const expires = new Date(Date.now() + 12 * 3600000).toISOString()
+      const expires = new Date(Date.now() + 30 * 60000).toISOString()
       checked(await db.from('photo_checkin_sessions').insert({ token_hash: await hash(token), profile_id: profile.id, password_hash: profile.password, expires_at: expires }))
       return respond({ token, expires })
     }
@@ -87,6 +87,9 @@ Deno.serve(async req => {
       checked(await db.from('photo_checkin_sessions').delete().eq('token_hash', session.token_hash))
       return respond({ ok: true })
     }
+    const expires = new Date(Date.now() + 30 * 60000).toISOString()
+    checked(await db.from('photo_checkin_sessions').update({ expires_at: expires }).eq('token_hash', session.token_hash))
+    if (input.action === 'keepalive') return respond({ ok: true, expires })
     const checkinsEnabled = checked(await db.rpc('tenant_feature_enabled', { p_profile_id: actor.id, p_feature_key: 'photo_checkin' }))
     if (!checkinsEnabled) throw new HttpError('本班级尚未开通照片打卡功能', 403)
     if (input.action === 'upload') {

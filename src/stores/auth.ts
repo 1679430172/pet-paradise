@@ -1,7 +1,7 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import { supabase } from '../lib/supabase'
-import { establishCheckinSession, checkinToken, sessionKey, sessionErrorKey } from '../lib/photoCheckins'
+import { establishCheckinSession, checkinApi, checkinToken, sessionKey, sessionErrorKey } from '../lib/photoCheckins'
 
 export interface Profile {
   id: string
@@ -18,6 +18,12 @@ export interface Profile {
 
 export type TenantFeature = 'travel' | 'photo_checkin' | 'shop'
 export const tenantFeatureKeys: TenantFeature[] = ['travel', 'photo_checkin', 'shop']
+const USER_ID_KEY = 'pet_user_id'
+const SESSION_EXPIRES_KEY = 'pet_session_expires_at'
+const SESSION_DURATION_MS = 30 * 60 * 1000
+const ACTIVITY_WRITE_INTERVAL_MS = 30 * 1000
+const CHECKIN_RENEW_INTERVAL_MS = 5 * 60 * 1000
+const checkinRenewedKey = (id: string) => `photo_checkin_renewed_at:${id}`
 
 export async function hashPassword(password: string): Promise<string> {
   const encoder = new TextEncoder()
@@ -38,6 +44,65 @@ export const useAuthStore = defineStore('auth', () => {
   const isTeacher = computed(() => user.value?.role === 'teacher')
   const isStudent = computed(() => user.value?.role === 'student')
   const isAdmin = computed(() => user.value?.role === 'teacher' && user.value?.is_admin === true)
+  let expiryTimer: ReturnType<typeof setTimeout> | null = null
+  let lastActivityWrite = 0
+
+  function clearExpiryTimer() {
+    if (expiryTimer) clearTimeout(expiryTimer)
+    expiryTimer = null
+  }
+
+  async function expireSession() {
+    if (hasValidSession()) {
+      scheduleExpiry(Number(localStorage.getItem(SESSION_EXPIRES_KEY)))
+      return
+    }
+    await signOut()
+    if (!window.location.hash.startsWith('#/login')) window.location.hash = '#/login?reason=expired'
+  }
+
+  function scheduleExpiry(expiresAt: number) {
+    clearExpiryTimer()
+    expiryTimer = setTimeout(() => { void expireSession() }, Math.max(0, expiresAt - Date.now()))
+  }
+
+  function saveSession(profileId: string, expiresAt = Date.now() + SESSION_DURATION_MS) {
+    localStorage.setItem(USER_ID_KEY, profileId)
+    localStorage.setItem(SESSION_EXPIRES_KEY, String(expiresAt))
+    scheduleExpiry(expiresAt)
+  }
+
+  function hasValidSession() {
+    const expiresAt = Number(localStorage.getItem(SESSION_EXPIRES_KEY))
+    return Number.isFinite(expiresAt) && expiresAt > Date.now()
+  }
+
+  function syncSessionExpiry() {
+    if (!user.value) return
+    const expiresAt = Number(localStorage.getItem(SESSION_EXPIRES_KEY))
+    if (Number.isFinite(expiresAt) && expiresAt > Date.now()) scheduleExpiry(expiresAt)
+    else void expireSession()
+  }
+
+  function recordActivity() {
+    if (!user.value) return
+    if (!hasValidSession()) { void expireSession(); return }
+    const now = Date.now()
+    if (now - lastActivityWrite >= ACTIVITY_WRITE_INTERVAL_MS) {
+      lastActivityWrite = now
+      saveSession(user.value.id)
+    }
+    if (isAdmin.value || !checkinToken(user.value.id)) return
+    const renewedKey = checkinRenewedKey(user.value.id)
+    const renewedAt = Number(localStorage.getItem(renewedKey)) || 0
+    if (now - renewedAt < CHECKIN_RENEW_INTERVAL_MS) return
+    localStorage.setItem(renewedKey, String(now))
+    const profileId = user.value.id
+    void checkinApi(profileId, 'keepalive').catch(() => {
+      if (!checkinToken(profileId)) void expireSession()
+      else if (localStorage.getItem(renewedKey) === String(now)) localStorage.removeItem(renewedKey)
+    })
+  }
 
   function tenantId(profile = user.value) {
     if (!profile || profile.is_admin) return null
@@ -67,8 +132,12 @@ export const useAuthStore = defineStore('auth', () => {
   }
 
   async function init() {
-    const savedUserId = localStorage.getItem('pet_user_id')
-    if (savedUserId) {
+    const savedUserId = localStorage.getItem(USER_ID_KEY)
+    if (savedUserId && !hasValidSession()) {
+      localStorage.removeItem(USER_ID_KEY)
+      localStorage.removeItem(SESSION_EXPIRES_KEY)
+    }
+    if (savedUserId && hasValidSession()) {
       const { data } = await supabase
         .from('profiles')
         .select('*')
@@ -76,9 +145,11 @@ export const useAuthStore = defineStore('auth', () => {
         .single()
       if (data) {
         user.value = data
+        saveSession(data.id, Math.min(Number(localStorage.getItem(SESSION_EXPIRES_KEY)), Date.now() + SESSION_DURATION_MS))
         await fetchTenantFeatures()
       } else {
-        localStorage.removeItem('pet_user_id')
+        localStorage.removeItem(USER_ID_KEY)
+        localStorage.removeItem(SESSION_EXPIRES_KEY)
       }
     }
     initialized.value = true
@@ -166,9 +237,9 @@ export const useAuthStore = defineStore('auth', () => {
       if (error) throw error
 
       user.value = data
-      localStorage.setItem('pet_user_id', data.id)
       await fetchTenantFeatures(true)
-      await establishCheckinSession(data.id, password)
+      const checkinExpires = await establishCheckinSession(data.id, password)
+      saveSession(data.id, checkinExpires ? Date.parse(checkinExpires) : undefined)
       return { data, error: null }
     } catch (error: any) {
       return { data: null, error }
@@ -199,9 +270,9 @@ export const useAuthStore = defineStore('auth', () => {
       }
 
       user.value = data[0]
-      localStorage.setItem('pet_user_id', data[0].id)
       await fetchTenantFeatures(true)
-      if (!data[0].is_admin) await establishCheckinSession(data[0].id, password)
+      const checkinExpires = !data[0].is_admin ? await establishCheckinSession(data[0].id, password) : null
+      saveSession(data[0].id, checkinExpires ? Date.parse(checkinExpires) : undefined)
       return { data: data[0], error: null }
     } catch (error: any) {
       return { data: null, error }
@@ -211,12 +282,14 @@ export const useAuthStore = defineStore('auth', () => {
   }
 
   async function signOut() {
+    clearExpiryTimer()
     if (user.value) {
       const key = sessionKey(user.value.id)
       const token = checkinToken(user.value.id)
       sessionStorage.removeItem(key)
       localStorage.removeItem(key)
       localStorage.removeItem(sessionErrorKey(user.value.id))
+      localStorage.removeItem(checkinRenewedKey(user.value.id))
       if (token) void supabase.functions.invoke('photo-checkins', {
         body: { action: 'logout' }, headers: { 'x-checkin-token': token },
       }).catch(() => {})
@@ -224,7 +297,8 @@ export const useAuthStore = defineStore('auth', () => {
     user.value = null
     tenantFeatures.value = { travel: false, photo_checkin: false, shop: false }
     tenantFeaturesLoadedFor.value = null
-    localStorage.removeItem('pet_user_id')
+    localStorage.removeItem(USER_ID_KEY)
+    localStorage.removeItem(SESSION_EXPIRES_KEY)
   }
 
   async function refreshProfile() {
@@ -416,5 +490,5 @@ export const useAuthStore = defineStore('auth', () => {
     return { error }
   }
 
-  return { user, profile, initialized, loading, isTeacher, isStudent, isAdmin, tenantFeatures, fetchTenantFeatures, hasFeature, init, signUp, fetchRegistrationClasses, fetchRegistrationEnabled, updateRegistrationEnabled, signIn, signOut, refreshProfile, changeOwnPassword, updateClassName, createTeacher, fetchManagedTenantFeatures, updateManagedTenantFeature, fetchTeachers, deleteTeacher, fetchTeacherStudents, updateTeacherClass, resetAccountPassword, deleteManagedStudent }
+  return { user, profile, initialized, loading, isTeacher, isStudent, isAdmin, tenantFeatures, fetchTenantFeatures, hasFeature, init, recordActivity, syncSessionExpiry, signUp, fetchRegistrationClasses, fetchRegistrationEnabled, updateRegistrationEnabled, signIn, signOut, refreshProfile, changeOwnPassword, updateClassName, createTeacher, fetchManagedTenantFeatures, updateManagedTenantFeature, fetchTeachers, deleteTeacher, fetchTeacherStudents, updateTeacherClass, resetAccountPassword, deleteManagedStudent }
 })

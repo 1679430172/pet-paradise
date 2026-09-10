@@ -39,6 +39,7 @@
       </Transition>
 
       <p v-if="route.query.reason === 'session'" class="auth-switch">登录状态已更新或过期，请重新登录，完成后会返回打卡页。</p>
+      <p v-else-if="route.query.reason === 'expired'" class="auth-switch">已连续 30 分钟没有操作，请重新登录。</p>
       <p v-if="error" class="auth-error">{{ error }}</p>
 
       <button type="submit" class="btn btn-primary auth-btn" :disabled="loading">

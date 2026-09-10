@@ -14,16 +14,18 @@ export const sessionKey = (id: string) => `photo_checkin_session:${id}`
 export const sessionErrorKey = (id: string) => `photo_checkin_error:${id}`
 export const checkinToken = (id: string) => localStorage.getItem(sessionKey(id)) || sessionStorage.getItem(sessionKey(id)) || ''
 
-export async function establishCheckinSession(profileId: string, password: string) {
+export async function establishCheckinSession(profileId: string, password: string): Promise<string | null> {
   localStorage.removeItem(sessionErrorKey(profileId))
   localStorage.removeItem(sessionKey(profileId))
   sessionStorage.removeItem(sessionKey(profileId))
   try {
-    const result = await checkinApi<{ token: string }>(profileId, 'login', { profileId, password })
+    const result = await checkinApi<{ token: string; expires: string }>(profileId, 'login', { profileId, password })
     localStorage.setItem(sessionKey(profileId), result.token)
+    return result.expires
   } catch (error) {
     // 打卡服务尚未部署时，保留原有网站登录，不阻断其他功能。
     localStorage.setItem(sessionErrorKey(profileId), error instanceof Error ? error.message : '打卡服务暂不可用')
+    return null
   }
 }
 
