@@ -17,9 +17,8 @@
         class="form-input"
         placeholder="搜索学生..."
         aria-label="搜索学生"
-        @input="handleSearch"
       />
-      <span class="result-count">显示 {{ teacherStore.students.length }} 名学生</span>
+      <span class="result-count">显示 {{ filteredStudents.length }} 名学生</span>
     </div>
 
     <div class="batch-toolbar">
@@ -28,7 +27,7 @@
           type="checkbox"
           :checked="allVisibleSelected"
           :indeterminate="someVisibleSelected"
-          :disabled="teacherStore.students.length === 0"
+          :disabled="filteredStudents.length === 0"
           @change="toggleSelectAll"
         />
         <span>{{ allVisibleSelected ? '取消全选' : '全选当前学生' }}</span>
@@ -46,10 +45,10 @@
     </div>
 
     <div v-if="teacherStore.loading" class="loading-state">加载中...</div>
-    <div v-else-if="teacherStore.students.length === 0" class="empty-state card">{{ searchQuery ? '没有找到匹配的学生，试试其他名字吧。' : '班级里还没有学生，点击「新增学生」开始吧。' }}</div>
+    <div v-else-if="filteredStudents.length === 0" class="empty-state card">{{ normalizedSearchQuery ? '没有找到匹配的学生，试试其他名字吧。' : '班级里还没有学生，点击「新增学生」开始吧。' }}</div>
     <div v-else class="student-list">
       <div
-        v-for="student in teacherStore.students"
+        v-for="student in filteredStudents"
         :key="student.id"
         class="student-card card"
         :class="{ 'is-selected': selectedStudentIds.includes(student.id) }"
@@ -167,7 +166,15 @@ const awarding = ref(false)
 const awardProgress = ref({ completed: 0, total: 0 })
 const toast = ref('')
 
-const visibleStudentIds = computed(() => teacherStore.students.map(student => student.id))
+const normalizedSearchQuery = computed(() => searchQuery.value.trim().toLocaleLowerCase())
+const filteredStudents = computed(() => {
+  const keyword = normalizedSearchQuery.value
+  if (!keyword) return teacherStore.students
+  return teacherStore.students.filter(student => (
+    student.username.toLocaleLowerCase().includes(keyword)
+  ))
+})
+const visibleStudentIds = computed(() => filteredStudents.value.map(student => student.id))
 const allVisibleSelected = computed(() => (
   visibleStudentIds.value.length > 0
   && visibleStudentIds.value.every(id => selectedStudentIds.value.includes(id))
@@ -193,10 +200,6 @@ onMounted(async () => {
     tasksStore.fetchTasks(),
   ])
 })
-
-function handleSearch() {
-  teacherStore.fetchStudents(searchQuery.value || undefined)
-}
 
 async function goDetail(id: string) {
   detailStudentId.value = id
@@ -277,7 +280,7 @@ async function confirmAward(task: Task) {
         : `发放失败：${error.message}`
       setTimeout(() => { toast.value = '' }, 3500)
     }
-    if (awardedCount > 0) await teacherStore.fetchStudents(searchQuery.value || undefined)
+    if (awardedCount > 0) await teacherStore.fetchStudents()
   } finally {
     awarding.value = false
   }
