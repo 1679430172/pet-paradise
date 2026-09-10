@@ -52,14 +52,28 @@
             <h2 class="pet-name">{{ petStore.currentPet.name }}</h2>
             <span class="level-badge">Lv.{{ petStore.currentPet.level }}</span>
           </div>
-          <div class="xp-bar">
-            <div class="progress-bar">
-              <div class="progress-fill" :style="{ width: xpPercent + '%', background: 'linear-gradient(90deg, var(--color-primary), var(--color-secondary))' }"></div>
+          <div class="pet-status-list" aria-label="宠物成长状态">
+            <div class="pet-status-row">
+              <div class="pet-status-meta">
+                <span class="pet-status-label">经验值</span>
+                <span class="pet-status-value">
+                  <template v-if="petStore.currentPet.level >= MAX_LEVEL">已满级</template>
+                  <template v-else>{{ xpLabel(petStore.currentPet) }}</template>
+                </span>
+              </div>
+              <div class="progress-bar">
+                <div class="progress-fill" :style="{ width: xpPercent + '%', background: 'linear-gradient(90deg, var(--color-primary), var(--color-secondary))' }"></div>
+              </div>
             </div>
-            <span class="xp-text">
-              <template v-if="petStore.currentPet.level >= MAX_LEVEL">已进化为完全体</template>
-              <template v-else>{{ xpLabel(petStore.currentPet) }}</template>
-            </span>
+            <div class="pet-status-row">
+              <div class="pet-status-meta">
+                <span class="pet-status-label">饱食度</span>
+                <span class="pet-status-value">{{ petStore.currentPet.hunger }} / 100</span>
+              </div>
+              <div class="progress-bar">
+                <div class="progress-fill hunger-fill" :style="{ width: petStore.currentPet.hunger + '%' }"></div>
+              </div>
+            </div>
           </div>
         </div>
       </div>
@@ -74,20 +88,6 @@
             <span class="points-icon">⭐</span>
             <strong>{{ authStore.user?.points || 0 }}</strong>
             <span>积分</span>
-          </div>
-        </div>
-
-        <!-- 状态条 -->
-        <div class="stats-grid">
-          <div class="stat-item">
-            <span class="stat-icon">🍖</span>
-            <div class="stat-info">
-              <span class="stat-label">当前饱食度</span>
-              <div class="progress-bar">
-                <div class="progress-fill" :style="{ width: petStore.currentPet.hunger + '%', background: '#4ECDC4' }"></div>
-              </div>
-            </div>
-            <span class="stat-val">{{ petStore.currentPet.hunger }}</span>
           </div>
         </div>
 
@@ -303,12 +303,12 @@ onMounted(async () => {
   justify-content: center;
   overflow: visible;
   width: min(300px, calc(100vw - 56px));
-  height: 480px;
-  min-height: 480px;
+  height: 500px;
+  min-height: 500px;
   box-sizing: border-box;
   text-align: center;
-  padding: 42px 24px 28px;
-  margin: 0 auto 28px;
+  padding: 34px 24px 24px;
+  margin: 0 auto 22px;
 }
 
 .pet-display[class*="cosmetic-frame-"]::after { inset: -5.56%; border-radius: 30px; }
@@ -318,7 +318,7 @@ onMounted(async () => {
 .pet-display.cosmetic-frame-gold { --cosmetic-frame-image: url('/assets/shop/frame-gold-portrait-v3.png'); }
 
 .care-panel {
-  padding: 24px;
+  padding: 22px 24px 24px;
   border: 1px solid rgba(232, 218, 205, 0.9);
   background: rgba(255, 255, 255, 0.88);
   box-shadow: 0 12px 32px rgba(78, 52, 43, 0.08);
@@ -329,7 +329,7 @@ onMounted(async () => {
   align-items: flex-start;
   justify-content: space-between;
   gap: 16px;
-  margin-bottom: 22px;
+  margin-bottom: 10px;
 }
 
 .care-eyebrow {
@@ -459,7 +459,7 @@ onMounted(async () => {
 .pet-identity {
   width: 100%;
   box-sizing: border-box;
-  padding: 14px 18px 13px;
+  padding: 15px 18px 17px;
   border: 1px solid rgba(255, 255, 255, 0.82);
   border-radius: 17px;
   background: rgba(255, 255, 255, 0.72);
@@ -472,7 +472,7 @@ onMounted(async () => {
   align-items: center;
   justify-content: space-between;
   gap: 14px;
-  margin-bottom: 10px;
+  margin-bottom: 14px;
 }
 
 .pet-name {
@@ -493,55 +493,32 @@ onMounted(async () => {
   white-space: nowrap;
 }
 
-.xp-bar {
-  width: 100%;
-}
-
-.xp-text {
-  font-size: 0.7rem;
-  color: var(--color-text-muted);
-  margin-top: 4px;
-  display: block;
-}
-
-.stats-grid {
+.pet-status-list {
   display: flex;
   flex-direction: column;
-  gap: 10px;
-  margin-bottom: 20px;
+  gap: 13px;
 }
 
-.stat-item {
+.pet-status-row {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.pet-status-meta {
   display: flex;
   align-items: center;
-  gap: 10px;
-  background: white;
-  padding: 12px 16px;
-  border-radius: var(--radius-sm);
-  border: 1px solid var(--color-border);
-}
-
-.stat-icon {
-  font-size: 1.3rem;
-}
-
-.stat-info {
-  flex: 1;
-}
-
-.stat-label {
-  font-size: 0.75rem;
+  justify-content: space-between;
+  gap: 12px;
   color: var(--color-text-muted);
-  display: block;
-  margin-bottom: 4px;
+  font-size: .7rem;
+  line-height: 1;
 }
 
-.stat-val {
-  font-size: 0.8rem;
-  font-weight: 600;
-  min-width: 28px;
-  text-align: right;
-}
+.pet-status-label { font-weight: 700; color: var(--color-text); }
+.pet-status-value { font-variant-numeric: tabular-nums; }
+.hunger-fill { background: linear-gradient(90deg, #49c8ba, #7bdac6); }
+.pet-status-row .progress-bar { height: 8px; }
 
 .actions-grid {
   display: grid;
@@ -615,4 +592,22 @@ onMounted(async () => {
 .upgrade-showcase-enter-from, .upgrade-showcase-leave-to { opacity: 0; }
 @keyframes center-pet-upgrade { 0% { opacity: 0; transform: translateY(160px) scale(.5); filter: brightness(1); } 24% { opacity: 1; transform: translateY(-28px) scale(1.2); filter: brightness(1.75) saturate(1.55) drop-shadow(0 0 34px #fff3a3); } 55% { transform: translateY(-44px) scale(1.32) rotate(-2deg); filter: brightness(1.48) saturate(1.75) drop-shadow(0 0 48px #ff65c7); } 72% { transform: translateY(-30px) scale(1.22) rotate(2deg); } 100% { opacity: 1; transform: translateY(0) scale(1); filter: brightness(1); } }
 @keyframes upgrade-title-in { 0%, 25% { opacity: 0; transform: translateY(15px) scale(.84); } 45%, 88% { opacity: 1; transform: translateY(0) scale(1); } 100% { opacity: 0; } }
+
+@media (max-width: 767px) {
+  .pet-display {
+    height: 440px;
+    min-height: 440px;
+    padding: 20px 22px;
+    margin-bottom: 16px;
+  }
+
+  .pet-avatar { margin-bottom: 2px; }
+  .pet-identity { padding: 13px 16px 14px; }
+  .pet-title-row { margin-bottom: 11px; }
+  .pet-status-list { gap: 10px; }
+  .care-panel { padding: 18px 20px 20px; }
+  .care-heading { margin-bottom: 4px; }
+  .care-divider { margin: 16px 0 12px; }
+  .action-btn { padding: 15px 8px; }
+}
 </style>

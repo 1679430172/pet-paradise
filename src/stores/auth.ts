@@ -9,6 +9,7 @@ export interface Profile {
   password?: string
   role: 'student' | 'teacher'
   points: number
+  badges?: string[]
   avatar_url: string | null
   class_name: string | null
   teacher_id: string | null

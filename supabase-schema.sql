@@ -21,6 +21,7 @@ CREATE TABLE IF NOT EXISTS profiles (
 ALTER TABLE profiles ADD COLUMN IF NOT EXISTS teacher_id UUID REFERENCES profiles(id) ON DELETE SET NULL;
 ALTER TABLE profiles ADD COLUMN IF NOT EXISTS is_admin BOOLEAN NOT NULL DEFAULT false;
 CREATE INDEX IF NOT EXISTS profiles_teacher_id_idx ON profiles(teacher_id);
+ALTER TABLE profiles ADD COLUMN IF NOT EXISTS badges JSONB NOT NULL DEFAULT '[]'::jsonb;
 
 -- Student names only need to be unique inside the same teacher's class.
 -- Teacher/admin account names remain globally unique among teacher accounts.
@@ -49,6 +50,38 @@ CREATE TABLE IF NOT EXISTS pets (
   created_at TIMESTAMPTZ DEFAULT now()
 );
 CREATE INDEX IF NOT EXISTS pets_owner_id_idx ON pets(owner_id);
+
+-- 徽章属于账号。兼容历史 pets.badges 写入，并把多只宠物的已有徽章合并到账号。
+UPDATE profiles profile
+SET badges = COALESCE((
+  SELECT jsonb_agg(DISTINCT badge)
+  FROM (
+    SELECT jsonb_array_elements_text(COALESCE(profile.badges, '[]'::jsonb)) AS badge
+    UNION
+    SELECT jsonb_array_elements_text(COALESCE(pet.badges, '[]'::jsonb)) AS badge
+    FROM pets pet WHERE pet.owner_id = profile.id
+  ) merged
+), '[]'::jsonb);
+
+CREATE OR REPLACE FUNCTION sync_pet_badges_to_profile() RETURNS TRIGGER
+LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
+BEGIN
+  UPDATE profiles profile
+  SET badges = (
+    SELECT COALESCE(jsonb_agg(DISTINCT badge), '[]'::jsonb)
+    FROM jsonb_array_elements_text(
+      COALESCE(profile.badges, '[]'::jsonb) || COALESCE(NEW.badges, '[]'::jsonb)
+    ) AS item(badge)
+  )
+  WHERE profile.id = NEW.owner_id;
+  RETURN NEW;
+END;
+$$;
+
+DROP TRIGGER IF EXISTS sync_pet_badges_to_profile ON pets;
+CREATE TRIGGER sync_pet_badges_to_profile
+AFTER INSERT OR UPDATE OF badges ON pets
+FOR EACH ROW EXECUTE FUNCTION sync_pet_badges_to_profile();
 
 -- ============== 3. 日记表 ==============
 CREATE TABLE IF NOT EXISTS diary_entries (
