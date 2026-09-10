@@ -18,6 +18,17 @@ export interface Profile {
 }
 
 export type TenantFeature = 'travel' | 'photo_checkin' | 'shop'
+export type AnnouncementType = 'notice' | 'celebration' | 'reminder' | 'maintenance' | 'other'
+export interface AnnouncementSetting {
+  id?: string
+  enabled: boolean
+  type: AnnouncementType
+  title: string
+  content: string
+  revision: string
+  end_at: string | null
+  created_at?: string
+}
 export const tenantFeatureKeys: TenantFeature[] = ['travel', 'photo_checkin', 'shop']
 const USER_ID_KEY = 'pet_user_id'
 const SESSION_EXPIRES_KEY = 'pet_session_expires_at'
@@ -187,6 +198,65 @@ export const useAuthStore = defineStore('auth', () => {
     const savedEnabled = data?.value?.enabled === true
     if (savedEnabled !== enabled) return { data: null, error: new Error('注册设置未能正确保存，请重试') }
     return { data: savedEnabled, error: null }
+  }
+
+  async function fetchAnnouncement() {
+    const { data, error } = await supabase
+      .from('announcements')
+      .select('id, enabled, type, title, content, end_at, created_at')
+      .eq('enabled', true)
+      .or(`end_at.is.null,end_at.gt.${new Date().toISOString()}`)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle()
+    if (error) return { data: null, error }
+    if (!data) return { data: null, error: null }
+    return {
+      data: {
+        id: data.id,
+        enabled: data.enabled === true,
+        type: ['notice', 'celebration', 'reminder', 'maintenance', 'other'].includes(data.type || '')
+          ? data.type as AnnouncementType
+          : 'notice',
+        title: data.title || '系统公告',
+        content: data.content || '',
+        revision: data.created_at,
+        end_at: data.end_at,
+        created_at: data.created_at,
+      } satisfies AnnouncementSetting,
+      error: null,
+    }
+  }
+
+  async function fetchAnnouncementHistory() {
+    if (!user.value || !isAdmin.value) return { data: [], error: new Error('仅管理员可查看公告历史') }
+    return await supabase
+      .from('announcements')
+      .select('id, enabled, type, title, content, end_at, created_at')
+      .order('created_at', { ascending: false })
+      .limit(30)
+  }
+
+  async function updateAnnouncement(input: Pick<AnnouncementSetting, 'enabled' | 'type' | 'title' | 'content' | 'end_at'>) {
+    if (!user.value || !isAdmin.value) return { data: null, error: new Error('仅管理员可修改公告') }
+    const title = input.title.trim()
+    const content = input.content.trim()
+    if (!title) return { data: null, error: new Error('公告标题不能为空') }
+    if (input.enabled && !content) return { data: null, error: new Error('启用公告前请填写公告内容') }
+    if (input.enabled && (!input.end_at || Date.parse(input.end_at) <= Date.now())) return { data: null, error: new Error('启用公告时，结束时间必须晚于当前时间') }
+    const { data, error } = await supabase
+      .from('announcements')
+      .insert({ enabled: input.enabled, type: input.type, title, content, end_at: input.end_at })
+      .select('id, enabled, type, title, content, end_at, created_at')
+      .single()
+    if (error) return { data: null, error }
+    const { error: disableError } = await supabase
+      .from('announcements')
+      .update({ enabled: false })
+      .eq('enabled', true)
+      .neq('id', data.id)
+    if (disableError) return { data: null, error: disableError }
+    return { data, error: null }
   }
 
   async function signUp(username: string, password: string, teacherId: string) {
@@ -491,5 +561,5 @@ export const useAuthStore = defineStore('auth', () => {
     return { error }
   }
 
-  return { user, profile, initialized, loading, isTeacher, isStudent, isAdmin, tenantFeatures, fetchTenantFeatures, hasFeature, init, recordActivity, syncSessionExpiry, signUp, fetchRegistrationClasses, fetchRegistrationEnabled, updateRegistrationEnabled, signIn, signOut, refreshProfile, changeOwnPassword, updateClassName, createTeacher, fetchManagedTenantFeatures, updateManagedTenantFeature, fetchTeachers, deleteTeacher, fetchTeacherStudents, updateTeacherClass, resetAccountPassword, deleteManagedStudent }
+  return { user, profile, initialized, loading, isTeacher, isStudent, isAdmin, tenantFeatures, fetchTenantFeatures, hasFeature, init, recordActivity, syncSessionExpiry, signUp, fetchRegistrationClasses, fetchRegistrationEnabled, updateRegistrationEnabled, fetchAnnouncement, fetchAnnouncementHistory, updateAnnouncement, signIn, signOut, refreshProfile, changeOwnPassword, updateClassName, createTeacher, fetchManagedTenantFeatures, updateManagedTenantFeature, fetchTeachers, deleteTeacher, fetchTeacherStudents, updateTeacherClass, resetAccountPassword, deleteManagedStudent }
 })

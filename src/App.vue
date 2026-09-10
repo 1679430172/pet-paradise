@@ -3,6 +3,7 @@
     <router-view />
     <BottomNav v-if="showStudentNav" />
     <TeacherNav v-if="showTeacherNav" />
+    <AnnouncementDialog />
   </div>
 </template>
 
@@ -12,6 +13,7 @@ import { useRoute } from 'vue-router'
 import { useAuthStore } from './stores/auth'
 import BottomNav from './components/common/BottomNav.vue'
 import TeacherNav from './components/teacher/TeacherNav.vue'
+import AnnouncementDialog from './components/common/AnnouncementDialog.vue'
 
 const route = useRoute()
 const authStore = useAuthStore()

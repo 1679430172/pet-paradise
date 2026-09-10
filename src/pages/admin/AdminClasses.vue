@@ -51,6 +51,42 @@
       {{ success || error }}
     </div>
 
+    <section class="announcement-card card">
+      <div class="announcement-heading">
+        <div><span class="eyebrow">SITE ANNOUNCEMENT</span><h2>公告弹窗</h2><p>启用后，老师和学生每次登录或刷新页面都会看到公告，直至管理员停用。</p></div>
+        <label class="switch" :class="{ disabled: announcementLoading || announcementSaving }">
+          <input v-model="announcementForm.enabled" type="checkbox" :disabled="announcementLoading || announcementSaving" />
+          <span class="switch-track"><span></span></span>
+        </label>
+      </div>
+      <div class="announcement-types" aria-label="公告类型">
+        <button v-for="option in announcementTypes" :key="option.value" type="button" :class="{ active: announcementForm.type === option.value }" @click="announcementForm.type = option.value">
+          <span>{{ option.icon }}</span><b>{{ option.label }}</b><small>{{ option.description }}</small>
+        </button>
+      </div>
+      <div class="announcement-form">
+        <label><span>公告标题</span><input v-model="announcementForm.title" class="form-input" maxlength="50" placeholder="例如：本周活动通知" /></label>
+        <label><span>公告内容</span><textarea v-model="announcementForm.content" class="form-input" maxlength="1000" rows="5" placeholder="请输入要通知老师和学生的内容"></textarea><small>{{ announcementForm.content.length }} / 1000</small></label>
+        <label><span>自动结束时间</span><input v-model="announcementForm.endAt" class="form-input" type="datetime-local" :min="minimumEndTime" /><small>到期后将自动停止弹出</small></label>
+      </div>
+      <div class="announcement-actions">
+        <span v-if="announcementMessage" class="save-message" :class="{ error: announcementError }">{{ announcementMessage }}</span>
+        <button class="primary-action" :disabled="announcementLoading || announcementSaving" @click="saveAnnouncement">{{ announcementSaving ? '保存中...' : '保存公告' }}</button>
+      </div>
+      <div class="announcement-history">
+        <div class="history-heading"><h3>历史记录</h3><span>最近 {{ announcementHistory.length }} 条</span></div>
+        <div v-if="historyLoading" class="history-empty">正在加载...</div>
+        <div v-else-if="announcementHistory.length === 0" class="history-empty">还没有发布记录</div>
+        <div v-else class="history-list">
+          <article v-for="item in announcementHistory" :key="item.id">
+            <span class="history-icon">{{ announcementTypeMeta(item.type).icon }}</span>
+            <div><strong>{{ item.title }}</strong><p>{{ item.content }}</p><small>发布：{{ formatDateTime(item.created_at) }} · 结束：{{ item.end_at ? formatDateTime(item.end_at) : '未设置' }}</small></div>
+            <span class="history-status" :class="announcementStatus(item).className">{{ announcementStatus(item).label }}</span>
+          </article>
+        </div>
+      </div>
+    </section>
+
     <Transition name="dialog-fade">
       <div v-if="showCreateForm" class="create-dialog-overlay" @click.self="closeCreateForm">
         <section class="create-dialog" role="dialog" aria-modal="true" aria-labelledby="create-class-title">
@@ -195,7 +231,7 @@
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
-import { tenantFeatureKeys, useAuthStore, type TenantFeature } from '../../stores/auth'
+import { tenantFeatureKeys, useAuthStore, type AnnouncementSetting, type AnnouncementType, type TenantFeature } from '../../stores/auth'
 
 interface TeacherItem {
   id: string
@@ -233,6 +269,21 @@ const registrationEnabled = ref(true)
 const registrationLoading = ref(true)
 const registrationMessage = ref('')
 const registrationError = ref('')
+const announcementLoading = ref(true)
+const announcementSaving = ref(false)
+const announcementError = ref(false)
+const announcementMessage = ref('')
+const announcementForm = reactive<{ enabled: boolean; type: AnnouncementType; title: string; content: string; endAt: string }>({ enabled: false, type: 'notice', title: '系统公告', content: '', endAt: '' })
+const announcementHistory = ref<AnnouncementSetting[]>([])
+const historyLoading = ref(true)
+const minimumEndTime = computed(() => toDateTimeLocal(new Date(Date.now() + 60 * 1000)))
+const announcementTypes: { value: AnnouncementType; icon: string; label: string; description: string }[] = [
+  { value: 'notice', icon: '📣', label: '通知', description: '常规消息' },
+  { value: 'celebration', icon: '🎉', label: '庆祝', description: '喜讯与表扬' },
+  { value: 'reminder', icon: '⏰', label: '提醒', description: '时间与事项' },
+  { value: 'maintenance', icon: '🛠️', label: '维护', description: '服务调整' },
+  { value: 'other', icon: '💬', label: '其他', description: '其他内容' },
+]
 const featureOptions: { key: TenantFeature; icon: string; label: string; description: string }[] = [
   { key: 'travel', icon: '🧳', label: '旅游', description: '旅行券、明信片和教师代管' },
   { key: 'photo_checkin', icon: '📷', label: '照片打卡', description: '学生上传与老师审核奖励' },
@@ -270,8 +321,71 @@ function closeCreateForm() {
 }
 
 onMounted(async () => {
-  await Promise.all([loadTeachers(), loadRegistrationSetting()])
+  await Promise.all([loadTeachers(), loadRegistrationSetting(), loadAnnouncement(), loadAnnouncementHistory()])
 })
+
+async function loadAnnouncement() {
+  announcementLoading.value = true
+  const result = await authStore.fetchAnnouncement()
+  if (result.error) {
+    announcementError.value = true
+    announcementMessage.value = '公告加载失败，请刷新后重试。'
+  } else if (result.data) {
+    announcementForm.enabled = result.data.enabled
+    announcementForm.type = result.data.type
+    announcementForm.title = result.data.title
+    announcementForm.content = result.data.content
+    announcementForm.endAt = result.data.end_at ? toDateTimeLocal(new Date(result.data.end_at)) : ''
+  }
+  announcementLoading.value = false
+}
+
+async function saveAnnouncement() {
+  announcementSaving.value = true
+  announcementError.value = false
+  announcementMessage.value = ''
+  const result = await authStore.updateAnnouncement({
+    enabled: announcementForm.enabled,
+    type: announcementForm.type,
+    title: announcementForm.title,
+    content: announcementForm.content,
+    end_at: announcementForm.endAt ? new Date(announcementForm.endAt).toISOString() : null,
+  })
+  if (result.error) {
+    announcementError.value = true
+    announcementMessage.value = result.error.message || '公告保存失败'
+  } else {
+    announcementMessage.value = announcementForm.enabled ? '公告已发布。' : '公告已保存并停用。'
+    await loadAnnouncementHistory()
+  }
+  announcementSaving.value = false
+}
+
+async function loadAnnouncementHistory() {
+  historyLoading.value = true
+  const result = await authStore.fetchAnnouncementHistory()
+  announcementHistory.value = (result.data || []) as AnnouncementSetting[]
+  historyLoading.value = false
+}
+
+function announcementTypeMeta(type: AnnouncementType) {
+  return announcementTypes.find(item => item.value === type) || announcementTypes[0]
+}
+
+function announcementStatus(item: AnnouncementSetting) {
+  if (!item.enabled) return { label: '已停用', className: 'disabled' }
+  if (item.end_at && Date.parse(item.end_at) <= Date.now()) return { label: '已到期', className: 'expired' }
+  return { label: '展示中', className: 'active' }
+}
+
+function toDateTimeLocal(date: Date) {
+  const offset = date.getTimezoneOffset() * 60_000
+  return new Date(date.getTime() - offset).toISOString().slice(0, 16)
+}
+
+function formatDateTime(value?: string) {
+  return value ? new Date(value).toLocaleString('zh-CN', { hour12: false }) : '—'
+}
 
 async function loadRegistrationSetting() {
   registrationLoading.value = true
@@ -442,7 +556,7 @@ async function handleLogout() {
 
 <style scoped>
 .admin-page { --admin-purple:#7657d5; --admin-ink:#292238; min-height:100vh; padding:38px 28px 100px; background:#f8f7fb; color:var(--admin-ink); }
-.admin-header,.overview-grid,.classes-section,.notice { max-width:1120px; margin-left:auto; margin-right:auto; }
+.admin-header,.overview-grid,.classes-section,.notice,.announcement-card { max-width:1120px; margin-left:auto; margin-right:auto; }
 .admin-header { margin-bottom:28px; display:flex; justify-content:space-between; align-items:flex-end; gap:24px; }
 .eyebrow { color:#9a8ab6; font-size:.68rem; font-weight:800; letter-spacing:.16em; }
 .admin-header h1 { margin:6px 0 4px; font-size:2rem; letter-spacing:-.04em; }
@@ -454,6 +568,23 @@ async function handleLogout() {
 .primary-action:disabled { opacity:.55; cursor:wait; }
 .secondary-action,.logout-btn { color:#6f6877; background:white; border:1px solid #e7e3ec; }
 .overview-grid { display:grid; grid-template-columns:180px 180px minmax(360px,1fr); gap:14px; margin-bottom:28px; }
+.announcement-card { box-sizing:border-box; margin-bottom:28px; padding:22px; border:1px solid #ece8f0; box-shadow:0 3px 14px rgba(57,42,74,.05); }
+.announcement-heading { display:flex; align-items:center; justify-content:space-between; gap:24px; }
+.announcement-heading h2 { margin:5px 0 4px; font-size:1.15rem; }
+.announcement-heading p { margin:0; color:#8a8392; font-size:.82rem; }
+.announcement-form { display:grid; grid-template-columns:minmax(220px,.7fr) minmax(320px,1.3fr); gap:16px; margin-top:18px; }
+.announcement-form label:last-child { grid-column:1/-1; max-width:360px; }
+.announcement-types { display:grid; grid-template-columns:repeat(5,1fr); gap:9px; margin-top:18px; }
+.announcement-types button { display:grid; grid-template-columns:auto 1fr; align-items:center; gap:2px 8px; padding:11px 12px; border:1px solid #e9e4ed; border-radius:12px; color:#655d69; background:#fff; cursor:pointer; text-align:left; }
+.announcement-types button > span { grid-row:1/3; font-size:1.2rem; }.announcement-types b { font-size:.78rem; }.announcement-types small { color:#9a929f; font-size:.66rem; }
+.announcement-types button.active { border-color:#8d72dc; color:#6c4dcc; background:#f5f1ff; box-shadow:0 0 0 2px rgba(118,87,213,.08); }
+.announcement-form label { display:flex; flex-direction:column; gap:7px; color:#655d69; font-size:.78rem; font-weight:700; }
+.announcement-form textarea { box-sizing:border-box; resize:vertical; min-height:112px; line-height:1.6; font-family:inherit; }
+.announcement-form small { align-self:flex-end; color:#a49daa; font-weight:400; }
+.announcement-actions { display:flex; align-items:center; justify-content:flex-end; gap:14px; margin-top:14px; }
+.save-message { color:#36865c; font-size:.8rem; }.save-message.error { color:#c7475e; }
+.announcement-history { margin-top:20px; padding-top:18px; border-top:1px solid #eee9f1; }.history-heading { display:flex; align-items:center; justify-content:space-between; }.history-heading h3 { margin:0; font-size:.9rem; }.history-heading>span { color:#9a929f; font-size:.7rem; }
+.history-list { display:grid; gap:8px; margin-top:11px; }.history-list article { display:grid; grid-template-columns:34px 1fr auto; align-items:center; gap:11px; padding:11px 12px; border:1px solid #eee9f1; border-radius:11px; background:#fcfbfd; }.history-icon { font-size:1.1rem; }.history-list strong { font-size:.78rem; }.history-list p { overflow:hidden; margin:3px 0; color:#827a87; font-size:.7rem; text-overflow:ellipsis; white-space:nowrap; }.history-list small { color:#aaa2ae; font-size:.64rem; }.history-status { padding:4px 8px; border-radius:999px; font-size:.66rem; font-weight:700; }.history-status.active { color:#198452; background:#e5f7ed; }.history-status.expired { color:#9b7419; background:#fff3d7; }.history-status.disabled { color:#817987; background:#efedf1; }.history-empty { padding:18px; color:#999; text-align:center; font-size:.75rem; }
 .metric-card,.registration-card { padding:18px; border:1px solid #ece8f0; box-shadow:0 3px 14px rgba(57,42,74,.05); }
 .metric-card { display:flex; align-items:center; gap:13px; }
 .metric-icon { width:42px; height:42px; display:grid; place-items:center; flex-shrink:0; border-radius:12px; font-weight:800; }
@@ -482,5 +613,6 @@ async function handleLogout() {
 .dialog-overlay { position:fixed; inset:0; z-index:300; display:grid; place-items:center; padding:20px; background:rgba(36,28,43,.5); backdrop-filter:blur(3px); }.password-dialog { width:min(380px,100%); padding:22px; }.password-dialog h3 { margin:0 0 7px; }.password-dialog p { color:#777; font-size:.84rem; margin-bottom:15px; }.dialog-actions { display:flex; justify-content:flex-end; gap:9px; margin-top:16px; }
 @keyframes modal-in { from { transform:translateY(10px) scale(.985); opacity:.4; } to { transform:translateY(0) scale(1); opacity:1; } }
 @media (max-width:900px) { .overview-grid { grid-template-columns:repeat(2,1fr); }.registration-card { grid-column:1/-1; }.class-grid { grid-template-columns:1fr; }.class-card.expanded { grid-column:auto; } }
-@media (max-width:700px) { .admin-page { padding:24px 16px 90px; }.admin-header { align-items:flex-start; }.admin-header h1 { font-size:1.6rem; }.header-actions { flex-direction:column; }.overview-grid { grid-template-columns:1fr 1fr; }.metric-card { padding:14px; }.registration-card { flex-direction:row; }.form-grid,.manage-grid { grid-template-columns:1fr; }.list-heading { align-items:stretch; flex-direction:column; }.search-box { box-sizing:border-box; width:100%; }.class-summary { flex-wrap:wrap; }.class-content { min-width:150px; }.student-count { order:4; margin-left:58px; }.student-row { flex-wrap:wrap; }.student-info { min-width:140px; }.drawer-overlay { padding:12px; }.manage-drawer { max-height:calc(100dvh - 24px); }.drawer-body { grid-template-columns:1fr; padding:16px; }.feature-box,.student-section,.danger-zone { grid-column:auto; }.feature-list { grid-template-columns:1fr; }.danger-zone { align-items:flex-start; } }
+@media (max-width:700px) { .admin-page { padding:24px 16px 90px; }.admin-header { align-items:flex-start; }.admin-header h1 { font-size:1.6rem; }.header-actions { flex-direction:column; }.overview-grid { grid-template-columns:1fr 1fr; }.metric-card { padding:14px; }.registration-card { flex-direction:row; }.announcement-form { grid-template-columns:1fr; }.announcement-heading { align-items:flex-start; }.form-grid,.manage-grid { grid-template-columns:1fr; }.list-heading { align-items:stretch; flex-direction:column; }.search-box { box-sizing:border-box; width:100%; }.class-summary { flex-wrap:wrap; }.class-content { min-width:150px; }.student-count { order:4; margin-left:58px; }.student-row { flex-wrap:wrap; }.student-info { min-width:140px; }.drawer-overlay { padding:12px; }.manage-drawer { max-height:calc(100dvh - 24px); }.drawer-body { grid-template-columns:1fr; padding:16px; }.feature-box,.student-section,.danger-zone { grid-column:auto; }.feature-list { grid-template-columns:1fr; }.danger-zone { align-items:flex-start; } }
+@media (max-width:700px) { .announcement-types { grid-template-columns:repeat(2,1fr); } }
 </style>

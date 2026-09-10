@@ -113,6 +113,16 @@ CREATE TABLE IF NOT EXISTS settings (
   updated_at TIMESTAMPTZ DEFAULT now()
 );
 
+CREATE TABLE IF NOT EXISTS announcements (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  type TEXT NOT NULL DEFAULT 'notice' CHECK (type IN ('notice', 'celebration', 'reminder', 'maintenance', 'other')),
+  title TEXT NOT NULL CHECK (char_length(title) BETWEEN 1 AND 50),
+  content TEXT NOT NULL CHECK (char_length(content) <= 1000),
+  enabled BOOLEAN NOT NULL DEFAULT true,
+  end_at TIMESTAMPTZ,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
 -- 三档喂食的默认积分消耗
 INSERT INTO settings (key, value)
 VALUES ('action_costs', '{"basic": 5, "nice": 10, "luxury": 20}')
@@ -126,6 +136,11 @@ ON CONFLICT (key) DO NOTHING;
 -- 是否允许学生从登录页自行注册账号
 INSERT INTO settings (key, value)
 VALUES ('registration_enabled', '{"enabled": true}')
+ON CONFLICT (key) DO NOTHING;
+
+-- 全站公告弹窗
+INSERT INTO settings (key, value)
+VALUES ('announcement', '{"enabled": false, "type": "notice", "title": "系统公告", "content": "", "revision": ""}')
 ON CONFLICT (key) DO NOTHING;
 
 -- ============== 6. 任务定义表 ==============
@@ -209,6 +224,14 @@ DROP POLICY IF EXISTS "允许插入设置" ON settings;
 CREATE POLICY "允许读取设置"     ON settings FOR SELECT USING (true);
 CREATE POLICY "允许修改设置"     ON settings FOR UPDATE USING (true);
 CREATE POLICY "允许插入设置"     ON settings FOR INSERT WITH CHECK (true);
+
+ALTER TABLE announcements ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "允许读取公告" ON announcements;
+DROP POLICY IF EXISTS "允许创建公告" ON announcements;
+DROP POLICY IF EXISTS "允许修改公告" ON announcements;
+CREATE POLICY "允许读取公告" ON announcements FOR SELECT USING (true);
+CREATE POLICY "允许创建公告" ON announcements FOR INSERT WITH CHECK (true);
+CREATE POLICY "允许修改公告" ON announcements FOR UPDATE USING (true);
 
 ALTER TABLE tasks ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "允许读取任务" ON tasks;
