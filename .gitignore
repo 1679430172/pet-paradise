@@ -13,7 +13,7 @@ dist-ssr
 *.local
 .env
 certs/*
-!certs/README.md
+supabase/.temp/
 
 # Editor directories and files
 .vscode/*

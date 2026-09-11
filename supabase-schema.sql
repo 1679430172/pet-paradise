@@ -1,6 +1,7 @@
 -- ==========================================
--- 班级宠物乐园（pet-paradise）— 全新部署 SQL
--- 在 Supabase Dashboard → SQL Editor 整段执行一次即可
+-- 班级宠物乐园（pet-paradise）— 唯一完整数据库 SQL
+-- 仅用于全新 Supabase 项目，在 Dashboard → SQL Editor 整段执行一次
+-- 本仓库不再维护或支持历史数据库的增量升级脚本
 -- 不依赖 Supabase Auth，使用自定义用户名/密码（SHA-256 + salt）
 -- ==========================================
 
@@ -16,8 +17,7 @@ CREATE TABLE IF NOT EXISTS profiles (
   created_at TIMESTAMPTZ DEFAULT now()
 );
 
--- Multi-teacher migration: students belong to a teacher; class_name remains
--- the human-readable class label. Safe to run against an existing database.
+-- Students belong to a teacher; class_name remains the human-readable class label.
 ALTER TABLE profiles ADD COLUMN IF NOT EXISTS teacher_id UUID REFERENCES profiles(id) ON DELETE SET NULL;
 ALTER TABLE profiles ADD COLUMN IF NOT EXISTS is_admin BOOLEAN NOT NULL DEFAULT false;
 CREATE INDEX IF NOT EXISTS profiles_teacher_id_idx ON profiles(teacher_id);

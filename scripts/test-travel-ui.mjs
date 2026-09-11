@@ -132,7 +132,7 @@ await page.screenshot({path:path.join(output,'collection-desktop.png'),fullPage:
 missingMigration=true
 await page.reload()
 await page.getByRole('alert').waitFor()
-assert.equal(await page.getByRole('button',{name:'使用 1 张旅行券出发 →'}).count(),0,'missing migration fails closed')
+assert.equal(await page.getByRole('button',{name:'使用 1 张旅行券出发 →'}).count(),0,'missing database capability fails closed')
 missingMigration=false
 await page.getByRole('button',{name:'重新加载'}).click()
 await page.getByRole('heading',{name:'攒一张券，去看看远方'}).waitFor()
@@ -257,4 +257,4 @@ await page.getByRole('heading',{name:'小云正在森林营地'}).waitFor()
 await page.screenshot({path:path.join(output,'independent-pet-travel-mobile.png'),fullPage:true})
 assert.deepEqual(errors,[])
 await browser.close();await db.close()
-console.log('PASS: four viewport sizes, no-ticket gating, task-issued tickets, departure spending, reload persistence, client-clock tampering, claim retry, equipment, redemption, migration recovery, teacher ticket-only task creation and mixed-reward editing; '+output)
+console.log('PASS: four viewport sizes, no-ticket gating, task-issued tickets, departure spending, reload persistence, client-clock tampering, claim retry, equipment, redemption, database recovery, teacher ticket-only task creation and mixed-reward editing; '+output)

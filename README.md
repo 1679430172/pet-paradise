@@ -1,59 +1,156 @@
 # 班级宠物乐园（pet-paradise）
 
-面向班级场景的"学生养宠 + 教师代管 + 任务积分"轻量级 Web 应用。学生通过完成任务获得积分，用积分喂养宠物以提升等级与形态；教师可代管学生、配置任务和积分消耗。
+面向班级场景的“学生养宠 + 教师管理 + 任务积分”Web 应用。前端使用 Vue 3、TypeScript、Vite 和 Pinia，数据、RPC、RLS 与文件存储使用 Supabase。
 
-> 本文档为**新部署**指南。所有历史迁移脚本已合并为单文件 [`supabase-schema.sql`](./supabase-schema.sql)。
-
-已有部署升级本次课堂功能：先执行 [`supabase-migration-classroom.sql`](./supabase-migration-classroom.sql)，再构建和发布前端，通知已打开页面的使用者刷新。不要重新执行初始化脚本。详细口径和验证方法见 [`docs/classroom-upgrade.md`](./docs/classroom-upgrade.md)。
-
-已启用课堂功能后升级「奖励撤销」：执行 [`supabase-migration-revoke-awards.sql`](./supabase-migration-revoke-awards.sql)，再发布前端。老师在「总览 → 积分发放记录」点击「撤销」。
-
----
+本文档是项目唯一部署说明，按全新环境从零部署编写。数据库只保留一个入口：[`supabase-schema.sql`](./supabase-schema.sql)。
 
 ## 一、功能概览
 
-- **角色**：学生 / 教师 / 管理员，单库共存，登录后按身份进入对应工作台
-- **宠物**：每只 1~20 级，5 个形态阶段（蛋 / 幼年 / 青年 / 成年 / 完全体），满 20 级后可领养下一只
-- **喂食**：仅一个状态（饱食度 hunger），通过三档"食物"消耗不同积分
-  | 档位 | icon | 默认积分 | hunger+ | xp+ |
-  |---|---|---|---|---|
-  | 普通粮 | 🍖 | 5 | 25 | 8 |
-  | 营养粮 | 🍗 | 10 | 55 | 18 |
-  | 豪华粮 | 🥩 | 20 | 100 | 40 |
-- **日记 / 点赞**：学生可发成长日记并互相点赞，每日首篇日记奖励积分
-- **任务系统**：教师创建任务并定义奖励积分；可记录学生完成情况
-- **本周成长榜**：按北京时间周一至周日的积分收入排名，喂食消费不影响排名，同分并列
-- **课堂大屏**：教师宠物页进入，支持全屏、卡片大小、勾选学生快捷发奖、奖励动画和带姓名的升级展示
-- **事务写入**：喂食扣分和成长、任务记录和发分、日记发布和首篇奖励分别在数据库事务中完成；传输重试复用请求编号
-- **教师端**：学生列表、单学生详情、宠物卡片视图（横向 Grid + 卡内左右切换多宠物）、任务管理、积分消耗设置
-- **管理员端**：创建和删除老师账号、修改班级名称、查看各班学生，以及重置老师/学生密码和删除学生
+- 学生、教师、管理员三类角色
+- 多宠物领养、喂养、等级和形态成长
+- 成长日记、点赞、任务奖励与积分收支
+- 本周成长榜、课堂大屏和奖励撤销
+- 商城装扮、旅行、旅行券、明信片与历史快照
+- 自主照片打卡、教师审核和定时清理
+- 班级功能开关和多类型公告
 
----
-
-## 二、技术栈
-
-- 前端：Vue 3.5 `<script setup>` + TypeScript + Vite + Pinia + Vue Router
-- 后端：Supabase（PostgreSQL + Row Level Security + Storage）
-- 部署：Docker + Nginx / Cloudflare Pages / 任意静态托管
-
-### Docker + Nginx 部署
-
-复制环境变量并填写 Supabase 配置：
-
-```bash
-cp .env.example .env
-```
-
-从腾讯云下载 Nginx 格式证书，并复制到以下固定路径：
+## 二、仓库结构
 
 ```text
-certs/fullchain.crt
-certs/private.key
+src/                              Vue 前端
+public/assets/                    宠物、商城和旅行素材
+supabase-schema.sql               唯一的完整数据库 SQL
+supabase/functions/photo-checkins 照片打卡 Edge Function
+scripts/                          本地验证脚本
+certs/                            Docker HTTPS 证书目录
+Dockerfile                        前端构建和 Nginx 镜像
+docker-compose.yml                Docker 部署配置
+nginx.conf                        HTTPS、SPA 和健康检查配置
+.github/workflows/deploy.yml      GitHub Pages 工作流
 ```
 
-其中 `fullchain.crt` 对应证书包中的 `*_bundle.crt`，`private.key` 对应 `*.key`。证书文件已被 Git 忽略，后续执行 `git pull` 不会覆盖。
+## 三、部署前准备
 
-设置私钥权限并启动：
+需要 Node.js 20/22、一个全新的 Supabase 项目，以及按部署方式选择的 Supabase CLI、Docker、域名和证书。
+
+复制 `.env.example` 为 `.env`，填写：
+
+```env
+VITE_SUPABASE_URL=https://<project-ref>.supabase.co
+VITE_SUPABASE_ANON_KEY=<anon-key>
+APP_PORT=80
+HTTPS_PORT=443
+```
+
+Supabase URL 和 anon key 可在 Dashboard → Project Settings → API 获取。`VITE_` 变量会在构建时写入静态文件，修改后必须重新构建。
+
+## 四、初始化 Supabase
+
+1. 打开新 Supabase 项目的 SQL Editor。
+2. 复制 [`supabase-schema.sql`](./supabase-schema.sql) 的全部内容。
+3. 整段执行一次并确认没有错误。
+4. 不需要再执行其他项目 SQL 文件。
+
+该脚本会创建当前项目需要的表、索引、函数、触发器、RLS 策略、Storage bucket、基础配置和默认管理员。
+
+执行后可做基础检查：
+
+```sql
+select table_name from information_schema.tables
+where table_schema = 'public' order by table_name;
+
+select routine_name from information_schema.routines
+where routine_schema = 'public' order by routine_name;
+
+select tablename, policyname, cmd from pg_policies
+where schemaname = 'public' order by tablename, policyname;
+```
+
+默认管理员为 `admin / 147258369lss`。当前管理页面不能修改管理员自己的密码，因此正式开放服务前，必须在 SQL Editor 将管理员密码更新为新密码的摘要；不要长期使用默认密码。摘要算法与前端一致：`SHA-256(新密码 + 'pet-paradise-salt')`。
+
+```sql
+update profiles
+set password = '<上面算法生成的 SHA-256 十六进制摘要>'
+where username = 'admin' and role = 'teacher' and is_admin = true;
+```
+
+## 五、部署照片打卡 Edge Function
+
+照片打卡表和私有 bucket 已包含在完整 SQL 中，但上传、审核和清理还依赖 Edge Function。
+
+```bash
+supabase login
+supabase secrets set PHOTO_CHECKIN_CLEANUP_SECRET=<至少32字节的随机密钥> --project-ref <project-ref>
+supabase functions deploy photo-checkins --project-ref <project-ref>
+```
+
+`supabase/config.toml` 已为该函数关闭平台 JWT 校验，因为项目使用自定义账号会话；函数内部仍会校验自己的会话令牌。`SUPABASE_URL` 和 `SUPABASE_SERVICE_ROLE_KEY` 使用 Supabase 运行环境提供的服务端变量，不能放进前端 `.env`。
+
+### 可选：每天自动清理
+
+先在 Supabase Vault 创建：
+
+- `photo_checkins_project_url`：`https://<project-ref>.supabase.co`
+- `photo_checkins_cleanup_secret`：与 Function Secret 相同的密钥
+
+然后在 SQL Editor 执行以下环境专属配置：
+
+```sql
+create extension if not exists pg_cron with schema pg_catalog;
+create extension if not exists pg_net with schema extensions;
+
+do $$
+begin
+  if not exists (select 1 from vault.decrypted_secrets where name='photo_checkins_project_url')
+     or not exists (select 1 from vault.decrypted_secrets where name='photo_checkins_cleanup_secret') then
+    raise exception '请先在 Vault 配置照片清理的项目地址和密钥';
+  end if;
+end $$;
+
+select cron.schedule(
+  'photo-checkins-daily-cleanup', '0 19 * * *',
+  $job$
+    select net.http_post(
+      url := (select decrypted_secret from vault.decrypted_secrets where name='photo_checkins_project_url' limit 1) || '/functions/v1/photo-checkins',
+      headers := jsonb_build_object(
+        'Content-Type', 'application/json',
+        'x-cleanup-secret', (select decrypted_secret from vault.decrypted_secrets where name='photo_checkins_cleanup_secret' limit 1)
+      ),
+      body := '{"action":"cleanup"}'::jsonb,
+      timeout_milliseconds := 120000
+    );
+  $job$
+);
+```
+
+`0 19 * * *` 是 UTC 19:00，即北京时间次日 03:00。调度成功只表示请求会发出，还应检查 Edge Function 日志、Storage 对象和 `net._http_response`。
+
+## 六、本地运行
+
+```bash
+npm ci
+npm run dev
+```
+
+生产构建与预览：
+
+```bash
+npm run build
+npm run preview
+```
+
+至少验证管理员登录和创建教师、教师创建学生和发奖、学生领养和喂养，以及照片上传和审核。构建成功不代表 Supabase、Storage、Edge Function 或浏览器业务流程已经可用。
+
+## 七、Docker + Nginx 部署
+
+将 Nginx 格式证书放到：
+
+```text
+certs/fullchain.crt   # 证书包中的 *_bundle.crt
+certs/private.key     # 证书包中的 *.key
+```
+
+证书和私钥已被 Git 忽略。Linux 主机执行：
 
 ```bash
 chmod 600 certs/private.key
@@ -61,152 +158,69 @@ chmod 644 certs/fullchain.crt
 docker compose up -d --build
 ```
 
-默认开放宿主机 `80` 和 `443` 端口，HTTP 会自动跳转到 `https://宠物.我爱你`。如需自定义端口，可在 `.env` 中修改 `APP_PORT` 和 `HTTPS_PORT`。
-
-常用维护命令：
+检查容器、日志、HTTP 和 HTTPS：
 
 ```bash
 docker compose ps
-docker compose logs -f
+docker compose logs --tail=100 pet-paradise
+curl -I http://127.0.0.1/healthz
+curl -I http://127.0.0.1
+curl -Ik https://127.0.0.1/healthz
+```
+
+`nginx.conf` 当前还包含 `13.231.205.217` 的 Let's Encrypt 证书路径。部署前确认目标主机存在：
+
+```text
+/etc/letsencrypt/live/13.231.205.217/fullchain.pem
+/etc/letsencrypt/live/13.231.205.217/privkey.pem
+```
+
+目标服务器或 IP 不同时，应先修改对应的 Nginx server 配置。容器显示 `healthy` 只证明容器内健康端点正常，不代表公网 DNS、HTTPS 证书或 Supabase 请求正常。
+
+后续更新：
+
+```bash
+git pull
 docker compose up -d --build
-docker compose down
+docker compose ps
+docker compose logs --tail=100 pet-paradise
+curl -I http://127.0.0.1/healthz
 ```
 
-`VITE_SUPABASE_URL` 和 `VITE_SUPABASE_ANON_KEY` 会在前端构建阶段写入静态文件，修改后必须重新构建镜像。
+## 八、GitHub Pages
 
----
+`.github/workflows/deploy.yml` 会在代码推送到 `master` 后发布 GitHub Pages。当前工作流没有注入 Supabase Secrets，会使用 `src/lib/supabase.ts` 的回退配置。要连接其他 Supabase 项目，应先在 GitHub Actions 中显式传入 `VITE_SUPABASE_URL` 和 `VITE_SUPABASE_ANON_KEY`。
 
-## 三、目录结构（核心）
+## 九、核心规则与安全边界
 
-```
-src/
-├── components/
-│   ├── common/BottomNav.vue
-│   ├── pet/PetAvatar.vue          # 宠物图片组件（按 species + level 取图，失败回退 emoji）
-│   └── teacher/TeacherNav.vue
-├── lib/
-│   ├── constants.ts               # 单一事实源：宠物种类/等级/形态/动作/积分
-│   └── supabase.ts
-├── pages/
-│   ├── HomePage.vue               # 学生主页（宠物 + 三档喂食按钮）
-│   ├── LoginPage.vue / RegisterPage.vue
-│   ├── PetCreatePage.vue          # 领养新宠物
-│   ├── DiaryPage.vue / DiaryEditorPage.vue / DiaryDetailPage.vue
-│   ├── FeedPage.vue / ProfilePage.vue
-│   ├── admin/AdminClasses.vue      # 管理员工作台：老师、班级与学生账号管理
-│   └── teacher/
-│       ├── TeacherDashboard.vue
-│       ├── TeacherStudents.vue / TeacherStudentDetail.vue
-│       ├── TeacherPets.vue        # 学生宠物卡片视图（核心 UI）
-│       ├── TeacherTasks.vue / TeacherTaskForm.vue
-│       ├── TeacherStats.vue
-│       └── TeacherSettings.vue    # 三档喂食积分配置 + 日记奖励配置
-├── stores/                        # Pinia：auth / pet / diary / feed / points / tasks / teacher
-└── router/index.ts
-public/
-└── assets/pets/<species>/Lv_01.png ~ Lv_20.png
-supabase-schema.sql                # ← 新部署唯一 SQL
-```
+- 项目使用自定义用户名密码，不依赖 Supabase Auth。
+- 学生账号在同一教师班级内不能重名，不同班级可以重名。
+- 徽章属于账号，多个宠物共享账号徽章。
+- 每只宠物独立旅行；旅行券、装扮和明信片收藏归学生账号共享。
+- 宠物旅行时暂停饱食度衰减，归来后继续计算。
+- 公告支持类型、结束时间和历史，每次登录会话展示一次。
+- 照片打卡使用私有 Storage 和短时签名 URL；service role key 只能存在于 Edge Function。
+- 当前自定义认证不是完整的服务端身份体系。正式收集学生私密照片前，应评估迁移 Supabase Auth 或可信后端并收紧旧业务表权限。
 
----
+## 十、宠物素材
 
-## 四、新部署完整步骤
+每个宠物种类使用 20 张等级图：
 
-### 1. 创建 Supabase 项目并执行 SQL
-
-1. 在 [Supabase](https://supabase.com) 新建项目
-2. 进入 **SQL Editor**，把 [`supabase-schema.sql`](./supabase-schema.sql) 的全部内容粘贴进去并 **Run**
-3. 该脚本会一次性完成：建表、索引、RLS 策略、Storage bucket、预置 settings、预置教师账号
-4. 默认管理员账号：用户名 `admin`，密码 `147258369lss`（用于管理老师账号、班级和各班学生账号）
-
-### 2. 配置环境变量
-
-复制 `.env.example` 为 `.env`，填入：
-```env
-VITE_SUPABASE_URL=https://<your-project>.supabase.co
-VITE_SUPABASE_ANON_KEY=<your-anon-key>
-```
-两者均可在 Supabase Dashboard → **Project Settings → API** 中获取。
-
-### 3. 准备宠物素材
-
-每个宠物种类需要 20 张等级图，命名 `Lv_01.png ~ Lv_20.png`（两位数补零），路径：
-```
+```text
 public/assets/pets/<species>/Lv_01.png
-public/assets/pets/<species>/Lv_02.png
 ...
 public/assets/pets/<species>/Lv_20.png
 ```
-> 必须放在 `public/` 下：Vite 仅从 public 目录按绝对 URL 提供静态资源；放在 `src/assets/` 下不会被 `<img src="/...">` 解析。
 
-当前仓库内置素材：`public/assets/pets/紫电龙/`。
+新增种类时同步修改 `src/lib/constants.ts` 的 `PET_SPECIES` 和 `PET_SPECIES_LABELS`。图片必须位于 `public/`，否则 `/assets/...` 的运行时路径无法读取。
 
-### 4. 安装依赖与启动
+## 十一、最终验收
 
-```bash
-npm install
-npm run dev      # 本地开发
-npm run build    # 生产构建
-npm run preview  # 预览构建产物
-```
-
----
-
-## 五、宠物种类扩展指南
-
-新增一个宠物种类（例：`焰狐`）需要 4 步：
-
-1. 准备 20 张图片放到 `public/assets/pets/焰狐/Lv_01.png ~ Lv_20.png`
-2. 编辑 [`src/lib/constants.ts`](./src/lib/constants.ts)：
-   ```ts
-   export const PET_SPECIES = ['紫电龙', '焰狐'] as const
-   export const PET_SPECIES_LABELS: Record<PetSpecies, string> = {
-     紫电龙: '紫电龙',
-     焰狐: '焰狐',
-   }
-   ```
-3. （可选，提升体验）在以下三处的 `speciesIcons` 与 [`PetAvatar.vue`](./src/components/pet/PetAvatar.vue) 的 `SPECIES_EMOJI` 添加 emoji 备选（图片加载失败时显示）：
-   - `src/pages/PetCreatePage.vue`
-   - `src/pages/teacher/TeacherPets.vue`
-   - `src/pages/teacher/TeacherStudentDetail.vue`
-4. 无需任何数据库改动。`getPetImage` 会按 species 自动拼路径。
-
----
-
-## 六、关键约束与设计要点
-
-- **数据模型保留字段**：`pets.happiness / cleanliness / last_played_at / last_cleaned_at` 为历史字段，前端不再读写但保留以兼容旧数据；如需清理可手动 DROP
-- **统一 fallback**：`getPetImage` 对未知 species（旧数据库历史值）自动回退到 `PET_SPECIES[0]`；图片加载失败则在 `PetAvatar` 内回退到对应 emoji
-- **多宠物**：`pets.owner_id` 无 UNIQUE 约束；满 20 级才能继续领养下一只
-- **成长机制**：当前仅喂食增加宠物 XP；日记、图片和点赞暂不增加 XP；升级所需经验逐级增加，Lv.20 累计需要 3050 XP
-- **饱食度**：每小时衰减 1.5 点，最低为 0；三档粮食均不设置饱食度使用门槛
-- **形态阶段**：Lv.1-3 蛋 / 4-8 幼年 / 9-13 青年 / 14-19 成年 / 20 完全体（详见 `getPetStage`）
-- **积分配置可在线修改**：教师端 → 积分设置；保存到 `settings` 表，前端读取做了"旧 `{feed,play,clean}` 格式自动回退默认值"的兼容
-- **认证**：自定义实现，密码使用 `SHA-256(password + 'pet-paradise-salt')`；不依赖 Supabase Auth
-
----
-
-## 七、默认账号
-
-| 角色 | 用户名 | 密码 |
-|---|---|---|
-| 管理员 | `admin` | `147258369lss` |
-
-学生账号通过教师端“新增学生”或注册页创建；管理员可在班级管理页查看、重置密码或删除学生。
-
----
-
-## 八、部署到 Cloudflare Pages（可选）
-
-仓库已自带 [`wrangler.jsonc`](./wrangler.jsonc) 与 [`.github/workflows/deploy.yml`](./.github/workflows/deploy.yml)。配置 GitHub Secrets：
-- `CLOUDFLARE_API_TOKEN`
-- `CLOUDFLARE_ACCOUNT_ID`
-- `VITE_SUPABASE_URL` / `VITE_SUPABASE_ANON_KEY`
-
-push 到 main 分支即自动构建并发布。
-
-## 九、自主照片打卡
-
-学生每天最多自主上传三张照片，教师逐张审核并自定奖励积分。照片自动压缩，审核后保留七天，待审核最多保留十五天。
-
-该功能需要额外部署私有 Storage、Edge Function 和定时清理任务；仅发布前端不会启用。迁移顺序、配置、测试及现有登录权限限制见 [照片打卡部署说明](docs/photo-checkins.md)。
+- `supabase-schema.sql` 在目标新项目完整执行成功
+- 表、函数、RLS 和 Storage bucket 已检查
+- 照片打卡 Edge Function 已完成真实上传和审核验证
+- 如启用定时清理，Cron 请求和实际对象删除均已验证
+- `.env` 指向正确项目，并已重新构建
+- 本地构建或 Docker 镜像构建成功
+- HTTP、HTTPS、域名和证书分别通过检查
+- 管理员、教师、学生的核心流程均完成浏览器验证

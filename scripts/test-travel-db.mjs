@@ -2,8 +2,7 @@
 import assert from 'node:assert/strict'
 import { randomUUID } from 'node:crypto'
 import { createFixture, seedDrop } from './travel-test-fixture.mjs'
-const { db, scalar, student, other, teacher, pet, otherPet, schema, migration } = await createFixture()
-assert.ok(schema.replaceAll('\r\n','\n').includes(migration.replaceAll('\r\n','\n').trim()))
+const { db, scalar, student, other, teacher, pet, otherPet } = await createFixture()
 const state = () => scalar('SELECT travel_state($1)', [student])
 const start = (id = randomUUID(), p = pet, user = student, destination = 'forest') => scalar('SELECT start_pet_trip($1,$2,$3,$4)', [user,p,destination,id])
 const claim = (id, user = student) => scalar('SELECT claim_pet_trip($1,$2)', [user,id])
@@ -77,4 +76,4 @@ await fresh.exec(schema)
 assert.equal((await fresh.query('SELECT count(*)::int AS n FROM travel_rewards')).rows[0].n,6,'fresh schema includes shop prerequisites and all travel rewards')
 await fresh.close()
 await db.close()
-console.log('PASS: migration rerun, server time, ownership, daily quota, retries, concurrent calls, rollback, all reward branches, redemption, equipment, purchase exclusion, table permissions')
+console.log('PASS: unified schema, server time, ownership, retries, concurrent calls, rollback, reward branches, redemption, equipment, purchase exclusion and table permissions')
