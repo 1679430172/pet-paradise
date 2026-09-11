@@ -51,42 +51,6 @@
       {{ success || error }}
     </div>
 
-    <section class="announcement-card card">
-      <div class="announcement-heading">
-        <div><span class="eyebrow">SITE ANNOUNCEMENT</span><h2>公告弹窗</h2><p>启用后，老师和学生每次登录会看到一次；刷新不重复，新公告会重新展示。</p></div>
-        <label class="switch" :class="{ disabled: announcementLoading || announcementSaving }">
-          <input v-model="announcementForm.enabled" type="checkbox" :disabled="announcementLoading || announcementSaving" />
-          <span class="switch-track"><span></span></span>
-        </label>
-      </div>
-      <div class="announcement-types" aria-label="公告类型">
-        <button v-for="option in announcementTypes" :key="option.value" type="button" :class="{ active: announcementForm.type === option.value }" @click="announcementForm.type = option.value">
-          <span>{{ option.icon }}</span><b>{{ option.label }}</b><small>{{ option.description }}</small>
-        </button>
-      </div>
-      <div class="announcement-form">
-        <label><span>公告标题</span><input v-model="announcementForm.title" class="form-input" maxlength="50" placeholder="例如：本周活动通知" /></label>
-        <label><span>公告内容</span><textarea v-model="announcementForm.content" class="form-input" maxlength="1000" rows="5" placeholder="请输入要通知老师和学生的内容"></textarea><small>{{ announcementForm.content.length }} / 1000</small></label>
-        <label><span>自动结束时间</span><input v-model="announcementForm.endAt" class="form-input" type="datetime-local" :min="minimumEndTime" /><small>到期后将自动停止弹出</small></label>
-      </div>
-      <div class="announcement-actions">
-        <span v-if="announcementMessage" class="save-message" :class="{ error: announcementError }">{{ announcementMessage }}</span>
-        <button class="primary-action" :disabled="announcementLoading || announcementSaving" @click="saveAnnouncement">{{ announcementSaving ? '保存中...' : '保存公告' }}</button>
-      </div>
-      <div class="announcement-history">
-        <div class="history-heading"><h3>历史记录</h3><span>最近 {{ announcementHistory.length }} 条</span></div>
-        <div v-if="historyLoading" class="history-empty">正在加载...</div>
-        <div v-else-if="announcementHistory.length === 0" class="history-empty">还没有发布记录</div>
-        <div v-else class="history-list">
-          <article v-for="item in announcementHistory" :key="item.id">
-            <span class="history-icon">{{ announcementTypeMeta(item.type).icon }}</span>
-            <div><strong>{{ item.title }}</strong><p>{{ item.content }}</p><small>发布：{{ formatDateTime(item.created_at) }} · 结束：{{ item.end_at ? formatDateTime(item.end_at) : '未设置' }}</small></div>
-            <span class="history-status" :class="announcementStatus(item).className">{{ announcementStatus(item).label }}</span>
-          </article>
-        </div>
-      </div>
-    </section>
-
     <Transition name="dialog-fade">
       <div v-if="showCreateForm" class="create-dialog-overlay" @click.self="closeCreateForm">
         <section class="create-dialog" role="dialog" aria-modal="true" aria-labelledby="create-class-title">
@@ -231,7 +195,7 @@
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
-import { tenantFeatureKeys, useAuthStore, type AnnouncementSetting, type AnnouncementType, type TenantFeature } from '../../stores/auth'
+import { tenantFeatureKeys, useAuthStore, type TenantFeature } from '../../stores/auth'
 
 interface TeacherItem {
   id: string
@@ -269,21 +233,6 @@ const registrationEnabled = ref(true)
 const registrationLoading = ref(true)
 const registrationMessage = ref('')
 const registrationError = ref('')
-const announcementLoading = ref(true)
-const announcementSaving = ref(false)
-const announcementError = ref(false)
-const announcementMessage = ref('')
-const announcementForm = reactive<{ enabled: boolean; type: AnnouncementType; title: string; content: string; endAt: string }>({ enabled: false, type: 'notice', title: '系统公告', content: '', endAt: '' })
-const announcementHistory = ref<AnnouncementSetting[]>([])
-const historyLoading = ref(true)
-const minimumEndTime = computed(() => toDateTimeLocal(new Date(Date.now() + 60 * 1000)))
-const announcementTypes: { value: AnnouncementType; icon: string; label: string; description: string }[] = [
-  { value: 'notice', icon: '📣', label: '通知', description: '常规消息' },
-  { value: 'celebration', icon: '🎉', label: '庆祝', description: '喜讯与表扬' },
-  { value: 'reminder', icon: '⏰', label: '提醒', description: '时间与事项' },
-  { value: 'maintenance', icon: '🛠️', label: '维护', description: '服务调整' },
-  { value: 'other', icon: '💬', label: '其他', description: '其他内容' },
-]
 const featureOptions: { key: TenantFeature; icon: string; label: string; description: string }[] = [
   { key: 'travel', icon: '🧳', label: '旅游', description: '旅行券、明信片和教师代管' },
   { key: 'photo_checkin', icon: '📷', label: '照片打卡', description: '学生上传与老师审核奖励' },
@@ -321,71 +270,8 @@ function closeCreateForm() {
 }
 
 onMounted(async () => {
-  await Promise.all([loadTeachers(), loadRegistrationSetting(), loadAnnouncement(), loadAnnouncementHistory()])
+  await Promise.all([loadTeachers(), loadRegistrationSetting()])
 })
-
-async function loadAnnouncement() {
-  announcementLoading.value = true
-  const result = await authStore.fetchAnnouncement()
-  if (result.error) {
-    announcementError.value = true
-    announcementMessage.value = '公告加载失败，请刷新后重试。'
-  } else if (result.data) {
-    announcementForm.enabled = result.data.enabled
-    announcementForm.type = result.data.type
-    announcementForm.title = result.data.title
-    announcementForm.content = result.data.content
-    announcementForm.endAt = result.data.end_at ? toDateTimeLocal(new Date(result.data.end_at)) : ''
-  }
-  announcementLoading.value = false
-}
-
-async function saveAnnouncement() {
-  announcementSaving.value = true
-  announcementError.value = false
-  announcementMessage.value = ''
-  const result = await authStore.updateAnnouncement({
-    enabled: announcementForm.enabled,
-    type: announcementForm.type,
-    title: announcementForm.title,
-    content: announcementForm.content,
-    end_at: announcementForm.endAt ? new Date(announcementForm.endAt).toISOString() : null,
-  })
-  if (result.error) {
-    announcementError.value = true
-    announcementMessage.value = result.error.message || '公告保存失败'
-  } else {
-    announcementMessage.value = announcementForm.enabled ? '公告已发布。' : '公告已保存并停用。'
-    await loadAnnouncementHistory()
-  }
-  announcementSaving.value = false
-}
-
-async function loadAnnouncementHistory() {
-  historyLoading.value = true
-  const result = await authStore.fetchAnnouncementHistory()
-  announcementHistory.value = (result.data || []) as AnnouncementSetting[]
-  historyLoading.value = false
-}
-
-function announcementTypeMeta(type: AnnouncementType) {
-  return announcementTypes.find(item => item.value === type) || announcementTypes[0]
-}
-
-function announcementStatus(item: AnnouncementSetting) {
-  if (!item.enabled) return { label: '已停用', className: 'disabled' }
-  if (item.end_at && Date.parse(item.end_at) <= Date.now()) return { label: '已到期', className: 'expired' }
-  return { label: '展示中', className: 'active' }
-}
-
-function toDateTimeLocal(date: Date) {
-  const offset = date.getTimezoneOffset() * 60_000
-  return new Date(date.getTime() - offset).toISOString().slice(0, 16)
-}
-
-function formatDateTime(value?: string) {
-  return value ? new Date(value).toLocaleString('zh-CN', { hour12: false }) : '—'
-}
 
 async function loadRegistrationSetting() {
   registrationLoading.value = true

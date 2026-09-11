@@ -228,6 +228,32 @@ export const useAuthStore = defineStore('auth', () => {
     }
   }
 
+  async function fetchAnnouncements() {
+    const { data, error } = await supabase
+      .from('announcements')
+      .select('id, enabled, type, title, content, end_at, created_at')
+      .eq('enabled', true)
+      .or(`end_at.is.null,end_at.gt.${new Date().toISOString()}`)
+      .order('created_at', { ascending: true })
+      .limit(30)
+    if (error) return { data: [], error }
+    return {
+      data: (data || []).map(item => ({
+        id: item.id,
+        enabled: item.enabled === true,
+        type: ['notice', 'celebration', 'reminder', 'maintenance', 'other'].includes(item.type || '')
+          ? item.type as AnnouncementType
+          : 'notice',
+        title: item.title || '系统公告',
+        content: item.content || '',
+        revision: item.created_at,
+        end_at: item.end_at,
+        created_at: item.created_at,
+      } satisfies AnnouncementSetting)),
+      error: null,
+    }
+  }
+
   async function fetchAnnouncementHistory() {
     if (!user.value || !isAdmin.value) return { data: [], error: new Error('仅管理员可查看公告历史') }
     return await supabase
@@ -243,20 +269,26 @@ export const useAuthStore = defineStore('auth', () => {
     const content = input.content.trim()
     if (!title) return { data: null, error: new Error('公告标题不能为空') }
     if (input.enabled && !content) return { data: null, error: new Error('启用公告前请填写公告内容') }
-    if (input.enabled && (!input.end_at || Date.parse(input.end_at) <= Date.now())) return { data: null, error: new Error('启用公告时，结束时间必须晚于当前时间') }
+    if (input.end_at && Date.parse(input.end_at) <= Date.now()) return { data: null, error: new Error('结束时间必须晚于当前时间') }
     const { data, error } = await supabase
       .from('announcements')
       .insert({ enabled: input.enabled, type: input.type, title, content, end_at: input.end_at })
       .select('id, enabled, type, title, content, end_at, created_at')
       .single()
     if (error) return { data: null, error }
-    const { error: disableError } = await supabase
-      .from('announcements')
-      .update({ enabled: false })
-      .eq('enabled', true)
-      .neq('id', data.id)
-    if (disableError) return { data: null, error: disableError }
     return { data, error: null }
+  }
+
+  async function updateAnnouncementEnabled(id: string, enabled: boolean) {
+    if (!user.value || !isAdmin.value) return { data: null, error: new Error('仅管理员可修改公告') }
+    if (!id) return { data: null, error: new Error('公告不存在') }
+    const { data, error } = await supabase
+      .from('announcements')
+      .update({ enabled })
+      .eq('id', id)
+      .select('id, enabled, type, title, content, end_at, created_at')
+      .single()
+    return { data, error }
   }
 
   async function signUp(username: string, password: string, teacherId: string) {
@@ -562,5 +594,5 @@ export const useAuthStore = defineStore('auth', () => {
     return { error }
   }
 
-  return { user, profile, initialized, loading, isTeacher, isStudent, isAdmin, tenantFeatures, fetchTenantFeatures, hasFeature, init, recordActivity, syncSessionExpiry, signUp, fetchRegistrationClasses, fetchRegistrationEnabled, updateRegistrationEnabled, fetchAnnouncement, fetchAnnouncementHistory, updateAnnouncement, signIn, signOut, refreshProfile, changeOwnPassword, updateClassName, createTeacher, fetchManagedTenantFeatures, updateManagedTenantFeature, fetchTeachers, deleteTeacher, fetchTeacherStudents, updateTeacherClass, resetAccountPassword, deleteManagedStudent }
+  return { user, profile, initialized, loading, isTeacher, isStudent, isAdmin, tenantFeatures, fetchTenantFeatures, hasFeature, init, recordActivity, syncSessionExpiry, signUp, fetchRegistrationClasses, fetchRegistrationEnabled, updateRegistrationEnabled, fetchAnnouncement, fetchAnnouncements, fetchAnnouncementHistory, updateAnnouncement, updateAnnouncementEnabled, signIn, signOut, refreshProfile, changeOwnPassword, updateClassName, createTeacher, fetchManagedTenantFeatures, updateManagedTenantFeature, fetchTeachers, deleteTeacher, fetchTeacherStudents, updateTeacherClass, resetAccountPassword, deleteManagedStudent }
 })

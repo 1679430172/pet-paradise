@@ -6,7 +6,8 @@
         <span class="announcement-label">{{ appearance.label }}</span>
         <h2 id="announcement-title">{{ announcement?.title }}</h2>
         <div class="announcement-content">{{ announcement?.content }}</div>
-        <button type="button" @click="dismiss">我知道了</button>
+        <span v-if="pendingCount > 1" class="announcement-progress">{{ currentIndex + 1 }} / {{ pendingCount }}</span>
+        <button type="button" @click="dismiss">{{ currentIndex < pendingCount - 1 ? '查看下一条' : '我知道了' }}</button>
       </section>
     </div>
   </Transition>
@@ -17,10 +18,12 @@ import { computed, ref, watch } from 'vue'
 import { useAuthStore, type AnnouncementSetting } from '../../stores/auth'
 
 const authStore = useAuthStore()
-const announcement = ref<AnnouncementSetting | null>(null)
-const dismissed = ref(false)
+const announcements = ref<AnnouncementSetting[]>([])
+const currentIndex = ref(0)
 const seenKey = computed(() => authStore.user ? `announcement_seen:${authStore.user.id}` : '')
-const visible = computed(() => !!authStore.user && !authStore.isAdmin && announcement.value?.enabled === true && !!announcement.value.content && !dismissed.value)
+const announcement = computed(() => announcements.value[currentIndex.value] || null)
+const pendingCount = computed(() => announcements.value.length)
+const visible = computed(() => !!authStore.user && !authStore.isAdmin && !!announcement.value?.content)
 const appearances = {
   notice: { icon: '📣', label: '最新通知' },
   celebration: { icon: '🎉', label: '一起庆祝' },
@@ -31,18 +34,35 @@ const appearances = {
 const appearance = computed(() => appearances[announcement.value?.type || 'notice'])
 
 watch(() => authStore.user?.id, async (userId) => {
-  announcement.value = null
-  dismissed.value = false
+  announcements.value = []
+  currentIndex.value = 0
   if (!userId || authStore.isAdmin) return
-  const result = await authStore.fetchAnnouncement()
-  if (result.error || !result.data) return
-  announcement.value = result.data
-  dismissed.value = !!seenKey.value && sessionStorage.getItem(seenKey.value) === result.data.id
+  const result = await authStore.fetchAnnouncements()
+  if (result.error) return
+  const seenIds = getSeenIds()
+  announcements.value = result.data.filter(item => item.id && !seenIds.has(item.id))
 }, { immediate: true })
 
 function dismiss() {
-  dismissed.value = true
-  if (seenKey.value && announcement.value?.id) sessionStorage.setItem(seenKey.value, announcement.value.id)
+  if (seenKey.value && announcement.value?.id) {
+    const seenIds = getSeenIds()
+    seenIds.add(announcement.value.id)
+    sessionStorage.setItem(seenKey.value, JSON.stringify([...seenIds]))
+  }
+  if (currentIndex.value < announcements.value.length - 1) currentIndex.value += 1
+  else announcements.value = []
+}
+
+function getSeenIds() {
+  if (!seenKey.value) return new Set<string>()
+  const stored = sessionStorage.getItem(seenKey.value)
+  if (!stored) return new Set<string>()
+  try {
+    const parsed = JSON.parse(stored)
+    return new Set<string>(Array.isArray(parsed) ? parsed : [String(parsed)])
+  } catch {
+    return new Set<string>([stored])
+  }
 }
 </script>
 
@@ -58,6 +78,8 @@ function dismiss() {
 h2 { margin:8px 0 14px; color:#3a3040; font-size:1.45rem; }
 .announcement-content { max-height:42vh; overflow:auto; color:#655d69; line-height:1.8; text-align:left; white-space:pre-wrap; overflow-wrap:anywhere; }
 button { width:100%; margin-top:22px; padding:12px 18px; border:0; border-radius:12px; color:white; background:var(--accent); box-shadow:0 8px 20px color-mix(in srgb,var(--accent) 28%,transparent); cursor:pointer; font-weight:800; }
+.announcement-progress { display:block; margin-top:18px; color:#99909f; font-size:.7rem; font-weight:700; }
+.announcement-progress + button { margin-top:8px; }
 .announcement-fade-enter-active,.announcement-fade-leave-active { transition:opacity .2s ease; }
 .announcement-fade-enter-active .announcement-dialog,.announcement-fade-leave-active .announcement-dialog { transition:transform .2s ease; }
 .announcement-fade-enter-from,.announcement-fade-leave-to { opacity:0; }

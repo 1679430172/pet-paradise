@@ -34,10 +34,14 @@ const teacherItems: { icon: string; label: string; route: string; feature?: Tena
 ]
 
 const navItems = computed(() => authStore.isAdmin
-  ? [{ icon: '🏫', label: '班级管理', route: '/admin' }]
+  ? [
+      { icon: '🏫', label: '班级管理', route: '/admin' },
+      { icon: '📣', label: '公告管理', route: '/admin/announcements' },
+    ]
   : teacherItems.filter(item => !item.feature || authStore.hasFeature(item.feature)))
 
 function isActive(path: string) {
+  if (path === '/admin') return route.path === '/admin'
   if (path === '/teacher') return route.path === '/teacher'
   return route.path.startsWith(path)
 }

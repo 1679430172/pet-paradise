@@ -149,6 +149,12 @@ const router = createRouter({
       component: () => import('../pages/admin/AdminClasses.vue'),
       meta: { requiresAuth: true, role: 'admin' },
     },
+    {
+      path: '/admin/announcements',
+      name: 'admin-announcements',
+      component: () => import('../pages/admin/AdminAnnouncements.vue'),
+      meta: { requiresAuth: true, role: 'admin' },
+    },
   ],
 })
 
