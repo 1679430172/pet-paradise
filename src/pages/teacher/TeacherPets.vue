@@ -62,7 +62,7 @@
         v-for="s in sortedStudents"
         :key="s.id"
         class="pet-card card"
-        :class="[cosmeticClasses(activePet(s)?.cosmetics), { 'travelling-card': isTravelling(activePet(s)), 'cosmetic-card': !!activePet(s), 'empty-adopt-card': !activePet(s), 'award-selected': classroomMode && awardStudentIds.includes(s.id), 'award-bounce': !!awardBubbles[s.id] }]"
+        :class="[cosmeticClasses(activePet(s)?.cosmetics), { 'travelling-card': isTravelling(activePet(s)), 'returned-card': isAwaitingClaim(activePet(s)), 'cosmetic-card': !!activePet(s), 'empty-adopt-card': !activePet(s), 'award-selected': classroomMode && awardStudentIds.includes(s.id), 'award-bounce': !!awardBubbles[s.id] }]"
         :style="cardStyle(s)"
       >
         <label v-if="classroomMode" class="classroom-student-select"><input type="checkbox" :checked="awardStudentIds.includes(s.id)" :disabled="awarding" @change="toggleAwardStudent(s.id)" :aria-label="`选择 ${s.username}`" /><span class="card-selection-mark" aria-hidden="true">{{ awardStudentIds.includes(s.id) ? '✓' : '' }}</span></label>
@@ -125,6 +125,7 @@
               :size="classroomMode ? (classroomDensity === 180 ? 110 : 140) : 160"
               show-stage
             />
+            <div v-if="isAwaitingClaim(activePet(s))" class="travel-returned-badge" role="status"><strong>✉ 旅行回来啦</strong><small>来信待领取</small></div>
             <Transition name="speech-pop">
               <div v-if="petReplies[activePet(s)!.id] || hoverPetId === activePet(s)!.id" class="pet-speech">
                 {{ petReplies[activePet(s)!.id] || hoverPetReply }}
@@ -476,6 +477,11 @@ function isTravelling(pet: TeacherPet | null | undefined) {
   if (!pet) return false
   const now = travelClock.value || Date.now()
   return isPetTravelling(pet, now) || !!travelOverview.value[pet.id] && Date.parse(travelOverview.value[pet.id]!.returns_at) > now
+}
+function isAwaitingClaim(pet: TeacherPet | null | undefined) {
+  if (!pet) return false
+  const trip = travelOverview.value[pet.id]
+  return !!trip && Date.parse(trip.returns_at) <= (travelClock.value || Date.now())
 }
 function travelCardLabel(petId: string) {
   const trip = travelOverview.value[petId]
@@ -923,6 +929,10 @@ async function handleAdopt() {
 .travel-care-note { position:relative; z-index:4; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:5px; min-height:50px; border:1px dashed #b8cec1; border-radius:13px; background:#eef6ef; color:#426957; text-align:center; padding:5px; }
 .travel-care-note strong { font-size:.72rem; }
 .travel-care-note span { font-size:.61rem; }
+.returned-card { border-color:#d7b66c!important; box-shadow:0 0 0 3px #e4bc5c18,0 8px 24px #72561b16!important; }
+.travel-returned-badge { position:absolute; z-index:5; left:50%; bottom:5px; display:flex; width:max-content; max-width:calc(100% - 18px); flex-direction:column; align-items:center; gap:2px; padding:7px 12px; border:1px solid #ead18e; border-radius:12px; background:#fff9dfeb; color:#75561b; box-shadow:0 5px 16px #58451d24; transform:translateX(-50%); backdrop-filter:blur(5px); pointer-events:none; }
+.travel-returned-badge strong { font-size:.72rem; }
+.travel-returned-badge small { overflow:hidden; max-width:100%; font-size:.58rem; text-overflow:ellipsis; white-space:nowrap; }
 .classroom-compact .travel-scene { padding:6px 3px; }
 .classroom-compact .travel-luggage { font-size:32px; }
 

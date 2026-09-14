@@ -207,7 +207,22 @@ async function handleLogout() {
 </script>
 
 <style scoped>
-.completion-date { color: #89918c; font-size: 12px; }
+.completion-date {
+  display: inline-flex;
+  align-items: center;
+  align-self: flex-start;
+  width: max-content;
+  margin-top: 4px;
+  padding: 2px 7px;
+  border-radius: 6px;
+  background: #f3f6f2;
+  color: #7d8981;
+  font-size: 11px;
+  line-height: 18px;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.completion-date::before { content: '·'; margin-right: 5px; color: #81a08c; font-weight: 700; }
 .revoked-detail { color: #8b7762; border: 0; padding: 0; background: none; cursor: pointer; text-align: left; }
 .completion-note { grid-column: 1 / -1; display: block; min-width: 0; font-size: 12px; line-height: 20px; height: 20px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #8b8f89; }
 .revoked-detail:hover { color: #91602f; text-decoration: underline; }
@@ -303,28 +318,35 @@ async function handleLogout() {
 }
 
 .dashboard-page .completion-item {
+  position: relative;
   display: grid;
-  grid-template-columns: 40px minmax(0, 1fr) auto;
+  grid-template-columns: 42px minmax(0, 1fr) auto;
   grid-template-rows: minmax(0, 1fr) 36px;
   align-items: center;
-  gap: 12px;
+  column-gap: 12px;
+  row-gap: 10px;
   height: 148px;
-  padding: 18px 18px 10px;
-  border: 1px solid #e4ebe6;
-  border-radius: 16px;
-  box-shadow: 0 3px 12px #324c3906;
+  padding: 16px 16px 10px;
+  border: 1px solid #e1e9e3;
+  border-radius: 17px;
+  background: linear-gradient(145deg, #fff 0%, #fdfefc 100%);
+  box-shadow: 0 4px 14px #324c3908;
+  transition: border-color .18s ease, box-shadow .18s ease, transform .18s ease;
 }
+.dashboard-page .completion-item:hover { transform: translateY(-1px); border-color: #cfded3; box-shadow: 0 8px 20px #324c3910; }
 .dashboard-page .completion-item.is-revoked { background: #f9faf8; border-color: #e7e9e4; }
-.student-monogram { display: grid; place-items: center; width: 40px; height: 40px; border-radius: 13px; background: #eaf3ee; color: #4b7c62; font-size: 18px; font-weight: 600; }
+.student-monogram { display: grid; place-items: center; width: 42px; height: 42px; border: 1px solid #dfebe3; border-radius: 14px; background: #edf5ef; color: #4b7c62; font-size: 17px; font-weight: 700; box-shadow: inset 0 1px 0 #fff; }
 .is-revoked .student-monogram { background: #eeefeb; color: #93988e; }
-.completion-info > span, .completion-date { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.dashboard-page .completion-points { white-space: nowrap; color: #36795c; font-size: 23px; font-variant-numeric: tabular-nums; }
+.completion-info > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dashboard-page .completion-points { align-self: start; margin-top: 5px; white-space: nowrap; color: #2f7657; font-size: clamp(17px, 1.15vw, 21px); line-height: 1.25; letter-spacing: -.02em; font-variant-numeric: tabular-nums; }
 .dashboard-page .revoked-points { color: #929b93; opacity: .65; }
-.record-footer { grid-column: 1 / -1; display: flex; justify-content: space-between; align-items: center; align-self: stretch; border-top: 1px solid #edf0ec; padding-top: 8px; }
-.active-label, .revoked-label { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: #738377; }
+.record-footer { grid-column: 1 / -1; display: flex; justify-content: space-between; align-items: center; align-self: stretch; border-top: 1px solid #edf1ed; padding-top: 8px; }
+.active-label, .revoked-label { display: inline-flex; align-items: center; gap: 6px; padding: 3px 8px; border-radius: 999px; background: #f0f6f2; font-size: 11px; color: #60796a; }
 .active-label i, .revoked-label i { width: 5px; height: 5px; border-radius: 50%; background: #68a284; }
+.revoked-label { background: #f0f1ee; color: #858b84; }
 .revoked-label i { background: #b3b9ad; }
-.record-footer .revoke-button, .record-footer .revoked-detail { border: 0; background: none; padding: 5px 0 5px 12px; font-size: 12px; color: #8d7966; }
+.record-footer .revoke-button, .record-footer .revoked-detail { border: 0; border-radius: 7px; background: transparent; padding: 5px 7px; font-size: 11px; color: #8d7966; transition: color .18s ease, background .18s ease; }
+.record-footer .revoke-button:hover, .record-footer .revoked-detail:hover { background: #faf3eb; }
 .record-footer button:hover { color: #ad6634; text-decoration: underline; }
 
 .completion-info {
@@ -334,13 +356,15 @@ async function handleLogout() {
 }
 
 .completion-student {
-  font-weight: 600;
-  font-size: 0.9rem;
+  color: #263d32;
+  font-weight: 700;
+  font-size: 0.92rem;
 }
 
 .completion-task {
-  font-size: 0.8rem;
-  color: #999;
+  margin-top: 2px;
+  font-size: 0.76rem;
+  color: #929b95;
 }
 
 .completion-points {
