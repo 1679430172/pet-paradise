@@ -53,6 +53,7 @@ import TravelPostcard from '../TravelPostcard.vue'
 import { classroomRpc } from '../../lib/classroomApi'
 import { useAuthStore } from '../../stores/auth'
 import type { Destination, TravelReward, TravelState, Trip } from '../../stores/travel'
+import { randomUuid } from '../../lib/uuid'
 const props = defineProps<{ studentId: string; studentName: string; petId: string; petName: string }>()
 const emit = defineEmits<{ close: []; updated: [] }>()
 const auth = useAuthStore()
@@ -80,7 +81,7 @@ async function refresh() {
 async function depart() {
   if (!selectedPlace.value || busy.value || !state.value?.canDepart || loading.value || error.value) return
   busy.value = true; error.value = ''
-  try { await classroomRpc('teacher_start_pet_trip', { ...args(), p_pet_id: props.petId, p_destination_id: selectedPlace.value.id, p_request_id: crypto.randomUUID() }); selectedPlace.value = null; reward.value = null; claimedTrip.value = null; await refresh(); emit('updated') }
+  try { await classroomRpc('teacher_start_pet_trip', { ...args(), p_pet_id: props.petId, p_destination_id: selectedPlace.value.id, p_request_id: randomUuid() }); selectedPlace.value = null; reward.value = null; claimedTrip.value = null; await refresh(); emit('updated') }
   catch (e) { error.value = message(e) }
   finally { busy.value = false }
 }

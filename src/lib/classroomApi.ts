@@ -1,6 +1,7 @@
 import { supabase } from './supabase'
 import type { Pet } from '../stores/pet'
 import type { ActionKey } from './constants'
+import { randomUuid } from './uuid'
 
 // 一次用户操作固定一个请求编号；传输失败重试也不会再次扣分或发奖励。
 export async function classroomRpc<T>(name: string, args: Record<string, unknown>): Promise<T> {
@@ -26,6 +27,6 @@ export interface FeedResult {
 export function feedPet(actorId: string, studentId: string, petId: string, action: ActionKey) {
   return classroomRpc<FeedResult>('feed_pet', {
     p_actor_id: actorId, p_student_id: studentId, p_pet_id: petId,
-    p_action: action, p_request_id: crypto.randomUUID(),
+    p_action: action, p_request_id: randomUuid(),
   })
 }

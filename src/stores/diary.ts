@@ -4,6 +4,7 @@ import { supabase } from '../lib/supabase'
 import { useAuthStore } from './auth'
 import { usePetStore } from './pet'
 import { classroomRpc } from '../lib/classroomApi'
+import { randomUuid } from '../lib/uuid'
 
 export interface DiaryEntry {
   id: string
@@ -43,7 +44,7 @@ export const useDiaryStore = defineStore('diary', () => {
     try {
       const result = await classroomRpc<{ entry: DiaryEntry; points: number; reward: number }>('publish_diary', {
         p_actor_id: authStore.user.id, p_pet_id: petStore.pet.id,
-        p_entry: entry, p_request_id: crypto.randomUUID(),
+        p_entry: entry, p_request_id: randomUuid(),
       })
       entries.value.unshift(result.entry)
       authStore.user.points = result.points

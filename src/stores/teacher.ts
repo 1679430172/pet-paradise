@@ -10,6 +10,7 @@ import type { Profile } from './auth'
 import { useAuthStore } from './auth'
 import type { CosmeticSelection } from '../lib/cosmetics'
 import type { ShopItem } from './shop'
+import { randomUuid } from '../lib/uuid'
 
 export interface TravelTicketUsage {
   tickets: number
@@ -519,7 +520,7 @@ export const useTeacherStore = defineStore('teacher', () => {
     const currentTeacherId = teacherId()
     if (!currentTeacherId) throw new Error('未登录')
     const result = await classroomRpc<{ balance: number; alreadyOwned: boolean }>('teacher_purchase_shop_item', {
-      p_actor_id: currentTeacherId, p_student_id: studentId, p_item_id: item.id, p_request_id: crypto.randomUUID(),
+      p_actor_id: currentTeacherId, p_student_id: studentId, p_item_id: item.id, p_request_id: randomUuid(),
     })
     const student = studentsWithPets.value.find(entry => entry.id === studentId)
     if (student) student.points = result.balance

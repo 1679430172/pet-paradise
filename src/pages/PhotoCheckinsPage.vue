@@ -76,6 +76,7 @@ import { useAuthStore } from '../stores/auth'
 import { useRouter } from 'vue-router'
 import PhotoViewer from '../components/common/PhotoViewer.vue'
 import { checkinApi, compressCheckinPhoto, photoBase64, checkinToken, sessionErrorKey, type PhotoCheckin, type CheckinList } from '../lib/photoCheckins'
+import { randomUuid } from '../lib/uuid'
 const auth = useAuthStore()
 const router = useRouter()
 const teacher = computed(() => auth.isTeacher)
@@ -125,7 +126,7 @@ async function choosePhoto(event: Event) {
   try {
     const result = await compressCheckinPhoto(file)
     if (preview.value) URL.revokeObjectURL(preview.value)
-    photo.value = result; preview.value = URL.createObjectURL(result); requestId.value = crypto.randomUUID(); attempted.value = false
+    photo.value = result; preview.value = URL.createObjectURL(result); requestId.value = randomUuid(); attempted.value = false
   } catch (e) { fail(e) } finally { busy.value = false; if (fileInput.value) fileInput.value.value = '' }
 }
 async function submit() {

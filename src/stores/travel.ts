@@ -3,6 +3,7 @@ import { ref } from 'vue'
 import { classroomRpc } from '../lib/classroomApi'
 import { useAuthStore } from './auth'
 import type { ShopItem } from './shop'
+import { randomUuid } from '../lib/uuid'
 
 export interface Destination { id: string; name: string; icon: string; description: string; hours: number; stories: string[] }
 export interface TravelItem extends ShopItem { destination_id: string; stamp_cost: number; owned: boolean }
@@ -53,7 +54,7 @@ export const useTravelStore = defineStore('travel', () => {
     } catch (e) { throw new Error(message(e)) }
     finally { busy.value = false }
   }
-  const start = (petId: string, destinationId: string) => act<Trip>('start_pet_trip', { p_pet_id: petId, p_destination_id: destinationId, p_request_id: crypto.randomUUID() })
+  const start = (petId: string, destinationId: string) => act<Trip>('start_pet_trip', { p_pet_id: petId, p_destination_id: destinationId, p_request_id: randomUuid() })
   const claim = (tripId: string) => act<TravelReward>('claim_pet_trip', { p_trip_id: tripId })
   const redeem = (itemId: string) => act<{ alreadyOwned: boolean }>('redeem_travel_item', { p_item_id: itemId })
   return { state, loading, busy, error, refresh, serverTime, start, claim, redeem }

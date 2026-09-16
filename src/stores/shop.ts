@@ -4,6 +4,7 @@ import { supabase } from '../lib/supabase'
 import { classroomRpc } from '../lib/classroomApi'
 import { useAuthStore } from './auth'
 import type { CosmeticCategory, CosmeticSelection } from '../lib/cosmetics'
+import { randomUuid } from '../lib/uuid'
 
 export interface ShopItem {
   id: string
@@ -81,7 +82,7 @@ export const useShopStore = defineStore('shop', () => {
     busyItemId.value = item.id
     try {
       const result = await classroomRpc<{ balance: number; alreadyOwned: boolean }>('purchase_shop_item', {
-        p_buyer_id: auth.user.id, p_item_id: item.id, p_request_id: crypto.randomUUID(),
+        p_buyer_id: auth.user.id, p_item_id: item.id, p_request_id: randomUuid(),
       })
       auth.user.points = result.balance
       await fetchAll(true)

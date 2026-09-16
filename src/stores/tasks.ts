@@ -4,6 +4,7 @@ import { supabase } from '../lib/supabase'
 import { useAuthStore } from './auth'
 import { classroomRpc } from '../lib/classroomApi'
 import { runBatch } from '../lib/runBatch'
+import { randomUuid } from '../lib/uuid'
 
 export interface Task {
   id: string
@@ -124,7 +125,7 @@ export const useTasksStore = defineStore('tasks', () => {
     const actor = useAuthStore().user
     if (!actor) throw new Error('未登录')
     return classroomRpc<{ points: number; balance: number; travelTickets: number }>('award_task_points', {
-      p_actor_id: actor.id, p_student_id: studentId, p_task_id: taskId, p_request_id: crypto.randomUUID(),
+      p_actor_id: actor.id, p_student_id: studentId, p_task_id: taskId, p_request_id: randomUuid(),
     })
   }
 
