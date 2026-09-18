@@ -13,7 +13,7 @@
       <div class="section-heading"><h2>{{ group.title }}</h2><span>{{ group.honor ? '每一份努力，都值得闪耀' : '一起积累，继续成长' }}</span></div>
       <div class="leaderboard" :class="{ 'honor-board': group.honor }">
       <div v-for="lane in (group.honor ? podiumLanes : [{ rank: null, entries: group.entries }])" :key="lane.rank ?? 'all'" :class="group.honor ? ['podium-lane', getRankClass(lane.rank)] : 'rank-list-content'">
-      <div v-for="entry in lane.entries" :key="entry.id" class="rank-item card cosmetic-card" :class="[getRankClass(entry.rank), cosmeticClasses(entry.cosmetics)]">
+      <div v-for="entry in lane.entries" :key="entry.id" class="rank-item card cosmetic-card" :class="[getRankClass(entry.rank), cosmeticClasses({ background: entry.cosmetics?.background })]">
         <div v-if="group.honor" class="podium-pet">
           <svg class="champion-crown" viewBox="0 0 64 44" aria-hidden="true">
             <path d="M8 12 20 23 32 5 44 23 56 12 51 35H13Z" fill="var(--stage-light)" stroke="var(--stage-deep)" stroke-width="2" stroke-linejoin="round" />
