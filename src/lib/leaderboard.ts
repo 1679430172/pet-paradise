@@ -23,9 +23,10 @@ export function rankingRange(period: RankingPeriod, now = new Date()) {
   return { start: new Date(start - offset).toISOString(), end: new Date(end - offset).toISOString() }
 }
 
-// Read all pages, including historical earnings; balances and spending are not ranking inputs.
-export async function readPeriodLeaderboard(teacherId: string, period: RankingPeriod) {
-  const range = rankingRange(period)
+type LeaderboardRow = { id: string; username: string; points: number; pet_level: number; pet_name: string }
+
+// Compatibility path for databases that have not applied the period_leaderboard migration yet.
+async function readPeriodLeaderboardLegacy(teacherId: string, range: ReturnType<typeof rankingRange>) {
   const students: { id: string; username: string; points: number; pet_level: number; pet_name: string }[] = []
   const pageSize = 500
   for (let from = 0; ; from += pageSize) {
@@ -57,4 +58,25 @@ export async function readPeriodLeaderboard(teacherId: string, period: RankingPe
   }
   students.sort((a, b) => b.points - a.points || a.username.localeCompare(b.username, 'zh-CN') || a.id.localeCompare(b.id))
   return { entries: students, weekStart: range.start, weekEnd: range.end }
+}
+
+// Aggregate earnings in Postgres so the browser does not download and re-query every earning page.
+export async function readPeriodLeaderboard(teacherId: string, period: RankingPeriod) {
+  const range = rankingRange(period)
+  const { data, error } = await supabase.rpc('period_leaderboard', {
+    p_teacher_id: teacherId,
+    p_start: range.start || null,
+    p_end: range.end || null,
+  })
+  if (!error) {
+    const result = data as { entries?: LeaderboardRow[]; periodStart?: string | null; periodEnd?: string | null } | null
+    return {
+      entries: result?.entries || [],
+      weekStart: result?.periodStart || range.start,
+      weekEnd: result?.periodEnd || range.end,
+    }
+  }
+  // PostgREST uses these codes when a newly added RPC is absent from its schema cache.
+  if (error.code !== 'PGRST202' && error.code !== '42883') throw error
+  return readPeriodLeaderboardLegacy(teacherId, range)
 }
