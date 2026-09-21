@@ -29,7 +29,7 @@
           <span v-if="group.honor" class="medal" aria-hidden="true">{{ entry.rank === 1 ? '🥇' : entry.rank === 2 ? '🥈' : '🥉' }}</span>
           <template v-else>{{ entry.rank ?? '—' }}</template>
         </div>
-        <div class="rank-info"><span class="rank-name">{{ entry.username }}</span>
+        <div class="rank-info"><TitleNameplate class="rank-name" :name="entry.username" :title="entry.current_title" />
           <span v-if="group.honor" class="honor-label">{{ entry.rank === 1 ? '第一名 · 闪耀之星' : entry.rank === 2 ? '第二名 · 成长之星' : '第三名 · 活力之星' }}</span>
           <span class="rank-pet">{{ entry.pet_name }}<template v-if="entry.pet_level"> · Lv.{{ entry.pet_level }}</template></span>
         </div>
@@ -51,6 +51,7 @@ import { useTeacherStore } from '../../stores/teacher'
 import PetAvatar from '../../components/pet/PetAvatar.vue'
 import { cosmeticClasses } from '../../lib/cosmetics'
 import { RANKING_PERIODS, type RankingPeriod } from '../../lib/leaderboard'
+import TitleNameplate from '../../components/TitleNameplate.vue'
 const period = ref<RankingPeriod>('week')
 const periodLabel = computed(() => RANKING_PERIODS.find(option => option.value === period.value)!.label)
 const teacherStore = useTeacherStore()

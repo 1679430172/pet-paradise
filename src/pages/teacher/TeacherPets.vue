@@ -144,7 +144,7 @@
 
           </div>
           <!-- 主标题：学生姓名 -->
-          <h2 class="pet-name">{{ s.username }}<span v-if="s.pets.length > 1" class="pet-page-count"  aria-label="当前宠物页码"><PetSpeciesMark :species="activePet(s)!.species" />{{ getIdx(s) + 1 }} / {{ s.pets.length }}</span></h2>
+          <h2 class="pet-name"><TitleNameplate :name="s.username" :title="s.current_title" /><span v-if="s.pets.length > 1" class="pet-page-count"  aria-label="当前宠物页码"><PetSpeciesMark :species="activePet(s)!.species" />{{ getIdx(s) + 1 }} / {{ s.pets.length }}</span></h2>
 
           <div class="pet-stats">
             <div class="pet-stat">
@@ -202,7 +202,7 @@
               <span class="empty-egg">🥚</span>
             </div>
           </div>
-          <h2 class="pet-name">{{ s.username }}</h2>
+          <h2 class="pet-name"><TitleNameplate :name="s.username" :title="s.current_title" /></h2>
           <div class="pet-sub">
             <span class="pet-sub-muted">还没有专属宠物</span>
           </div>
@@ -366,6 +366,7 @@ import { PET_COLORS, MAX_LEVEL, getFeedingReply } from '../../lib/constants'
 import { getPetThemeStyle } from '../../lib/petTheme'
 import { cosmeticClasses } from '../../lib/cosmetics'
 import { classroomRpc } from '../../lib/classroomApi'
+import TitleNameplate from '../../components/TitleNameplate.vue'
 import type { ShopItem } from '../../stores/shop'
 import PetAvatar from '../../components/pet/PetAvatar.vue'
 import PetSpeciesMark from '../../components/pet/PetSpeciesMark.vue'
@@ -1451,6 +1452,11 @@ async function handleAdopt() {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+.pet-name { display:flex; min-height:60px; align-items:center; justify-content:center; }
+.pet-name:has(.title-effect) { width:100%; overflow:visible; }
+.pet-name .title-effect { width:min(180px,100%); font-size:.88rem; }
+.classroom-mode .pet-name { min-height:72px; }
+.classroom-mode .pet-name .title-effect { width:min(220px,100%); font-size:1rem; }
 
 .pet-sub {
   display: flex;

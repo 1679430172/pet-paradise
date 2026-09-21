@@ -61,6 +61,7 @@ export interface LeaderboardEntry {
   pet_species?: string
   pet_id?: string
   cosmetics?: CosmeticSelection
+  current_title?: string | null
 }
 
 export const useTeacherStore = defineStore('teacher', () => {
@@ -255,6 +256,12 @@ export const useTeacherStore = defineStore('teacher', () => {
         rank: entry.points > 0 ? index + 1 : null,
       }))
       const studentIds = rankedEntries.map(entry => entry.id)
+      const { data: titleData, error: titleError } = studentIds.length
+        ? await supabase.from('profiles').select('id,current_title').in('id', studentIds)
+        : { data: [], error: null }
+      // Keep the leaderboard usable while the title migration is still pending.
+      if (titleError && titleError.code !== '42703' && titleError.code !== 'PGRST204') throw titleError
+      const titleMap = new Map((titleData || []).map(row => [row.id, row.current_title]))
       const { data: rankingPets, error: petError } = studentIds.length
         ? await supabase.from('pets').select('id,owner_id,name,species,level,created_at').in('owner_id', studentIds)
         : { data: [], error: null }
@@ -279,7 +286,7 @@ export const useTeacherStore = defineStore('teacher', () => {
       if (request !== leaderboardRequest) return
       leaderboard.value = rankedEntries.map(entry => {
         const pet = representativePets.get(entry.id)
-        return { ...entry, pet_id: pet?.id, pet_species: pet?.species, pet_name: pet?.name || '未领养', pet_level: pet?.level || 0,
+        return { ...entry, current_title: titleMap.get(entry.id) || null, pet_id: pet?.id, pet_species: pet?.species, pet_name: pet?.name || '未领养', pet_level: pet?.level || 0,
           cosmetics: pet ? cosmeticMap.get(pet.id) : undefined }
       })
       leaderboardWeek.value = { start: result.weekStart, end: result.weekEnd }
@@ -419,6 +426,28 @@ export const useTeacherStore = defineStore('teacher', () => {
     }
   }
 
+  async function setStudentTitle(studentId: string, title: string | null) {
+    const currentTeacherId = teacherId()
+    if (!currentTeacherId) return { error: new Error('未登录') }
+    try {
+      const result = await classroomRpc<{ title: string | null }>('teacher_set_student_title', {
+        p_actor_id: currentTeacherId,
+        p_student_id: studentId,
+        p_title: title,
+      })
+      const savedTitle = result.title
+      for (const list of [students.value, studentsWithPets.value]) {
+        const student = list.find(item => item.id === studentId)
+        if (student) student.current_title = savedTitle
+      }
+      const rankingEntry = leaderboard.value.find(item => item.id === studentId)
+      if (rankingEntry) rankingEntry.current_title = savedTitle
+      return { error: null }
+    } catch (error) {
+      return { error: error instanceof Error ? error : new Error('称号设置失败') }
+    }
+  }
+
   async function renamePetForStudent(studentId: string, petId: string, name: string) {
     const currentTeacherId = teacherId()
     if (!currentTeacherId) return { error: new Error('未登录') }
@@ -541,7 +570,7 @@ export const useTeacherStore = defineStore('teacher', () => {
     if (pet) pet.cosmetics = { ...pet.cosmetics, [category]: item?.style_key || null }
   }
 
-  return { students, studentsWithPets, leaderboardError, leaderboardLoading, leaderboardWeek, leaderboard, loading, totalStudents, totalPointsGiven, cosmeticItems, cosmeticOwnedIds, fetchStudents, fetchStudentsWithPets, performActionForStudent, fetchStudentDetail, fetchTravelTicketUsage, fetchPointSpending, fetchStudentLedger, fetchLeaderboard, fetchStats, fetchStudentCosmetics, purchaseCosmeticForStudent, equipCosmeticForStudent, createStudent, renameStudent, resetStudentPassword, adoptPetForStudent, renamePetForStudent, deleteStudent }
+  return { students, studentsWithPets, leaderboardError, leaderboardLoading, leaderboardWeek, leaderboard, loading, totalStudents, totalPointsGiven, cosmeticItems, cosmeticOwnedIds, fetchStudents, fetchStudentsWithPets, performActionForStudent, fetchStudentDetail, fetchTravelTicketUsage, fetchPointSpending, fetchStudentLedger, fetchLeaderboard, fetchStats, fetchStudentCosmetics, purchaseCosmeticForStudent, equipCosmeticForStudent, createStudent, renameStudent, setStudentTitle, resetStudentPassword, adoptPetForStudent, renamePetForStudent, deleteStudent }
 })
 
 if (import.meta.hot) {

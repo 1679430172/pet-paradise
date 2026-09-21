@@ -22,6 +22,9 @@ ALTER TABLE profiles ADD COLUMN IF NOT EXISTS teacher_id UUID REFERENCES profile
 ALTER TABLE profiles ADD COLUMN IF NOT EXISTS is_admin BOOLEAN NOT NULL DEFAULT false;
 CREATE INDEX IF NOT EXISTS profiles_teacher_id_idx ON profiles(teacher_id);
 ALTER TABLE profiles ADD COLUMN IF NOT EXISTS badges JSONB NOT NULL DEFAULT '[]'::jsonb;
+ALTER TABLE profiles ADD COLUMN IF NOT EXISTS current_title TEXT;
+ALTER TABLE profiles DROP CONSTRAINT IF EXISTS profiles_current_title_length;
+ALTER TABLE profiles ADD CONSTRAINT profiles_current_title_length CHECK (current_title IS NULL OR char_length(current_title) BETWEEN 1 AND 20);
 
 -- Student names only need to be unique inside the same teacher's class.
 -- Teacher/admin account names remain globally unique among teacher accounts.
@@ -188,6 +191,34 @@ CREATE POLICY "允许查看资料"     ON profiles FOR SELECT USING (true);
 CREATE POLICY "允许插入资料"     ON profiles FOR INSERT WITH CHECK (true);
 CREATE POLICY "允许更新资料"     ON profiles FOR UPDATE USING (true);
 CREATE POLICY "允许删除学生"     ON profiles FOR DELETE USING (true);
+
+DROP FUNCTION IF EXISTS teacher_set_student_title(UUID, UUID, TEXT);
+CREATE FUNCTION teacher_set_student_title(
+  p_actor_id UUID,
+  p_student_id UUID,
+  p_title TEXT
+) RETURNS JSONB
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  normalized_title TEXT := NULLIF(btrim(p_title), '');
+BEGIN
+  IF normalized_title IS NOT NULL AND normalized_title NOT IN (
+    '进步之星', '自律达人', '热心伙伴', '勇敢挑战者', '坚持小标兵', '课堂闪耀之星'
+  ) THEN
+    RAISE EXCEPTION '不支持的称号';
+  END IF;
+  UPDATE profiles SET current_title = normalized_title
+  WHERE id = p_student_id AND role = 'student' AND teacher_id = p_actor_id
+    AND EXISTS (SELECT 1 FROM profiles actor WHERE actor.id = p_actor_id AND actor.role = 'teacher');
+  IF NOT FOUND THEN RAISE EXCEPTION '只能给本班学生佩戴称号'; END IF;
+  RETURN jsonb_build_object('title', normalized_title);
+END;
+$$;
+REVOKE ALL ON FUNCTION teacher_set_student_title(UUID, UUID, TEXT) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION teacher_set_student_title(UUID, UUID, TEXT) TO anon, authenticated;
 
 ALTER TABLE pets ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "允许查看宠物" ON pets;

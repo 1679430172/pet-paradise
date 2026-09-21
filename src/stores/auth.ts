@@ -10,6 +10,7 @@ export interface Profile {
   role: 'student' | 'teacher'
   points: number
   badges?: string[]
+  current_title?: string | null
   avatar_url: string | null
   class_name: string | null
   teacher_id: string | null

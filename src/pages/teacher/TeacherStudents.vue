@@ -65,12 +65,13 @@
         <div class="student-info">
           <div class="student-avatar">{{ student.username.charAt(0) }}</div>
           <div class="student-meta">
-            <span class="student-name">{{ student.username }}</span>
+            <TitleNameplate class="student-name" :name="student.username" :title="student.current_title" />
           </div>
         </div>
         <div class="student-points"><strong>{{ student.points }}</strong><span>可用积分</span></div>
         <div class="student-actions">
           <button type="button" class="btn btn-secondary btn-sm growth-button" :aria-label="`查看 ${student.username} 的详情`" @click.stop="goDetail(student.id)">学生详情</button>
+          <button type="button" class="btn btn-secondary btn-sm title-button" @click.stop="openTitleDialog(student)">🌟 称号</button>
           <button class="btn btn-primary btn-sm award-button" @click.stop="openAwardDialog(student)">＋ 发积分</button>
         </div>
       </div>
@@ -136,6 +137,25 @@
       </div>
     </div>
 
+    <div v-if="showTitleDialog" class="dialog-overlay" @click.self="closeTitleDialog">
+      <div class="dialog title-dialog card" role="dialog" aria-modal="true" aria-labelledby="title-dialog-heading">
+        <h3 id="title-dialog-heading">给 {{ titleStudent?.username }} 佩戴称号</h3>
+        <p class="dialog-hint">称号会显示在学生主页、宠物卡和成长榜。</p>
+        <div class="title-options">
+          <button v-for="item in STUDENT_TITLES" :key="item.value" type="button" :class="{ active: selectedTitle === item.value }" :disabled="savingTitle" @click="selectedTitle = item.value">
+            <span class="title-choice-name"><i>{{ item.icon }} {{ item.value }}</i><TitleNameplate class="title-choice-preview" :name="titleStudent?.username || '姓名预览'" :title="item.value" /></span>
+            <span class="title-choice-check" aria-hidden="true">{{ selectedTitle === item.value ? '✓' : '' }}</span>
+          </button>
+        </div>
+        <p v-if="titleError" class="form-error">{{ titleError }}</p>
+        <div class="dialog-actions">
+          <button class="btn btn-secondary" :disabled="savingTitle" @click="closeTitleDialog">取消</button>
+          <button v-if="titleStudent?.current_title" class="btn btn-secondary remove-title" :disabled="savingTitle" @click="saveTitle(null)">取消佩戴</button>
+          <button class="btn btn-primary" :disabled="savingTitle || !selectedTitle" @click="saveTitle(selectedTitle)">{{ savingTitle ? '保存中...' : '确认佩戴' }}</button>
+        </div>
+      </div>
+    </div>
+
     <!-- 成功提示 -->
     <div v-if="toast" class="toast">{{ toast }}</div>
   </div>
@@ -149,6 +169,8 @@ import { useAuthStore } from '../../stores/auth'
 import { useTasksStore, rewardLabel } from '../../stores/tasks'
 import type { Profile } from '../../stores/auth'
 import type { Task } from '../../stores/tasks'
+import { STUDENT_TITLES } from '../../lib/studentTitles'
+import TitleNameplate from '../../components/TitleNameplate.vue'
 
 const detailStudentId = ref<string | null>(null)
 const detailDialog = ref<HTMLDialogElement | null>(null)
@@ -165,6 +187,11 @@ const selectedStudentIds = ref<string[]>([])
 const awarding = ref(false)
 const awardProgress = ref({ completed: 0, total: 0 })
 const toast = ref('')
+const showTitleDialog = ref(false)
+const titleStudent = ref<Profile | null>(null)
+const selectedTitle = ref('')
+const savingTitle = ref(false)
+const titleError = ref('')
 
 const normalizedSearchQuery = computed(() => searchQuery.value.trim().toLocaleLowerCase())
 const filteredStudents = computed(() => {
@@ -229,6 +256,34 @@ onBeforeUnmount(() => {
 function openAwardDialog(student: Profile) {
   selectedStudent.value = student
   showDialog.value = true
+}
+
+function openTitleDialog(student: Profile) {
+  titleStudent.value = student
+  selectedTitle.value = student.current_title || ''
+  titleError.value = ''
+  showTitleDialog.value = true
+}
+
+function closeTitleDialog() {
+  if (savingTitle.value) return
+  showTitleDialog.value = false
+  titleStudent.value = null
+  selectedTitle.value = ''
+  titleError.value = ''
+}
+
+async function saveTitle(title: string | null) {
+  if (!titleStudent.value || savingTitle.value) return
+  savingTitle.value = true
+  titleError.value = ''
+  const studentName = titleStudent.value.username
+  const { error } = await teacherStore.setStudentTitle(titleStudent.value.id, title)
+  savingTitle.value = false
+  if (error) { titleError.value = error.message; return }
+  closeTitleDialog()
+  toast.value = title ? `已给 ${studentName} 佩戴“${title}”` : `已取消 ${studentName} 的称号`
+  setTimeout(() => { toast.value = '' }, 2500)
 }
 
 function toggleStudent(studentId: string) {
@@ -330,6 +385,7 @@ async function handleCreateStudent() {
   .detail-modal-header { padding: 12px 16px; }
   .detail-modal-body { padding: 14px; }
 }
+
 .teacher-page {
   padding-bottom: 80px;
 }
@@ -403,7 +459,7 @@ async function handleCreateStudent() {
 .clear-selection { background: none; border: 0; color: #498b74; cursor: pointer; padding: 6px; }
 .loading-state, .empty-state { text-align: center; color: #8b968f; padding: 40px 20px; }
 :global(#app .app-shell .students-page .student-list) { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 300px), 1fr)); gap: 16px; }
-:global(#app .app-shell .students-page .student-card) { display: grid; grid-template-columns: 18px minmax(0, 1fr) auto; grid-template-rows: 62px 44px; gap: 10px 12px; padding: 18px 18px 10px; border: 1px solid #e5eae3; border-radius: 17px; box-shadow: 0 3px 12px #354e4206; transition: border-color .18s, background .18s; }
+:global(#app .app-shell .students-page .student-card) { display: grid; grid-template-columns: 18px minmax(0, 1fr) auto; grid-template-rows: 72px 44px; gap: 10px 12px; padding: 18px 18px 10px; border: 1px solid #e5eae3; border-radius: 17px; box-shadow: 0 3px 12px #354e4206; transition: border-color .18s, background .18s; }
 :global(#app .app-shell .students-page .student-card.is-selected) { border-color: #84b69c; background: #f4faf5; box-shadow: 0 0 0 2px #498b740a; }
 .student-selector { display: flex; align-items: center; }
 .student-info { display: flex; align-items: center; gap: 11px; cursor: pointer; background: none; border: 0; padding: 0; color: inherit; text-align: left; font: inherit; }
@@ -411,7 +467,8 @@ async function handleCreateStudent() {
 .student-card:nth-child(3n+2) .student-avatar { background: #eef0f9; color: #8580aa; }
 .student-card:nth-child(3n) .student-avatar { background: #fcf0e5; color: #b18c65; }
 .student-meta { display: flex; flex-direction: column; gap: 5px; }
-.student-name { font-weight: 600; font-size: .95rem; color: #3c5047; overflow-wrap: anywhere; }
+.student-name { min-height:64px; font-weight: 600; font-size: .95rem; color: #3c5047; overflow-wrap: anywhere; }
+.student-name:not(.title-effect) { display: flex; align-items: center; }
 .student-card { cursor: pointer; }
 .student-points { display: flex; flex-direction: column; gap: 3px; text-align: right; align-self: center; }
 .student-points strong { font-size: 1.2rem; color: #498b74; font-variant-numeric: tabular-nums; }
@@ -421,6 +478,18 @@ async function handleCreateStudent() {
 .student-actions .growth-button { margin-right: auto; color: #498b74; background: #ecf5ee; border-color: #e1e7e1; }
 .student-actions .award-button { background: #ecf5ee; color: #498b74; }
 .student-actions .award-button:hover { color: white; }
+.student-actions .title-button { color: #8a6820; background: #fff9df; border-color: #eadba8; }
+.title-options { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; margin: 16px 0; }
+.title-options button { position:relative; display:flex; align-items:center; min-height:104px; padding:8px 28px 8px 9px; overflow:visible; border:1px solid #e5e9e2; border-radius:13px; background:linear-gradient(145deg,#fff,#f8faf6); color:#56645c; cursor:pointer; text-align:left; transition:border-color .18s,box-shadow .18s,transform .18s; }
+.title-options button:hover:not(:disabled) { transform:translateY(-1px); border-color:#c9d7ce; box-shadow:0 6px 15px #354e4210; }
+.title-options button.active { border-color:#c8a949; background:linear-gradient(145deg,#fffdf5,#fff8da); box-shadow:0 0 0 2px #dbb94e26,0 7px 18px #92701c14; }
+.title-choice-name { display:flex; min-width:0; flex-direction:column; align-items:flex-start; gap:8px; }
+.title-choice-name i { color:#8a938d; font-size:.63rem; font-style:normal; font-weight:650; letter-spacing:.02em; }
+.title-choice-preview { width:210px; max-width:100%; font-size:.95rem; line-height:1.05; white-space:nowrap; }
+.title-choice-check { position:absolute; right:10px; top:50%; display:grid; place-items:center; width:19px; height:19px; border:1px solid #d9dfda; border-radius:50%; color:white; background:white; font-size:.72rem; transform:translateY(-50%); }
+.title-options button.active .title-choice-check { border-color:#c69e31; background:#c69e31; box-shadow:0 2px 6px #8f6c1f2e; }
+.dialog-actions .remove-title { color: #a8665e; }
+@media (max-width:540px) { .title-options { grid-template-columns:1fr; }.title-dialog { max-height:86vh; }.title-choice-preview { max-width:220px; } }
 .btn-danger { background: transparent; color: #b3938b; border: none; }
 .btn-danger:hover { background: #fff0ed; color: #b96257; }
 .students-page button:focus-visible { outline: 2px solid #498b74; outline-offset: 3px; }

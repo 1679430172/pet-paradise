@@ -6,7 +6,7 @@
       <div class="profile-avatar">
         {{ authStore.profile?.username?.charAt(0) || '?' }}
       </div>
-      <h2 class="profile-name">{{ authStore.profile?.username }}</h2>
+      <h2 class="profile-name"><TitleNameplate :name="authStore.profile?.username || ''" :title="authStore.user?.current_title" /></h2>
       <p class="profile-class">{{ authStore.profile?.class_name || '未设置班级' }}</p>
       <div class="profile-wallet">
         <div class="profile-points">
@@ -111,6 +111,7 @@ import { usePetStore } from '../stores/pet'
 import { useTravelStore } from '../stores/travel'
 import { BADGES, PET_SPECIES_LABELS } from '../lib/constants'
 import type { PetSpecies } from '../lib/constants'
+import TitleNameplate from '../components/TitleNameplate.vue'
 
 const router = useRouter()
 const authStore = useAuthStore()
@@ -206,6 +207,7 @@ onMounted(async () => {
   font-size: 1.18rem;
   margin-bottom: 2px;
 }
+
 
 .profile-email {
   font-size: 0.8rem;

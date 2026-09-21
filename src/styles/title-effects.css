@@ -1,0 +1,30 @@
+.title-effect {
+  --title-ink:#57356f; --title-asset:url('/assets/title/nameplate-rise-v3.png');
+  position:relative; z-index:0; display:inline-grid; width:min(190px,100%); height:auto; aspect-ratio:4/1;
+  box-sizing:border-box; place-items:center; padding:0 34px;
+  color:var(--title-ink); -webkit-text-fill-color:var(--title-ink);
+  font-size:.92rem; font-weight:900; line-height:1; letter-spacing:.02em; text-align:center; white-space:nowrap; isolation:isolate;
+  text-shadow:0 1px 0 #fff,0 2px 2px #5d326626;
+}
+.title-effect__name,.title-effect__title { grid-area:1/1; display:block; width:100%; min-width:0; text-align:center; }
+.title-effect__name { color:var(--title-ink); -webkit-text-fill-color:var(--title-ink); }
+.title-effect__title { color:color-mix(in srgb,var(--title-ink),var(--title-accent) 36%); -webkit-text-fill-color:color-mix(in srgb,var(--title-ink),var(--title-accent) 36%); font-size:1em; letter-spacing:.02em; }
+.is-alternating .title-effect__name { animation:title-swap-name 4.5s ease-in-out infinite; }
+.is-alternating .title-effect__title { animation:title-swap-title 4.5s ease-in-out infinite; }
+.title-effect::before {
+  content:''; position:absolute; z-index:-1; inset:0;
+  background-image:var(--title-asset); background-position:center; background-size:var(--title-asset-size,contain); background-repeat:no-repeat;
+  filter:drop-shadow(0 3px 5px #62428a30);
+  animation:title-frame-breathe 3.2s ease-in-out infinite;
+}
+.title-effect--rise { --title-ink:#6b4a19;--title-asset:url('/assets/title/nameplate-rise-v5.png');--title-asset-size:100% auto; }
+.title-effect--focus { --title-ink:#234e76;--title-asset:url('/assets/title/nameplate-focus-v5.png');--title-asset-size:100% auto; }
+.title-effect--heart { --title-ink:#863e5c;--title-asset:url('/assets/title/nameplate-heart-v3.png'); }
+.title-effect--brave { --title-ink:#ffe3a8;--title-asset:url('/assets/title/nameplate-brave-v5.png');--title-asset-size:96% auto;text-shadow:0 1px 1px #3c130f,0 2px 3px #21080699; }
+.title-effect--steady { --title-ink:#17665b;--title-asset:url('/assets/title/nameplate-steady-v3.png'); }
+.title-effect--legend { --title-ink:#ffe9a6;--title-asset:url('/assets/title/nameplate-legend-v5.png');--title-asset-size:98% auto;text-shadow:0 1px 1px #32125f,0 2px 3px #21083f99; }
+@keyframes title-frame-breathe { 0%,100%{opacity:.96;transform:scale(.985)}50%{opacity:1;transform:scale(1)} }
+/* 4.5-second cycle: approximately 3 seconds of name and 1.5 seconds of title, including 0.2-second crossfades. */
+@keyframes title-swap-name { 0%,62.222%{opacity:1;transform:translateY(0)}66.667%,95.556%{opacity:0;transform:translateY(-4px)}100%{opacity:1;transform:translateY(0)} }
+@keyframes title-swap-title { 0%,62.222%{opacity:0;transform:translateY(4px)}66.667%,95.556%{opacity:1;transform:translateY(0)}100%{opacity:0;transform:translateY(-4px)} }
+@media (prefers-reduced-motion:reduce) { .title-effect::before,.title-effect__name,.title-effect__title { animation:none; }.is-alternating .title-effect__title{display:none} }
