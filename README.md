@@ -187,6 +187,43 @@ docker compose logs --tail=100 pet-paradise
 curl -I http://127.0.0.1/healthz
 ```
 
+### Docker 同源 Supabase 转发
+
+Docker 构建默认设置 `VITE_SUPABASE_PROXY_PATH=/supabase`，优先于
+`VITE_SUPABASE_URL`。浏览器使用当前访问地址，因此域名和 IP 两个 HTTPS
+入口都会请求各自的 `/supabase/rest/v1/...`，由 Nginx 转发到云端。
+现有 `.env` 中的 Supabase URL 和公开 API Key 可以保留，无须迁移数据。
+此配置不改变未设置代理路径的本地开发和 GitHub Pages 构建。
+
+代理配置在 `nginx/supabase-proxy.conf`，两个 HTTPS server 共用；更换
+Supabase 项目时必须同步修改这里的上游域名、Host、TLS 名称和前端公开 Key。
+不要使用 service role key。当前配置用于 REST、RPC、Storage API 和云函数，
+不包含 Realtime WebSocket。数据库中已有的照片完整 URL 和云函数返回的
+签名 URL 仍可能直连 Supabase，并不会自动改写。
+
+将更新文件同步到服务器后，在项目目录构建并先验证 Nginx：
+
+```bash
+docker compose build pet-paradise
+docker compose run --rm --no-deps pet-paradise nginx -t
+```
+
+仅当检查成功后执行：
+
+```bash
+docker compose up -d --no-deps pet-paradise
+docker compose ps
+curl -sS -o /dev/null -w 'HTTP=%{http_code} total=%{time_total}s\n' https://13.231.205.217/supabase/rest/v1/
+curl -sS -o /dev/null -w 'HTTP=%{http_code} total=%{time_total}s\n' https://xn--wxwv19g.xn--6qq986b3xl/supabase/rest/v1/
+```
+
+不携带 API Key 的两次检查应返回 401；它们仅验证代理连通性。
+随后刷新浏览器并实际登录，在 Network 确认请求使用当前网站的
+`/supabase/rest/v1/profiles`，再验证学生列表、加分及排行榜。
+请勿分享完整登录请求 URL（查询参数包含密码哈希）。代理关闭常规访问日志，
+但排查错误日志时仍应按敏感数据处理。容器健康检查不代表代理或登录成功。
+配置和前端变量都打包在镜像中，仅重启旧容器不生效。
+
 ## 八、GitHub Pages
 
 `.github/workflows/deploy.yml` 会在代码推送到 `master` 后发布 GitHub Pages。当前工作流没有注入 Supabase Secrets，会使用 `src/lib/supabase.ts` 的回退配置。要连接其他 Supabase 项目，应先在 GitHub Actions 中显式传入 `VITE_SUPABASE_URL` 和 `VITE_SUPABASE_ANON_KEY`。

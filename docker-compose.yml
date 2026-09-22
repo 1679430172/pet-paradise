@@ -5,6 +5,7 @@ services:
       args:
         VITE_SUPABASE_URL: ${VITE_SUPABASE_URL}
         VITE_SUPABASE_ANON_KEY: ${VITE_SUPABASE_ANON_KEY}
+        VITE_SUPABASE_PROXY_PATH: ${VITE_SUPABASE_PROXY_PATH:-/supabase}
     image: pet-paradise:latest
     container_name: pet-paradise
     restart: unless-stopped
