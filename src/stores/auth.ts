@@ -27,6 +27,7 @@ export interface AnnouncementSetting {
   title: string
   content: string
   revision: string
+  start_at: string | null
   end_at: string | null
   created_at?: string
 }
@@ -204,8 +205,9 @@ export const useAuthStore = defineStore('auth', () => {
   async function fetchAnnouncement() {
     const { data, error } = await supabase
       .from('announcements')
-      .select('id, enabled, type, title, content, end_at, created_at')
+      .select('id, enabled, type, title, content, start_at, end_at, created_at')
       .eq('enabled', true)
+      .or(`start_at.is.null,start_at.lte.${new Date().toISOString()}`)
       .or(`end_at.is.null,end_at.gt.${new Date().toISOString()}`)
       .order('created_at', { ascending: false })
       .limit(1)
@@ -222,6 +224,7 @@ export const useAuthStore = defineStore('auth', () => {
         title: data.title || '系统公告',
         content: data.content || '',
         revision: data.created_at,
+        start_at: data.start_at,
         end_at: data.end_at,
         created_at: data.created_at,
       } satisfies AnnouncementSetting,
@@ -232,8 +235,9 @@ export const useAuthStore = defineStore('auth', () => {
   async function fetchAnnouncements() {
     const { data, error } = await supabase
       .from('announcements')
-      .select('id, enabled, type, title, content, end_at, created_at')
+      .select('id, enabled, type, title, content, start_at, end_at, created_at')
       .eq('enabled', true)
+      .or(`start_at.is.null,start_at.lte.${new Date().toISOString()}`)
       .or(`end_at.is.null,end_at.gt.${new Date().toISOString()}`)
       .order('created_at', { ascending: true })
       .limit(30)
@@ -248,6 +252,7 @@ export const useAuthStore = defineStore('auth', () => {
         title: item.title || '系统公告',
         content: item.content || '',
         revision: item.created_at,
+        start_at: item.start_at,
         end_at: item.end_at,
         created_at: item.created_at,
       } satisfies AnnouncementSetting)),
@@ -259,22 +264,25 @@ export const useAuthStore = defineStore('auth', () => {
     if (!user.value || !isAdmin.value) return { data: [], error: new Error('仅管理员可查看公告历史') }
     return await supabase
       .from('announcements')
-      .select('id, enabled, type, title, content, end_at, created_at')
+      .select('id, enabled, type, title, content, start_at, end_at, created_at')
       .order('created_at', { ascending: false })
       .limit(30)
   }
 
-  async function updateAnnouncement(input: Pick<AnnouncementSetting, 'enabled' | 'type' | 'title' | 'content' | 'end_at'>) {
+  async function updateAnnouncement(input: Pick<AnnouncementSetting, 'enabled' | 'type' | 'title' | 'content' | 'start_at' | 'end_at'>) {
     if (!user.value || !isAdmin.value) return { data: null, error: new Error('仅管理员可修改公告') }
     const title = input.title.trim()
     const content = input.content.trim()
     if (!title) return { data: null, error: new Error('公告标题不能为空') }
     if (input.enabled && !content) return { data: null, error: new Error('启用公告前请填写公告内容') }
+    if (input.start_at && !Number.isFinite(Date.parse(input.start_at))) return { data: null, error: new Error('开始时间格式不正确') }
+    if (input.end_at && !Number.isFinite(Date.parse(input.end_at))) return { data: null, error: new Error('结束时间格式不正确') }
+    if (input.start_at && input.end_at && Date.parse(input.end_at) <= Date.parse(input.start_at)) return { data: null, error: new Error('结束时间必须晚于开始时间') }
     if (input.end_at && Date.parse(input.end_at) <= Date.now()) return { data: null, error: new Error('结束时间必须晚于当前时间') }
     const { data, error } = await supabase
       .from('announcements')
-      .insert({ enabled: input.enabled, type: input.type, title, content, end_at: input.end_at })
-      .select('id, enabled, type, title, content, end_at, created_at')
+      .insert({ enabled: input.enabled, type: input.type, title, content, start_at: input.start_at ? new Date(input.start_at).toISOString() : null, end_at: input.end_at ? new Date(input.end_at).toISOString() : null })
+      .select('id, enabled, type, title, content, start_at, end_at, created_at')
       .single()
     if (error) return { data: null, error }
     return { data, error: null }
@@ -287,7 +295,7 @@ export const useAuthStore = defineStore('auth', () => {
       .from('announcements')
       .update({ enabled })
       .eq('id', id)
-      .select('id, enabled, type, title, content, end_at, created_at')
+      .select('id, enabled, type, title, content, start_at, end_at, created_at')
       .single()
     return { data, error }
   }

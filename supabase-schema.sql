@@ -122,7 +122,9 @@ CREATE TABLE IF NOT EXISTS announcements (
   title TEXT NOT NULL CHECK (char_length(title) BETWEEN 1 AND 50),
   content TEXT NOT NULL CHECK (char_length(content) <= 1000),
   enabled BOOLEAN NOT NULL DEFAULT true,
+  start_at TIMESTAMPTZ,
   end_at TIMESTAMPTZ,
+  CONSTRAINT announcements_time_range CHECK (start_at IS NULL OR end_at IS NULL OR end_at > start_at),
   created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
