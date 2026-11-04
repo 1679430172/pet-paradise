@@ -5,6 +5,9 @@ export const STUDENT_TITLES = [
   { value: '勇敢挑战者', icon: '💪', theme: 'brave' },
   { value: '坚持小标兵', icon: '🎯', theme: 'steady' },
   { value: '课堂闪耀之星', icon: '✨', theme: 'legend' },
+  { value: '全勤宝贝', icon: '📅', theme: 'attendance' },
+  { value: '妙笔小达人', icon: '✍️', theme: 'writer' },
+  { value: '跳绳小健将', icon: '🪢', theme: 'jumprope' },
 ] as const
 
 export function titleLabel(title?: string | null) {

@@ -208,7 +208,8 @@ DECLARE
   normalized_title TEXT := NULLIF(btrim(p_title), '');
 BEGIN
   IF normalized_title IS NOT NULL AND normalized_title NOT IN (
-    '进步之星', '自律达人', '热心伙伴', '勇敢挑战者', '坚持小标兵', '课堂闪耀之星'
+    '进步之星', '自律达人', '热心伙伴', '勇敢挑战者', '坚持小标兵', '课堂闪耀之星',
+    '全勤宝贝', '妙笔小达人', '跳绳小健将'
   ) THEN
     RAISE EXCEPTION '不支持的称号';
   END IF;
