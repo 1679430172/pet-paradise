@@ -18,7 +18,7 @@ export interface Profile {
   created_at: string
 }
 
-export type TenantFeature = 'travel' | 'photo_checkin' | 'shop'
+export type TenantFeature = 'travel' | 'photo_checkin' | 'shop' | 'geometry_game'
 export type AnnouncementType = 'notice' | 'celebration' | 'reminder' | 'maintenance' | 'other'
 export interface AnnouncementSetting {
   id?: string
@@ -31,7 +31,7 @@ export interface AnnouncementSetting {
   end_at: string | null
   created_at?: string
 }
-export const tenantFeatureKeys: TenantFeature[] = ['travel', 'photo_checkin', 'shop']
+export const tenantFeatureKeys: TenantFeature[] = ['travel', 'photo_checkin', 'shop', 'geometry_game']
 const USER_ID_KEY = 'pet_user_id'
 const SESSION_EXPIRES_KEY = 'pet_session_expires_at'
 const SESSION_DURATION_MS = 30 * 60 * 1000
@@ -51,7 +51,7 @@ export const useAuthStore = defineStore('auth', () => {
   const user = ref<Profile | null>(null)
   const initialized = ref(false)
   const loading = ref(false)
-  const tenantFeatures = ref<Record<TenantFeature, boolean>>({ travel: false, photo_checkin: false, shop: false })
+  const tenantFeatures = ref<Record<TenantFeature, boolean>>({ travel: false, photo_checkin: false, shop: false, geometry_game: false })
   const tenantFeaturesLoadedFor = ref<string | null>(null)
 
   const profile = computed(() => user.value)
@@ -127,7 +127,7 @@ export const useAuthStore = defineStore('auth', () => {
     const id = tenantId()
     if (!id) return { data: tenantFeatures.value, error: null }
     if (!force && tenantFeaturesLoadedFor.value === id) return { data: tenantFeatures.value, error: null }
-    tenantFeatures.value = { travel: false, photo_checkin: false, shop: false }
+    tenantFeatures.value = { travel: false, photo_checkin: false, shop: false, geometry_game: false }
     const { data, error } = await supabase.rpc('get_tenant_features', { p_tenant_id: id })
     if (!error && user.value && tenantId() === id) {
       const enabled = new Set((data || []).filter((row: any) => row.enabled).map((row: any) => row.feature_key))
@@ -135,6 +135,7 @@ export const useAuthStore = defineStore('auth', () => {
         travel: enabled.has('travel'),
         photo_checkin: enabled.has('photo_checkin'),
         shop: enabled.has('shop'),
+        geometry_game: enabled.has('geometry_game'),
       }
       tenantFeaturesLoadedFor.value = id
     }
@@ -408,7 +409,7 @@ export const useAuthStore = defineStore('auth', () => {
       }).catch(() => {})
     }
     user.value = null
-    tenantFeatures.value = { travel: false, photo_checkin: false, shop: false }
+    tenantFeatures.value = { travel: false, photo_checkin: false, shop: false, geometry_game: false }
     tenantFeaturesLoadedFor.value = null
     localStorage.removeItem(USER_ID_KEY)
     localStorage.removeItem(SESSION_EXPIRES_KEY)

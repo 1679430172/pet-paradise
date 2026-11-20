@@ -149,7 +149,7 @@
               <label v-for="feature in featureOptions" :key="feature.key" class="feature-row">
                 <span><b>{{ feature.icon }} {{ feature.label }}</b><small>{{ feature.description }}</small></span>
                 <span class="switch" :class="{ disabled: featuresLoading || featureSaving === feature.key }">
-                  <input type="checkbox" :checked="managedFeatures[feature.key]" :disabled="featuresLoading || !!featureSaving" @change="toggleTenantFeature(feature.key)" />
+                  <input type="checkbox" :checked="managedFeatures[feature.key]" :disabled="featuresLoading || !!featureSaving" @change="toggleTenantFeature(feature.key, $event)" />
                   <span class="switch-track"><span></span></span>
                 </span>
               </label>
@@ -237,8 +237,9 @@ const featureOptions: { key: TenantFeature; icon: string; label: string; descrip
   { key: 'travel', icon: '🧳', label: '旅游', description: '旅行券、明信片和教师代管' },
   { key: 'photo_checkin', icon: '📷', label: '照片打卡', description: '学生上传与老师审核奖励' },
   { key: 'shop', icon: '🛒', label: '宠物商城', description: '购买和更换宠物装扮' },
+  { key: 'geometry_game', icon: '◇', label: '几何切切乐', description: '平面图形切割与旋转' },
 ]
-const managedFeatures = reactive<Record<TenantFeature, boolean>>({ travel: false, photo_checkin: false, shop: false })
+const managedFeatures = reactive<Record<TenantFeature, boolean>>({ travel: false, photo_checkin: false, shop: false, geometry_game: false })
 const featuresLoading = ref(false)
 const featureSaving = ref<TenantFeature | null>(null)
 const featureError = ref('')
@@ -355,15 +356,19 @@ async function loadTenantFeatures(teacherId: string) {
   featuresLoading.value = false
 }
 
-async function toggleTenantFeature(feature: TenantFeature) {
+async function toggleTenantFeature(feature: TenantFeature, event: Event) {
+  const input = event.target as HTMLInputElement
+  input.checked = managedFeatures[feature]
   if (!managingTeacher.value || featureSaving.value) return
+  const teacherId = managingTeacher.value.id
   const next = !managedFeatures[feature]
   featureSaving.value = feature
   featureError.value = ''
-  const result = await authStore.updateManagedTenantFeature(managingTeacher.value.id, feature, next)
+  const result = await authStore.updateManagedTenantFeature(teacherId, feature, next)
+  featureSaving.value = null
+  if (managingTeacher.value?.id !== teacherId) return
   if (result.error) featureError.value = result.error.message || '功能设置保存失败'
   else managedFeatures[feature] = next
-  featureSaving.value = null
 }
 
 async function loadStudents(teacherId: string) {

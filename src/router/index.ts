@@ -1,5 +1,5 @@
 import { createRouter, createWebHashHistory } from 'vue-router'
-import { useAuthStore } from '../stores/auth'
+import { useAuthStore, type TenantFeature } from '../stores/auth'
 
 const router = createRouter({
   history: createWebHashHistory(),
@@ -13,6 +13,16 @@ const router = createRouter({
       path: '/teacher/checkins', name: 'teacher-photo-checkins',
       component: () => import('../pages/PhotoCheckinsPage.vue'),
       meta: { requiresAuth: true, role: 'teacher', feature: 'photo_checkin' },
+    },
+    {
+      path: '/teacher/geometry-game', name: 'teacher-geometry-game',
+      component: () => import('../pages/GeometryGamePage.vue'),
+      meta: { requiresAuth: true, role: 'teacher', feature: 'geometry_game' },
+    },
+    {
+      path: '/geometry-game', name: 'geometry-game',
+      component: () => import('../pages/GeometryGamePage.vue'),
+      meta: { requiresAuth: true, role: 'student', feature: 'geometry_game' },
     },
     // 公开页面
     {
@@ -196,8 +206,8 @@ router.beforeEach(async (to) => {
   }
 
   if (to.meta.feature && authStore.user && !authStore.isAdmin) {
-    await authStore.fetchTenantFeatures()
-    if (!authStore.hasFeature(to.meta.feature as 'travel' | 'photo_checkin' | 'shop')) {
+    const { error } = await authStore.fetchTenantFeatures(to.meta.feature === 'geometry_game')
+    if (error || !authStore.hasFeature(to.meta.feature as TenantFeature)) {
       return authStore.isTeacher ? { name: 'teacher-dashboard', query: { featureUnavailable: '1' } } : { name: 'home', query: { featureUnavailable: '1' } }
     }
   }
