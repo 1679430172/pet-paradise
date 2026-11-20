@@ -127,7 +127,7 @@ export const useAuthStore = defineStore('auth', () => {
     const id = tenantId()
     if (!id) return { data: tenantFeatures.value, error: null }
     if (!force && tenantFeaturesLoadedFor.value === id) return { data: tenantFeatures.value, error: null }
-    tenantFeatures.value = { travel: false, photo_checkin: false, shop: false, geometry_game: false }
+    // Keep the active tenant's menu stable until the refreshed permissions arrive.
     const { data, error } = await supabase.rpc('get_tenant_features', { p_tenant_id: id })
     if (!error && user.value && tenantId() === id) {
       const enabled = new Set((data || []).filter((row: any) => row.enabled).map((row: any) => row.feature_key))
