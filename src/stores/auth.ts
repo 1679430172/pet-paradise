@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
-import { supabase } from '../lib/supabase'
+import { clearLoginAuditSession, loginAuditEmail, loginAuditSupabase, supabase } from '../lib/supabase'
 import { establishCheckinSession, checkinApi, checkinToken, sessionKey, sessionErrorKey } from '../lib/photoCheckins'
 
 export interface Profile {
@@ -364,24 +364,36 @@ export const useAuthStore = defineStore('auth', () => {
   async function signIn(username: string, password: string, teacherId?: string) {
     loading.value = true
     try {
+      const { origin, pathname, hash } = window.location
+      const accessUrl = origin + pathname + (hash.startsWith('#/') ? hash.split('?')[0] : '')
       const hashedPwd = await hashPassword(password)
-      let query = supabase
-        .from('profiles')
-        .select('*')
-        .eq('username', username.trim())
-        .eq('password', hashedPwd)
-      if (teacherId) {
-        query = query.eq('role', 'student').eq('teacher_id', teacherId)
-      }
-      const { data, error } = await query.limit(2)
+      const { data, error } = await supabase.rpc('sign_in_with_login_log', {
+        p_username: username.trim(),
+        p_password: hashedPwd,
+        p_teacher_id: teacherId || null,
+        p_access_url: accessUrl,
+      })
 
-      if (error || !data || data.length === 0) {
+      if (error) throw new Error('登录服务暂不可用，请稍后重试')
+      if (!data || data.length === 0) {
         throw new Error('用户名或密码错误')
       }
       if (data.length > 1) {
         throw new Error('该名字存在于多个班级，请选择班级后登录')
       }
 
+      if (data[0].role === 'teacher' && data[0].is_admin === true) {
+        // Keep the legacy login available while the administrator's audit identity is provisioned.
+        try {
+          const { error: auditError } = await loginAuditSupabase.auth.signInWithPassword({
+            email: loginAuditEmail(data[0].id),
+            password,
+          })
+          if (auditError) await clearLoginAuditSession()
+        } catch {
+          void clearLoginAuditSession().catch(() => {})
+        }
+      }
       user.value = data[0]
       await fetchTenantFeatures(true)
       const checkinExpires = !data[0].is_admin ? await establishCheckinSession(data[0].id, password) : null
@@ -396,6 +408,7 @@ export const useAuthStore = defineStore('auth', () => {
 
   async function signOut() {
     clearExpiryTimer()
+    const auditSignOut = isAdmin.value ? clearLoginAuditSession().catch(() => {}) : undefined
     if (user.value) {
       sessionStorage.removeItem(`announcement_seen:${user.value.id}`)
       const key = sessionKey(user.value.id)
@@ -413,6 +426,7 @@ export const useAuthStore = defineStore('auth', () => {
     tenantFeaturesLoadedFor.value = null
     localStorage.removeItem(USER_ID_KEY)
     localStorage.removeItem(SESSION_EXPIRES_KEY)
+    await auditSignOut
   }
 
   async function refreshProfile() {

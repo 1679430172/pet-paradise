@@ -38,6 +38,7 @@ const navItems = computed(() => authStore.isAdmin
   ? [
       { icon: '🏫', label: '班级管理', route: '/admin' },
       { icon: '📣', label: '公告管理', route: '/admin/announcements' },
+      { icon: '📋', label: '登录日志', route: '/admin/login-logs' },
     ]
   : teacherItems.filter(item => !item.feature || authStore.hasFeature(item.feature)))
 

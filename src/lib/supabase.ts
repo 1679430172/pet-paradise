@@ -9,3 +9,23 @@ const supabaseUrl = proxyPath
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || 'sb_publishable_6Cc1YHvGqR7HZvKqGRMAwA_X4t0Uq9Z'
 
 export const supabase = createClient(supabaseUrl, supabaseAnonKey)
+
+export const loginAuditSupabase = createClient(supabaseUrl, supabaseAnonKey, {
+  auth: {
+    storage: window.sessionStorage,
+    storageKey: 'pet-login-audit-auth',
+    detectSessionInUrl: false,
+  },
+})
+
+export function loginAuditEmail(profileId: string) {
+  return `${profileId}@admin.pet-paradise.example`
+}
+
+export async function clearLoginAuditSession() {
+  try {
+    await loginAuditSupabase.auth.signOut({ scope: 'local' })
+  } finally {
+    sessionStorage.removeItem('pet-login-audit-auth')
+  }
+}

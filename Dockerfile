@@ -19,7 +19,11 @@ RUN npm run build
 FROM nginx:1.27-alpine AS runtime
 
 RUN apk add --no-cache ca-certificates
-COPY nginx/supabase-proxy.conf /etc/nginx/snippets/supabase-proxy.conf
+ENV NGINX_ENVSUBST_OUTPUT_DIR=/etc/nginx/snippets
+ENV NGINX_ENVSUBST_FILTER=^LOGIN_LOG_PROXY_SECRET$
+ENV LOGIN_LOG_PROXY_SECRET=""
+RUN mkdir -p /etc/nginx/snippets
+COPY nginx/supabase-proxy.conf /etc/nginx/templates/supabase-proxy.conf.template
 COPY nginx.conf /etc/nginx/conf.d/default.conf
 COPY --from=build /app/dist /usr/share/nginx/html
 

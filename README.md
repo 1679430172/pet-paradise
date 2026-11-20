@@ -228,9 +228,32 @@ curl -sS -o /dev/null -w 'HTTP=%{http_code} total=%{time_total}s\n' https://xn--
 
 `.github/workflows/deploy.yml` 会在代码推送到 `master` 后发布 GitHub Pages。当前工作流没有注入 Supabase Secrets，会使用 `src/lib/supabase.ts` 的回退配置。要连接其他 Supabase 项目，应先在 GitHub Actions 中显式传入 `VITE_SUPABASE_URL` 和 `VITE_SUPABASE_ANON_KEY`。
 
+### 启用后台登录日志
+
+1. 在 Supabase SQL Editor 执行 `supabase-migration-login-logs.sql`。新版登录依赖其中的 RPC，先迁移数据库，再发布前端。
+2. 从 `public.profiles` 中查找管理员的 `id`（`role = 'teacher'` 且 `is_admin = true`）。在 Supabase 的 Authentication → Users 中创建用户，邮箱填写 `<管理员资料id>@admin.pet-paradise.example`，密码使用该管理员当前的站点登录密码，并确认此用户。若仍使用初始密码，先更换为唯一的强密码。记录新建的 Auth 用户 UID，并执行下面的授权 SQL。管理员密码变更时，同步更新 Auth 用户密码。
+
+   ```sql
+   INSERT INTO pet_login_audit.administrators (auth_user_id)
+   VALUES ('<Auth 用户 UID>'::uuid)
+   ON CONFLICT DO NOTHING;
+   ```
+
+3. 若已配置 `LOGIN_LOG_PROXY_SECRET`，沿用现有密钥。首次配置时运行 `openssl rand -hex 32`，将生成的密钥填入 Compose `.env` 的 `LOGIN_LOG_PROXY_SECRET` 和下面 SQL 的占位符。
+
+   ```sql
+   INSERT INTO pet_login_audit.configuration (name, secret_hash)
+   VALUES ('proxy', sha256(convert_to('<代理密钥>', 'UTF8')))
+   ON CONFLICT (name) DO UPDATE SET secret_hash = EXCLUDED.secret_hash;
+   ```
+
+4. 执行 `docker compose up -d --build`。分别通过站点域名和服务器 IP 重新登录，在「公告管理」下方打开「登录日志」，核对客户端 IP 和访问地址。通过 GitHub Pages 等方式直连 Supabase 时，客户端 IP 显示「未获取」。
+
+日志从启用后开始记录成功的密码登录，按北京时间显示。地址保留协议、域名或 IP、端口和页面路由，省略查询参数。
+
 ## 九、核心规则与安全边界
 
-- 项目使用自定义用户名密码，不依赖 Supabase Auth。
+- 项目使用自定义用户名密码，登录日志查询使用独立的 Supabase Auth 管理员授权。
 - 学生账号在同一教师班级内不能重名，不同班级可以重名。
 - 徽章属于账号，多个宠物共享账号徽章。
 - 每只宠物独立旅行；旅行券、装扮和明信片收藏归学生账号共享。
