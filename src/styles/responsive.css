@@ -6,6 +6,8 @@
 }
 
 #app .app-shell { min-height: 100dvh; }
+.app-shell .game-fullscreen { overflow: auto; overscroll-behavior: contain; }
+.app-shell .game-fullscreen:not(:fullscreen) { position: fixed; inset: 0; width: 100%; z-index: 110; }
 #app .app-shell .page,
 #app .app-shell .create-page,
 #app .app-shell .admin-page {

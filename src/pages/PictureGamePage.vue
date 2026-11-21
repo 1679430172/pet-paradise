@@ -1,5 +1,5 @@
 <template>
-  <div class="picture-game">
+  <div ref="fullscreenTarget" class="picture-game" :class="{ 'game-fullscreen': fullscreen }">
     <h1>图片切切乐</h1>
     <p>按住滑过图片，松开后切割。长按图片块可移动图片块，长按空白处可移动画布。</p>
     <div class="shape-picker">
@@ -9,6 +9,7 @@
       <div class="history-actions">
         <button type="button" :disabled="!!snip || !undoStack.length" @click="undo">撤销</button>
         <button type="button" :disabled="!!snip || !redoStack.length" @click="redo">重做</button>
+        <button type="button" :aria-pressed="fullscreen" @click="toggleFullscreen">{{ fullscreenLabel }}</button>
       </div>
     </div>
 
@@ -76,6 +77,7 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, ref, useId, watch } from 'vue'
 import PictureFragment from '../components/common/PictureFragment.vue'
+import { useGameFullscreen } from '../lib/useGameFullscreen'
 import { add, makeShape, scale, splitPolygon, sub, type Line, type Point, type Shape } from '../lib/geometryGame'
 import { cutRecordLimit } from '../lib/geometryCutRecords'
 import { useAuthStore } from '../stores/auth'
@@ -118,6 +120,7 @@ interface BoardSnapshot {
 }
 
 const auth = useAuthStore()
+const { fullscreen, fullscreenLabel, toggleFullscreen } = useGameFullscreen()
 const gridId = `picture-grid-${useId()}`
 const board = ref<SVGSVGElement>()
 const shape = ref<Shape>('square')
@@ -408,6 +411,12 @@ onBeforeUnmount(() => {
 
 <style scoped>
 .picture-game { max-width: 1460px; margin: 0 auto; padding: 24px clamp(12px, 3vw, 40px) 96px; color: #253754; }
+.picture-game.game-fullscreen {
+  display: flex; flex-direction: column; max-width: none;
+  padding: clamp(8px, 2vw, 24px); background: #fcf7ee;
+}
+.game-fullscreen .board { flex: 1 0 220px; height: auto; }
+.game-fullscreen .records { display: none; }
 h1 { margin: 0; font-size: clamp(1.6rem, 4vw, 2.35rem); }
 p { margin: 8px 0 16px; }
 .shape-picker { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 0 0 10px; }

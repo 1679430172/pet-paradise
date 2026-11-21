@@ -1,5 +1,5 @@
 <template>
-  <main class="geometry-page">
+  <main ref="fullscreenTarget" class="geometry-page" :class="{ 'game-fullscreen': fullscreen }">
     <header class="game-header">
       <div class="game-title">
         <span class="logo" aria-hidden="true">✂</span>
@@ -20,6 +20,7 @@
             <button aria-label="缩小" @click="changeZoom(-1)">−</button>
             <button title="让所有图形回到视野内" @click="fitView">看全部</button>
             <button aria-label="放大" @click="changeZoom(1)">＋</button>
+            <button type="button" :aria-pressed="fullscreen" @click="toggleFullscreen">{{ fullscreenLabel }}</button>
           </div>
         </div>
 
@@ -121,12 +122,14 @@ import { computed, onBeforeUnmount, onMounted, ref, shallowRef, watch, watchEffe
 import { add, center, cross, cutAngleToEdges, distanceToLine, findEdgeSnap, makeShape, polygonCentroid, polygonEdges, scale, snapCutDirection, snapCutEndpointToPoint, snapCutLineToPoint, snapRotationToAxes, splitPolygon, sub } from '../lib/geometryGame'
 import type { Line, Point, Shape } from '../lib/geometryGame'
 import GeometryCutThumbnail from '../components/common/GeometryCutThumbnail.vue'
+import { useGameFullscreen } from '../lib/useGameFullscreen'
 import { cutRecordLimit, geometryShapeName, readCutRecords, saveCutRecords } from '../lib/geometryCutRecords'
 import type { GeometryCutRecord } from '../lib/geometryCutRecords'
 import { randomUuid } from '../lib/uuid'
 import { useAuthStore } from '../stores/auth'
 
 const auth = useAuthStore()
+const { fullscreen, fullscreenLabel, toggleFullscreen } = useGameFullscreen()
 const cutRecords = shallowRef<GeometryCutRecord[]>([])
 const recordKey = computed(() => auth.user ? `geometry-cut-records:${auth.user.id}` : '')
 const visibleRecordLimit = ref(6)
@@ -1008,5 +1011,19 @@ button:disabled { color: #65738b; background: #f1f4f9; border-color: #dce3f0; cu
   .view-tools { gap: 3px; }
   .view-tools button { padding-inline: 6px; }
   .cut-button { width: 100%; }
+}
+.geometry-page.game-fullscreen {
+  display: flex; flex-direction: column; max-width: none;
+  padding: clamp(8px, 2vw, 24px); background: #fcf7ee;
+}
+.game-fullscreen .game-header { display: none; }
+.game-fullscreen .game-layout { flex: 1; }
+.game-fullscreen .workspace { display: flex; flex-direction: column; align-self: stretch; }
+.game-fullscreen .stage { flex: 1 0 220px; }
+.game-fullscreen .work-canvas { position: absolute; inset: 0; height: 100%; }
+.game-fullscreen .cut-records { display: none; }
+@media (max-width: 820px) {
+  .game-fullscreen .game-layout { grid-template-rows: auto minmax(min-content, 1fr) auto auto; }
+  .game-fullscreen .workspace { min-height: max(360px, 65dvh); }
 }
 </style>
