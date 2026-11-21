@@ -322,7 +322,6 @@ export const useTeacherStore = defineStore('teacher', () => {
           role: 'student',
           points: 0,
           teacher_id: authStore.user.id,
-          class_name: authStore.user.class_name || '默认班级',
         })
         .select()
         .single()

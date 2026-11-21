@@ -33,6 +33,7 @@ AS $$
 DECLARE
   matched_profiles jsonb;
   account jsonb;
+  login_class_name text;
   headers jsonb := nullif(current_setting('request.headers', true), '')::jsonb;
   client_ip inet;
   access_origin text;
@@ -53,6 +54,13 @@ BEGIN
   END IF;
 
   account := matched_profiles -> 0;
+  login_class_name := account ->> 'class_name';
+  IF account ->> 'role' = 'student' THEN
+    SELECT teacher.class_name INTO login_class_name
+    FROM public.profiles AS teacher
+    WHERE teacher.id = (account ->> 'teacher_id')::uuid
+      AND teacher.role = 'teacher';
+  END IF;
   IF EXISTS (
     SELECT 1 FROM pet_login_audit.configuration
     WHERE name = 'proxy' AND secret_hash = sha256(convert_to(headers ->> 'x-pet-login-proxy-secret', 'UTF8'))
@@ -74,7 +82,7 @@ BEGIN
     account ->> 'username',
     CASE WHEN (account ->> 'is_admin')::boolean AND account ->> 'role' = 'teacher'
          THEN 'admin' ELSE account ->> 'role' END,
-    account ->> 'class_name',
+    login_class_name,
     client_ip,
     left(access_origin || coalesce(access_path, '/'), 2048)
   );

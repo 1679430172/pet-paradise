@@ -17,7 +17,7 @@ CREATE TABLE IF NOT EXISTS profiles (
   created_at TIMESTAMPTZ DEFAULT now()
 );
 
--- Students belong to a teacher; class_name remains the human-readable class label.
+-- Each teacher owns one class. Students use teacher_id as their class ID.
 ALTER TABLE profiles ADD COLUMN IF NOT EXISTS teacher_id UUID REFERENCES profiles(id) ON DELETE SET NULL;
 ALTER TABLE profiles ADD COLUMN IF NOT EXISTS is_admin BOOLEAN NOT NULL DEFAULT false;
 CREATE INDEX IF NOT EXISTS profiles_teacher_id_idx ON profiles(teacher_id);
@@ -325,8 +325,7 @@ WHERE username = 'teacher' AND role = 'teacher';
 
 -- Attach legacy students to the original teacher account.
 UPDATE profiles AS student
-SET teacher_id = teacher.id,
-    class_name = COALESCE(student.class_name, teacher.class_name, '默认班级')
+SET teacher_id = teacher.id
 FROM profiles AS teacher
 WHERE student.role = 'student'
   AND student.teacher_id IS NULL
@@ -1659,7 +1658,7 @@ BEGIN
  SELECT COALESCE(sum(bytes),0) INTO used FROM photo_checkins WHERE photo_deleted_at IS NULL;
  IF used+p_bytes>cap THEN RAISE EXCEPTION '照片存储空间暂时不足，请稍后再试'; END IF;
  INSERT INTO photo_checkins(id,student_id,student_name,teacher_id,class_name,description,object_path,bytes)
- VALUES(p_id,s.id,s.username,s.teacher_id,s.class_name,p_description,s.id||'/'||p_id||'.jpg',p_bytes) RETURNING * INTO c;
+ VALUES(p_id,s.id,s.username,s.teacher_id,(SELECT t.class_name FROM profiles t WHERE t.id=s.teacher_id AND t.role='teacher'),p_description,s.id||'/'||p_id||'.jpg',p_bytes) RETURNING * INTO c;
  RETURN c;
 END $$;
 

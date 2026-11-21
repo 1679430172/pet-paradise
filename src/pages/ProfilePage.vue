@@ -7,7 +7,7 @@
         {{ authStore.profile?.username?.charAt(0) || '?' }}
       </div>
       <h2 class="profile-name"><TitleNameplate :name="authStore.profile?.username || ''" :title="authStore.user?.current_title" /></h2>
-      <p class="profile-class">{{ authStore.profile?.class_name || '未设置班级' }}</p>
+      <p class="profile-class">{{ className || '未设置班级' }}</p>
       <div class="profile-wallet">
         <div class="profile-points">
           <span class="points-icon">⭐</span>
@@ -104,7 +104,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '../stores/auth'
 import { usePetStore } from '../stores/pet'
@@ -112,11 +112,28 @@ import { useTravelStore } from '../stores/travel'
 import { BADGES, PET_SPECIES_LABELS } from '../lib/constants'
 import type { PetSpecies } from '../lib/constants'
 import TitleNameplate from '../components/TitleNameplate.vue'
+import { supabase } from '../lib/supabase'
 
 const router = useRouter()
 const authStore = useAuthStore()
 const petStore = usePetStore()
 const travelStore = useTravelStore()
+const className = ref<string | null>(null)
+watch(() => authStore.user?.teacher_id, async (classId, _, onCleanup) => {
+  className.value = null
+  if (!classId) return
+
+  const request = new AbortController()
+  onCleanup(() => request.abort())
+  const { data } = await supabase
+    .from('profiles')
+    .select('class_name')
+    .eq('id', classId)
+    .eq('role', 'teacher')
+    .abortSignal(request.signal)
+    .maybeSingle()
+  if (!request.signal.aborted) className.value = data?.class_name ?? null
+}, { immediate: true })
 const currentPassword = ref('')
 const newPassword = ref('')
 const confirmPassword = ref('')

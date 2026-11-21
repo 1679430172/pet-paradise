@@ -323,7 +323,7 @@ export const useAuthStore = defineStore('auth', () => {
 
       const { data: teacher, error: classError } = await supabase
         .from('profiles')
-        .select('id, class_name')
+        .select('id')
         .eq('id', teacherId)
         .eq('role', 'teacher')
         .eq('is_admin', false)
@@ -342,7 +342,6 @@ export const useAuthStore = defineStore('auth', () => {
           role: 'student',
           points: 0,
           teacher_id: teacher.id,
-          class_name: teacher.class_name || '默认班级',
         })
         .select()
         .single()
@@ -567,7 +566,7 @@ export const useAuthStore = defineStore('auth', () => {
     if (!user.value || !isAdmin.value) return { data: [], error: new Error('仅管理员可查看学生') }
     const { data, error } = await supabase
       .from('profiles')
-      .select('id, username, points, class_name, created_at')
+      .select('id, username, points, created_at')
       .eq('role', 'student')
       .eq('teacher_id', teacherId)
       .order('created_at', { ascending: false })
@@ -584,13 +583,7 @@ export const useAuthStore = defineStore('auth', () => {
       .eq('id', teacherId)
       .eq('role', 'teacher')
       .eq('is_admin', false)
-    if (error) return { error }
-    const { error: studentError } = await supabase
-      .from('profiles')
-      .update({ class_name: normalized })
-      .eq('role', 'student')
-      .eq('teacher_id', teacherId)
-    return { error: studentError }
+    return { error }
   }
 
   async function resetAccountPassword(accountId: string, password: string, role: 'teacher' | 'student') {

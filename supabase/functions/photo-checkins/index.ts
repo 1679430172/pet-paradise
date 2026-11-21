@@ -81,7 +81,7 @@ Deno.serve(async req => {
     if (token.length !== 72) throw new HttpError('请验证当前账号密码', 401)
     const session = checked(await db.from('photo_checkin_sessions').select('*').eq('token_hash', await hash(token)).gt('expires_at', new Date().toISOString()).maybeSingle())
     if (!session) throw new HttpError('验证已过期，请重新输入密码', 401)
-    const actor = checked(await db.from('profiles').select('id,password,role,is_admin,teacher_id').eq('id', session.profile_id).maybeSingle())
+    const actor = checked(await db.from('profiles').select('id,password,role,is_admin,teacher_id,class_name').eq('id', session.profile_id).maybeSingle())
     if (!actor || actor.password !== session.password_hash || actor.is_admin) throw new HttpError('账号已变化，请重新验证', 401)
     if (input.action === 'logout') {
       checked(await db.from('photo_checkin_sessions').delete().eq('token_hash', session.token_hash))
@@ -155,7 +155,10 @@ Deno.serve(async req => {
       const today = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Shanghai', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date())
       const daily = actor.role === 'student' ? await db.from('photo_checkins').select('id', { count: 'exact', head: true }).eq('student_id', actor.id).eq('submission_day', today) : null
       if (daily?.error) throw new HttpError(daily.error.message)
-      const students = actor.role === 'teacher' ? checked(await db.from('profiles').select('id,username,class_name').eq('teacher_id', actor.id).eq('role', 'student').order('username')) : []
+      const students = actor.role === 'teacher'
+        ? checked(await db.from('profiles').select('id,username').eq('teacher_id', actor.id).eq('role', 'student').order('username'))
+          .map(student => ({ ...student, class_name: actor.class_name }))
+        : []
       const urgent = actor.role === 'teacher' ? await db.from('photo_checkins').select('id', { count: 'exact', head: true }).eq('teacher_id', actor.id).eq('status', 'pending').gt('expires_at', new Date().toISOString()).lt('expires_at', new Date(Date.now() + 2 * 86400000).toISOString()) : null
       if (urgent?.error) throw new HttpError(urgent.error.message)
       const revokedIds = entries.length ? checked(await db.from('task_completions').select('id,revoked_at').in('id', entries.map(r => r.id)).not('revoked_at', 'is', null)) || [] : []

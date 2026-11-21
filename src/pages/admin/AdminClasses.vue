@@ -209,7 +209,6 @@ interface StudentItem {
   id: string
   username: string
   points: number
-  class_name: string | null
   created_at: string
 }
 
