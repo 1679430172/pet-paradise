@@ -25,7 +25,7 @@
       <g :transform="translate(pan)">
         <g v-for="piece in pieces" :key="piece.id" :transform="translate(piece.offset)">
           <g :class="{ separating: piece.separation }" :style="separationStyle(piece.separation)">
-            <PictureFragment :vertices="piece.vertices" :picture="currentShape.picture" :data-piece="piece.id" />
+            <PictureFragment :vertices="piece.vertices" :color="currentShape.color" :data-piece="piece.id" />
           </g>
         </g>
       </g>
@@ -56,12 +56,12 @@
         <li v-for="{ record, viewBox } in recordPreviews" :key="record.id">
           <svg :viewBox="viewBox" role="img" aria-label="切割前">
             <g v-for="(piece, index) in record.before" :key="index" :transform="translate(piece.offset)">
-              <PictureFragment :vertices="piece.vertices" :picture="record.picture" />
+              <PictureFragment :vertices="piece.vertices" :color="record.color" />
             </g>
           </svg>
           <svg :viewBox="viewBox" role="img" aria-label="切割后">
             <g v-for="(piece, index) in record.after" :key="index" :transform="translate(piece.offset)">
-              <PictureFragment :vertices="piece.vertices" :picture="record.picture" />
+              <PictureFragment :vertices="piece.vertices" :color="record.color" />
             </g>
           </svg>
           <span>切割前 · {{ record.before.length }} 块</span>
@@ -81,9 +81,9 @@ import { cutRecordLimit } from '../lib/geometryCutRecords'
 import { useAuthStore } from '../stores/auth'
 
 const shapes = [
-  { id: 'square', label: '正方形', picture: '/assets/travel/stars-camp.webp' },
-  { id: 'rectangle', label: '长方形', picture: '/assets/travel/scenes/forest-01.webp' },
-  { id: 'triangle', label: '三角形', picture: '/assets/travel/stars-dawn.webp' },
+  { id: 'square', label: '正方形', color: '#f6c653', previousPicture: '/assets/travel/stars-camp.webp' },
+  { id: 'rectangle', label: '长方形', color: '#79cbb9', previousPicture: '/assets/travel/scenes/forest-01.webp' },
+  { id: 'triangle', label: '三角形', color: '#ed91b7', previousPicture: '/assets/travel/stars-dawn.webp' },
 ] as const
 
 interface Piece {
@@ -98,12 +98,14 @@ type RecordPiece = Pick<Piece, 'vertices' | 'offset'>
 interface CutRecord {
   id: number
   timestamp: number
-  picture: string
+  color: string
   before: RecordPiece[]
   after: RecordPiece[]
 }
 
-interface LegacyCutRecord extends Pick<CutRecord, 'id' | 'timestamp' | 'picture'> {
+type PictureCutRecord = Omit<CutRecord, 'color'> & { picture: string }
+
+interface LegacyCutRecord extends Pick<PictureCutRecord, 'id' | 'timestamp' | 'picture'> {
   before: Point[]
   pieces: [Point[], Point[]]
   offsets: [Point, Point]
@@ -169,14 +171,15 @@ function translate(point: Point) {
   return `translate(${point.join(' ')})`
 }
 
-function readRecord(record: CutRecord | LegacyCutRecord): CutRecord {
-  if ('after' in record) return record
+function readRecord(record: CutRecord | PictureCutRecord | LegacyCutRecord): CutRecord {
+  if ('color' in record) return record
+  const color = shapes.find(option => option.previousPicture === record.picture)?.color ?? shapes[0].color
   return {
     id: record.id,
     timestamp: record.timestamp,
-    picture: record.picture,
-    before: [{ vertices: record.before, offset: [0, 0] }],
-    after: record.pieces.map((vertices, index) => ({ vertices, offset: record.offsets[index]! })),
+    color,
+    before: 'after' in record ? record.before : [{ vertices: record.before, offset: [0, 0] }],
+    after: 'after' in record ? record.after : record.pieces.map((vertices, index) => ({ vertices, offset: record.offsets[index]! })),
   }
 }
 
@@ -357,7 +360,7 @@ function cut(line: Line) {
     const record: CutRecord = {
       id: ++nextRecordId,
       timestamp: Date.now(),
-      picture: currentShape.value.picture,
+      color: currentShape.value.color,
       before: before.pieces.map(({ vertices, offset }) => ({ vertices, offset })),
       after: fragmentsAfterCut.map(({ vertices, offset }) => ({ vertices, offset })),
     }
