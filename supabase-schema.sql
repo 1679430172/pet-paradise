@@ -1536,7 +1536,7 @@ COMMIT;
 -- 班级租户增值功能（现有班级全开，新建班级默认关闭）
 CREATE TABLE IF NOT EXISTS tenant_features (
  tenant_id UUID NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
- feature_key TEXT NOT NULL CHECK(feature_key IN ('travel','photo_checkin','shop','geometry_game')),
+ feature_key TEXT NOT NULL CHECK(feature_key IN ('travel','photo_checkin','shop','geometry_game','picture_game')),
  enabled BOOLEAN NOT NULL DEFAULT false, enabled_at TIMESTAMPTZ,
  enabled_by UUID REFERENCES profiles(id) ON DELETE SET NULL, updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
  PRIMARY KEY(tenant_id,feature_key)
@@ -1547,10 +1547,10 @@ INSERT INTO tenant_features(tenant_id,feature_key,enabled,enabled_at)
  SELECT p.id,f.feature_key,true,now() FROM profiles p CROSS JOIN (VALUES('travel'),('photo_checkin'),('shop')) f(feature_key)
  WHERE p.role='teacher' AND NOT p.is_admin ON CONFLICT(tenant_id,feature_key) DO NOTHING;
 CREATE OR REPLACE FUNCTION get_tenant_features(p_tenant_id UUID) RETURNS TABLE(feature_key TEXT,enabled BOOLEAN)
- LANGUAGE sql STABLE SECURITY DEFINER SET search_path=public AS $$ SELECT f.feature_key,COALESCE(tf.enabled,false) FROM (VALUES('travel'),('photo_checkin'),('shop'),('geometry_game')) f(feature_key) LEFT JOIN tenant_features tf ON tf.tenant_id=p_tenant_id AND tf.feature_key=f.feature_key $$;
+ LANGUAGE sql STABLE SECURITY DEFINER SET search_path=public AS $$ SELECT f.feature_key,COALESCE(tf.enabled,false) FROM (VALUES('travel'),('photo_checkin'),('shop'),('geometry_game'),('picture_game')) f(feature_key) LEFT JOIN tenant_features tf ON tf.tenant_id=p_tenant_id AND tf.feature_key=f.feature_key $$;
 CREATE OR REPLACE FUNCTION set_tenant_feature(p_admin_id UUID,p_tenant_id UUID,p_feature_key TEXT,p_enabled BOOLEAN) RETURNS BOOLEAN
  LANGUAGE plpgsql SECURITY DEFINER SET search_path=public AS $$ BEGIN
- IF p_feature_key NOT IN ('travel','photo_checkin','shop','geometry_game') THEN RAISE EXCEPTION '未知的班级功能'; END IF;
+ IF p_feature_key NOT IN ('travel','photo_checkin','shop','geometry_game','picture_game') THEN RAISE EXCEPTION '未知的班级功能'; END IF;
  IF NOT EXISTS(SELECT 1 FROM profiles WHERE id=p_admin_id AND role='teacher' AND is_admin) THEN RAISE EXCEPTION '仅管理员可修改班级功能'; END IF;
  IF NOT EXISTS(SELECT 1 FROM profiles WHERE id=p_tenant_id AND role='teacher' AND NOT is_admin) THEN RAISE EXCEPTION '班级不存在'; END IF;
  INSERT INTO tenant_features(tenant_id,feature_key,enabled,enabled_at,enabled_by,updated_at) VALUES(p_tenant_id,p_feature_key,p_enabled,CASE WHEN p_enabled THEN now() END,p_admin_id,now())

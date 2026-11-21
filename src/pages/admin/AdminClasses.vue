@@ -236,9 +236,10 @@ const featureOptions: { key: TenantFeature; icon: string; label: string; descrip
   { key: 'travel', icon: '🧳', label: '旅游', description: '旅行券、明信片和教师代管' },
   { key: 'photo_checkin', icon: '📷', label: '照片打卡', description: '学生上传与老师审核奖励' },
   { key: 'shop', icon: '🛒', label: '宠物商城', description: '购买和更换宠物装扮' },
+  { key: 'picture_game', icon: '✂', label: '图片切切乐', description: '滑动直线切割图片' },
   { key: 'geometry_game', icon: '◇', label: '几何切切乐', description: '平面图形切割与旋转' },
 ]
-const managedFeatures = reactive<Record<TenantFeature, boolean>>({ travel: false, photo_checkin: false, shop: false, geometry_game: false })
+const managedFeatures = reactive<Record<TenantFeature, boolean>>({ travel: false, photo_checkin: false, shop: false, geometry_game: false, picture_game: false })
 const featuresLoading = ref(false)
 const featureSaving = ref<TenantFeature | null>(null)
 const featureError = ref('')

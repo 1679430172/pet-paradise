@@ -15,6 +15,16 @@ const router = createRouter({
       meta: { requiresAuth: true, role: 'teacher', feature: 'photo_checkin' },
     },
     {
+      path: '/teacher/picture-game', name: 'teacher-picture-game',
+      component: () => import('../pages/PictureGamePage.vue'),
+      meta: { requiresAuth: true, role: 'teacher', feature: 'picture_game' },
+    },
+    {
+      path: '/picture-game', name: 'picture-game',
+      component: () => import('../pages/PictureGamePage.vue'),
+      meta: { requiresAuth: true, role: 'student', feature: 'picture_game' },
+    },
+    {
       path: '/teacher/geometry-game', name: 'teacher-geometry-game',
       component: () => import('../pages/GeometryGamePage.vue'),
       meta: { requiresAuth: true, role: 'teacher', feature: 'geometry_game' },
@@ -212,7 +222,7 @@ router.beforeEach(async (to) => {
   }
 
   if (to.meta.feature && authStore.user && !authStore.isAdmin) {
-    const { error } = await authStore.fetchTenantFeatures(to.meta.feature === 'geometry_game')
+    const { error } = await authStore.fetchTenantFeatures(to.meta.feature === 'geometry_game' || to.meta.feature === 'picture_game')
     if (error || !authStore.hasFeature(to.meta.feature as TenantFeature)) {
       return authStore.isTeacher ? { name: 'teacher-dashboard', query: { featureUnavailable: '1' } } : { name: 'home', query: { featureUnavailable: '1' } }
     }

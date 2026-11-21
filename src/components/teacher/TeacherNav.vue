@@ -29,6 +29,7 @@ const teacherItems: { icon: string; label: string; route: string; feature?: Tena
   { icon: '📋', label: '任务', route: '/teacher/tasks' },
   { icon: '📖', label: '日记', route: '/teacher/diary' },
   { icon: '📷', label: '打卡', route: '/teacher/checkins', feature: 'photo_checkin' },
+  { icon: '✂', label: '图片切切乐', route: '/teacher/picture-game', feature: 'picture_game' },
   { icon: '◇', label: '几何切切乐', route: '/teacher/geometry-game', feature: 'geometry_game' },
   { icon: '🏆', label: '排行', route: '/teacher/stats' },
   { icon: '⚙️', label: '设置', route: '/teacher/settings' },

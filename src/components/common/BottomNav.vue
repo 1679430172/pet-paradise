@@ -8,6 +8,10 @@
       <span class="nav-icon">📷</span>
       <span>打卡</span>
     </router-link>
+    <router-link v-if="auth.hasFeature('picture_game')" to="/picture-game" :class="{ active: route.name === 'picture-game' }">
+      <span class="nav-icon" aria-hidden="true">✂</span>
+      <span>图片切切乐</span>
+    </router-link>
     <router-link v-if="auth.hasFeature('geometry_game')" to="/geometry-game" :class="{ active: route.name === 'geometry-game' }">
       <span class="nav-icon" aria-hidden="true">◇</span>
       <span>切切乐</span>
