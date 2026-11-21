@@ -184,6 +184,15 @@ input, textarea {
 }
 
 /* 底部导航 */
+.geometry-game-icon {
+  display: block;
+  flex: none;
+  width: 1em;
+  height: 1em;
+  border-radius: 4px;
+  background: linear-gradient(135deg, #7855d5 0 46%, transparent 47% 53%, #e28c26 54% 100%);
+}
+
 .bottom-nav {
   position: fixed;
   bottom: 0;

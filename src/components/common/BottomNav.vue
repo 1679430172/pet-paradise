@@ -13,8 +13,8 @@
       <span>图片切切乐</span>
     </router-link>
     <router-link v-if="auth.hasFeature('geometry_game')" to="/geometry-game" :class="{ active: route.name === 'geometry-game' }">
-      <span class="nav-icon" aria-hidden="true">◇</span>
-      <span>切切乐</span>
+      <span class="nav-icon geometry-game-icon" aria-hidden="true"></span>
+      <span>几何切切乐</span>
     </router-link>
     <router-link to="/diary" :class="{ active: route.name === 'diary' || route.name === 'diary-new' || route.name === 'diary-detail' }">
       <span class="nav-icon">📖</span>

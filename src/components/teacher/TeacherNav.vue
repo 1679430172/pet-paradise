@@ -7,7 +7,8 @@
       class="teacher-nav-item"
       :class="{ active: isActive(item.route) }"
     >
-      <span class="nav-icon">{{ item.icon }}</span>
+      <span v-if="item.icon" class="nav-icon">{{ item.icon }}</span>
+      <span v-else class="nav-icon geometry-game-icon" aria-hidden="true"></span>
       <span class="nav-label">{{ item.label }}</span>
     </router-link>
   </nav>
@@ -22,7 +23,7 @@ import type { TenantFeature } from '../../stores/auth'
 const route = useRoute()
 const authStore = useAuthStore()
 
-const teacherItems: { icon: string; label: string; route: string; feature?: TenantFeature }[] = [
+const teacherItems: { icon?: string; label: string; route: string; feature?: TenantFeature }[] = [
   { icon: '📊', label: '总览', route: '/teacher' },
   { icon: '👥', label: '学生', route: '/teacher/students' },
   { icon: '🐾', label: '宠物', route: '/teacher/pets' },
@@ -30,7 +31,7 @@ const teacherItems: { icon: string; label: string; route: string; feature?: Tena
   { icon: '📖', label: '日记', route: '/teacher/diary' },
   { icon: '📷', label: '打卡', route: '/teacher/checkins', feature: 'photo_checkin' },
   { icon: '✂', label: '图片切切乐', route: '/teacher/picture-game', feature: 'picture_game' },
-  { icon: '◇', label: '几何切切乐', route: '/teacher/geometry-game', feature: 'geometry_game' },
+  { label: '几何切切乐', route: '/teacher/geometry-game', feature: 'geometry_game' },
   { icon: '🏆', label: '排行', route: '/teacher/stats' },
   { icon: '⚙️', label: '设置', route: '/teacher/settings' },
 ]
