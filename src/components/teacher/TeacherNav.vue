@@ -32,6 +32,7 @@ const teacherItems: { icon?: string; label: string; route: string; feature?: Ten
   { icon: '📷', label: '打卡', route: '/teacher/checkins', feature: 'photo_checkin' },
   { icon: '✂', label: '图片切切乐', route: '/teacher/picture-game', feature: 'picture_game' },
   { label: '几何切切乐', route: '/teacher/geometry-game', feature: 'geometry_game' },
+  { icon: '🔤', label: '拼音探险', route: '/teacher/pinyin', feature: 'pinyin' },
   { icon: '🏆', label: '排行', route: '/teacher/stats' },
   { icon: '⚙️', label: '设置', route: '/teacher/settings' },
 ]

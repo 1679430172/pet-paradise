@@ -34,6 +34,16 @@ const router = createRouter({
       component: () => import('../pages/GeometryGamePage.vue'),
       meta: { requiresAuth: true, role: 'student', feature: 'geometry_game' },
     },
+    {
+      path: '/teacher/pinyin', name: 'teacher-pinyin',
+      component: () => import('../pages/PinyinPage.vue'),
+      meta: { requiresAuth: true, role: 'teacher', feature: 'pinyin' },
+    },
+    {
+      path: '/pinyin', name: 'pinyin',
+      component: () => import('../pages/PinyinPage.vue'),
+      meta: { requiresAuth: true, role: 'student', feature: 'pinyin' },
+    },
     // 公开页面
     {
       path: '/login',
@@ -222,7 +232,9 @@ router.beforeEach(async (to) => {
   }
 
   if (to.meta.feature && authStore.user && !authStore.isAdmin) {
-    const { error } = await authStore.fetchTenantFeatures(to.meta.feature === 'geometry_game' || to.meta.feature === 'picture_game')
+    const { error } = await authStore.fetchTenantFeatures(
+      to.meta.feature === 'geometry_game' || to.meta.feature === 'picture_game' || to.meta.feature === 'pinyin',
+    )
     if (error || !authStore.hasFeature(to.meta.feature as TenantFeature)) {
       return authStore.isTeacher ? { name: 'teacher-dashboard', query: { featureUnavailable: '1' } } : { name: 'home', query: { featureUnavailable: '1' } }
     }

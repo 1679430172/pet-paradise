@@ -1,5 +1,10 @@
 <template>
   <div class="page home-page">
+    <RouterLink v-if="authStore.hasFeature('pinyin')" class="pinyin-entry card" to="/pinyin">
+      <span class="pinyin-entry-icon" aria-hidden="true">ā</span>
+      <span><strong>拼音探险</strong><small>选一课，点一点，听发音</small></span>
+      <span aria-hidden="true">›</span>
+    </RouterLink>
     <p v-if="route.query.featureUnavailable" class="feature-unavailable" role="status">本班级尚未开通该功能，请联系管理员。</p>
     <div v-if="petStore.loading && petStore.pets.length === 0" class="loading">
       <span class="animate-bounce">🐾</span>
@@ -222,6 +227,27 @@ onMounted(async () => {
 </script>
 
 <style scoped>
+.pinyin-entry {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 12px;
+  color: #244c40;
+  background: #edf8ee;
+  text-decoration: none;
+}
+.pinyin-entry-icon {
+  display: grid;
+  place-items: center;
+  width: 42px;
+  height: 42px;
+  border-radius: 14px;
+  background: #cdebd7;
+  font-size: 26px;
+}
+.pinyin-entry small { display: block; }
 .feature-unavailable { margin:0 0 16px; padding:12px 14px; border-radius:10px; color:#805d22; background:#fff3d6; }
 .loading {
   display: flex;

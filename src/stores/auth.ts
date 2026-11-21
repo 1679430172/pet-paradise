@@ -18,7 +18,7 @@ export interface Profile {
   created_at: string
 }
 
-export type TenantFeature = 'travel' | 'photo_checkin' | 'shop' | 'geometry_game' | 'picture_game'
+export type TenantFeature = 'travel' | 'photo_checkin' | 'shop' | 'geometry_game' | 'picture_game' | 'pinyin'
 export type AnnouncementType = 'notice' | 'celebration' | 'reminder' | 'maintenance' | 'other'
 export interface AnnouncementSetting {
   id?: string
@@ -31,7 +31,7 @@ export interface AnnouncementSetting {
   end_at: string | null
   created_at?: string
 }
-export const tenantFeatureKeys: TenantFeature[] = ['travel', 'photo_checkin', 'shop', 'geometry_game', 'picture_game']
+export const tenantFeatureKeys: TenantFeature[] = ['travel', 'photo_checkin', 'shop', 'geometry_game', 'picture_game', 'pinyin']
 const USER_ID_KEY = 'pet_user_id'
 const SESSION_EXPIRES_KEY = 'pet_session_expires_at'
 const SESSION_DURATION_MS = 30 * 60 * 1000
@@ -51,7 +51,7 @@ export const useAuthStore = defineStore('auth', () => {
   const user = ref<Profile | null>(null)
   const initialized = ref(false)
   const loading = ref(false)
-  const tenantFeatures = ref<Record<TenantFeature, boolean>>({ travel: false, photo_checkin: false, shop: false, geometry_game: false, picture_game: false })
+  const tenantFeatures = ref<Record<TenantFeature, boolean>>({ travel: false, photo_checkin: false, shop: false, geometry_game: false, picture_game: false, pinyin: false })
   const tenantFeaturesLoadedFor = ref<string | null>(null)
 
   const profile = computed(() => user.value)
@@ -136,6 +136,7 @@ export const useAuthStore = defineStore('auth', () => {
         photo_checkin: enabled.has('photo_checkin'),
         shop: enabled.has('shop'),
         geometry_game: enabled.has('geometry_game'),
+        pinyin: enabled.has('pinyin'),
         picture_game: enabled.has('picture_game'),
       }
       tenantFeaturesLoadedFor.value = id
@@ -422,7 +423,7 @@ export const useAuthStore = defineStore('auth', () => {
       }).catch(() => {})
     }
     user.value = null
-    tenantFeatures.value = { travel: false, photo_checkin: false, shop: false, geometry_game: false, picture_game: false }
+    tenantFeatures.value = { travel: false, photo_checkin: false, shop: false, geometry_game: false, picture_game: false, pinyin: false }
     tenantFeaturesLoadedFor.value = null
     localStorage.removeItem(USER_ID_KEY)
     localStorage.removeItem(SESSION_EXPIRES_KEY)
