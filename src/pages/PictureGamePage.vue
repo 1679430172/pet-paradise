@@ -27,6 +27,8 @@
         <g v-for="piece in pieces" :key="piece.id" :transform="translate(piece.offset)">
           <g :class="{ separating: piece.separation }" :style="separationStyle(piece.separation)">
             <PictureFragment :vertices="piece.vertices" :color="currentShape.color" :data-piece="piece.id" />
+            <text v-for="corner in piece.corners" :key="corner.number" :transform="translate(corner.labelPosition)"
+              class="corner-label" text-anchor="middle" dominant-baseline="central">{{ corner.number }}</text>
           </g>
         </g>
       </g>
@@ -88,9 +90,16 @@ const shapes = [
   { id: 'triangle', label: '三角形', color: '#ed91b7', previousPicture: '/assets/travel/stars-dawn.webp' },
 ] as const
 
+interface Corner {
+  number: number
+  vertex: Point
+  labelPosition: Point
+}
+
 interface Piece {
   id: number
   vertices: Point[]
+  corners: Corner[]
   offset: Point
   separation?: Point
 }
@@ -212,7 +221,13 @@ function resetBoard(nextShape: Shape) {
   redoStack.value = []
   shape.value = nextShape
   pan.value = [0, 0]
-  pieces.value = [{ id: ++nextPieceId, vertices: makeShape(nextShape).map(point => scale(point, 80)), offset: [0, 0] }]
+  const vertices = makeShape(nextShape).map(point => scale(point, 80))
+  const corners = vertices.map((vertex, index) => ({
+    number: index + 1,
+    vertex,
+    labelPosition: add(vertex, [Math.sign(vertex[0]) * 10, Math.sign(vertex[1]) * 10]),
+  }))
+  pieces.value = [{ id: ++nextPieceId, vertices, corners, offset: [0, 0] }]
 }
 
 function switchShape(nextShape: Shape) {
@@ -349,6 +364,8 @@ function cut(line: Line) {
     const fragments: [Point[], Point[]] = [result.positive, result.negative]
     return fragments.map((vertices, index) => ({
       id: ++nextPieceId, vertices, offset: add(piece.offset, separation[index]!),
+      // A corner on the cutting line belongs to both polygons. Keep its label on the first fragment only.
+      corners: piece.corners.filter(corner => fragments.findIndex(points => points.includes(corner.vertex)) === index),
       separation: separation[index],
     }))
   })
@@ -430,6 +447,10 @@ p { margin: 8px 0 16px; }
   overflow: hidden;
 }
 .blade { stroke: #2055a4; stroke-width: 2; stroke-dasharray: 6 4; stroke-linecap: round; pointer-events: none; }
+.corner-label {
+  fill: #253754; stroke: #fff; stroke-width: 2.5; stroke-linejoin: round; paint-order: stroke;
+  font-size: 13px; font-weight: 600; pointer-events: none;
+}
 .snip { pointer-events: none; }
 .cut-trail { stroke: white; stroke-width: 2; stroke-linecap: round; }
 .scissor-blade path { fill: #f4f7ff; stroke: #253754; stroke-width: 1.2; stroke-linejoin: round; }
