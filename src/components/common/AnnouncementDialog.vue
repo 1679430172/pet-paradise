@@ -7,7 +7,9 @@
         <h2 id="announcement-title">{{ announcement?.title }}</h2>
         <div class="announcement-content">{{ announcement?.content }}</div>
         <span v-if="pendingCount > 1" class="announcement-progress">{{ currentIndex + 1 }} / {{ pendingCount }}</span>
-        <button type="button" @click="dismiss">{{ currentIndex < pendingCount - 1 ? '查看下一条' : '我知道了' }}</button>
+        <p v-if="readError" class="read-error" role="status">{{ readError }}</p>
+        <button type="button" :disabled="confirming" @click="confirmRead">{{ confirming ? '正在确认…' : currentIndex < pendingCount - 1 ? '查看下一条' : '我知道了' }}</button>
+        <button v-if="readError" type="button" class="skip-read" @click="dismiss">关闭并跳过确认</button>
       </section>
     </div>
   </Transition>
@@ -16,10 +18,15 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
 import { useAuthStore, type AnnouncementSetting } from '../../stores/auth'
+import { checkinToken } from '../../lib/photoCheckins'
+import { supabase } from '../../lib/supabase'
 
 const authStore = useAuthStore()
 const announcements = ref<AnnouncementSetting[]>([])
 const currentIndex = ref(0)
+const confirming = ref(false)
+const readError = ref('')
+let readRequest = 0
 const seenKey = computed(() => authStore.user ? `announcement_seen:${authStore.user.id}` : '')
 const announcement = computed(() => announcements.value[currentIndex.value] || null)
 const pendingCount = computed(() => announcements.value.length)
@@ -33,17 +40,52 @@ const appearances = {
 } as const
 const appearance = computed(() => appearances[announcement.value?.type || 'notice'])
 
-watch(() => authStore.user?.id, async (userId) => {
+watch(() => authStore.user?.id, async (userId, _previousId, onCleanup) => {
+  readRequest += 1
+  confirming.value = false
+  readError.value = ''
   announcements.value = []
   currentIndex.value = 0
   if (!userId || authStore.isAdmin) return
+  let cancelled = false
+  onCleanup(() => { cancelled = true })
   const result = await authStore.fetchAnnouncements()
-  if (result.error) return
+  if (cancelled || result.error) return
   const seenIds = getSeenIds()
   announcements.value = result.data.filter(item => item.id && !seenIds.has(item.id))
 }, { immediate: true })
 
+async function confirmRead() {
+  const accountId = authStore.user?.id
+  const announcementId = announcement.value?.id
+  if (!accountId || !announcementId || confirming.value) return
+  const token = checkinToken(accountId)
+  if (!token) {
+    readError.value = '登录凭证不可用，请重新登录后确认。'
+    return
+  }
+  const request = ++readRequest
+  confirming.value = true
+  readError.value = ''
+  try {
+    const { data, error } = await supabase.rpc('confirm_announcement_read', {
+      p_announcement_id: announcementId,
+      p_session_token: token,
+    })
+    if (request !== readRequest || authStore.user?.id !== accountId) return
+    if (error || data !== true) throw new Error()
+    confirming.value = false
+    dismiss()
+  } catch {
+    if (request === readRequest) readError.value = '未能保存已读记录，请重试。'
+  } finally {
+    if (request === readRequest) confirming.value = false
+  }
+}
+
 function dismiss() {
+  if (confirming.value) return
+  readError.value = ''
   if (seenKey.value && announcement.value?.id) {
     const seenIds = getSeenIds()
     seenIds.add(announcement.value.id)
@@ -67,6 +109,8 @@ function getSeenIds() {
 </script>
 
 <style scoped>
+.read-error { color: #a93452; font-size: .82rem; }
+.announcement-dialog .skip-read { margin-top: 8px; background: transparent; color: #655d69; box-shadow: none; }
 .announcement-overlay { position:fixed; inset:0; z-index:1000; display:grid; place-items:center; padding:20px; background:rgba(45,35,54,.48); backdrop-filter:blur(4px); }
 .announcement-dialog { --accent:#e96391; --accent-soft:#fff0f5; --surface:#fff9f3; box-sizing:border-box; width:min(440px,100%); padding:30px 28px 24px; border:1px solid color-mix(in srgb,var(--accent) 25%,transparent); border-radius:24px; background:linear-gradient(160deg,#fff 0%,var(--surface) 100%); box-shadow:0 24px 70px rgba(55,38,62,.2); text-align:center; }
 .announcement-dialog.type-celebration { --accent:#e99a19; --accent-soft:#fff3cf; --surface:#fffaf0; }

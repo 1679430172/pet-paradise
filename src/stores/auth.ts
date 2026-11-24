@@ -27,6 +27,8 @@ export interface AnnouncementSetting {
   title: string
   content: string
   revision: string
+  target_class_ids: string[] | null
+  teachers_only: boolean
   start_at: string | null
   end_at: string | null
   created_at?: string
@@ -206,44 +208,27 @@ export const useAuthStore = defineStore('auth', () => {
   }
 
   async function fetchAnnouncement() {
-    const { data, error } = await supabase
-      .from('announcements')
-      .select('id, enabled, type, title, content, start_at, end_at, created_at')
-      .eq('enabled', true)
-      .or(`start_at.is.null,start_at.lte.${new Date().toISOString()}`)
-      .or(`end_at.is.null,end_at.gt.${new Date().toISOString()}`)
-      .order('created_at', { ascending: false })
-      .limit(1)
-      .maybeSingle()
-    if (error) return { data: null, error }
-    if (!data) return { data: null, error: null }
-    return {
-      data: {
-        id: data.id,
-        enabled: data.enabled === true,
-        type: ['notice', 'celebration', 'reminder', 'maintenance', 'other'].includes(data.type || '')
-          ? data.type as AnnouncementType
-          : 'notice',
-        title: data.title || '系统公告',
-        content: data.content || '',
-        revision: data.created_at,
-        start_at: data.start_at,
-        end_at: data.end_at,
-        created_at: data.created_at,
-      } satisfies AnnouncementSetting,
-      error: null,
-    }
+    const { data, error } = await fetchAnnouncements(false)
+    return { data: data[0] ?? null, error }
   }
 
-  async function fetchAnnouncements() {
-    const { data, error } = await supabase
+  async function fetchAnnouncements(oldestFirst = true) {
+    const profile = user.value
+    if (!profile || isAdmin.value) return { data: [], error: null }
+    const classId = tenantId(profile)
+    const now = new Date().toISOString()
+    const query = supabase
       .from('announcements')
-      .select('id, enabled, type, title, content, start_at, end_at, created_at')
+      .select('id, enabled, type, title, content, start_at, end_at, created_at, target_class_ids, teachers_only')
       .eq('enabled', true)
-      .or(`start_at.is.null,start_at.lte.${new Date().toISOString()}`)
-      .or(`end_at.is.null,end_at.gt.${new Date().toISOString()}`)
-      .order('created_at', { ascending: true })
-      .limit(30)
+      .or(`start_at.is.null,start_at.lte.${now}`)
+      .or(`end_at.is.null,end_at.gt.${now}`)
+      .order('created_at', { ascending: oldestFirst })
+      .limit(oldestFirst ? 30 : 1)
+    if (classId) query.or(`target_class_ids.is.null,target_class_ids.cs.{${classId}}`)
+    else query.is('target_class_ids', null)
+    if (profile.role !== 'teacher') query.eq('teachers_only', false)
+    const { data, error } = await query
     if (error) return { data: [], error }
     return {
       data: (data || []).map(item => ({
@@ -255,6 +240,8 @@ export const useAuthStore = defineStore('auth', () => {
         title: item.title || '系统公告',
         content: item.content || '',
         revision: item.created_at,
+        target_class_ids: item.target_class_ids,
+        teachers_only: item.teachers_only,
         start_at: item.start_at,
         end_at: item.end_at,
         created_at: item.created_at,
@@ -267,13 +254,14 @@ export const useAuthStore = defineStore('auth', () => {
     if (!user.value || !isAdmin.value) return { data: [], error: new Error('仅管理员可查看公告历史') }
     return await supabase
       .from('announcements')
-      .select('id, enabled, type, title, content, start_at, end_at, created_at')
+      .select('id, enabled, type, title, content, start_at, end_at, created_at, target_class_ids, teachers_only')
       .order('created_at', { ascending: false })
       .limit(30)
   }
 
-  async function updateAnnouncement(input: Pick<AnnouncementSetting, 'enabled' | 'type' | 'title' | 'content' | 'start_at' | 'end_at'>) {
+  async function updateAnnouncement(input: Pick<AnnouncementSetting, 'enabled' | 'type' | 'title' | 'content' | 'start_at' | 'end_at' | 'target_class_ids' | 'teachers_only'>) {
     if (!user.value || !isAdmin.value) return { data: null, error: new Error('仅管理员可修改公告') }
+    if (input.target_class_ids?.length === 0) return { data: null, error: new Error('请至少选择一个班级') }
     const title = input.title.trim()
     const content = input.content.trim()
     if (!title) return { data: null, error: new Error('公告标题不能为空') }
@@ -284,8 +272,8 @@ export const useAuthStore = defineStore('auth', () => {
     if (input.end_at && Date.parse(input.end_at) <= Date.now()) return { data: null, error: new Error('结束时间必须晚于当前时间') }
     const { data, error } = await supabase
       .from('announcements')
-      .insert({ enabled: input.enabled, type: input.type, title, content, start_at: input.start_at ? new Date(input.start_at).toISOString() : null, end_at: input.end_at ? new Date(input.end_at).toISOString() : null })
-      .select('id, enabled, type, title, content, start_at, end_at, created_at')
+      .insert({ enabled: input.enabled, type: input.type, title, content, target_class_ids: input.target_class_ids, teachers_only: input.teachers_only, start_at: input.start_at ? new Date(input.start_at).toISOString() : null, end_at: input.end_at ? new Date(input.end_at).toISOString() : null })
+      .select('id, enabled, type, title, content, start_at, end_at, created_at, target_class_ids, teachers_only')
       .single()
     if (error) return { data: null, error }
     return { data, error: null }
@@ -298,7 +286,7 @@ export const useAuthStore = defineStore('auth', () => {
       .from('announcements')
       .update({ enabled })
       .eq('id', id)
-      .select('id, enabled, type, title, content, start_at, end_at, created_at')
+      .select('id, enabled, type, title, content, start_at, end_at, created_at, target_class_ids, teachers_only')
       .single()
     return { data, error }
   }
@@ -350,10 +338,10 @@ export const useAuthStore = defineStore('auth', () => {
 
       if (error) throw error
 
-      user.value = data
-      await fetchTenantFeatures(true)
       const checkinExpires = await establishCheckinSession(data.id, password)
       saveSession(data.id, checkinExpires ? Date.parse(checkinExpires) : undefined)
+      user.value = data
+      await fetchTenantFeatures(true)
       return { data, error: null }
     } catch (error: any) {
       return { data: null, error }
@@ -395,10 +383,10 @@ export const useAuthStore = defineStore('auth', () => {
           void clearLoginAuditSession().catch(() => {})
         }
       }
-      user.value = data[0]
-      await fetchTenantFeatures(true)
       const checkinExpires = !data[0].is_admin ? await establishCheckinSession(data[0].id, password) : null
       saveSession(data[0].id, checkinExpires ? Date.parse(checkinExpires) : undefined)
+      user.value = data[0]
+      await fetchTenantFeatures(true)
       return { data: data[0], error: null }
     } catch (error: any) {
       return { data: null, error }

@@ -122,6 +122,8 @@ CREATE TABLE IF NOT EXISTS announcements (
   title TEXT NOT NULL CHECK (char_length(title) BETWEEN 1 AND 50),
   content TEXT NOT NULL CHECK (char_length(content) <= 1000),
   enabled BOOLEAN NOT NULL DEFAULT true,
+  target_class_ids UUID[] CHECK (cardinality(target_class_ids) > 0),
+  teachers_only BOOLEAN NOT NULL DEFAULT false,
   start_at TIMESTAMPTZ,
   end_at TIMESTAMPTZ,
   CONSTRAINT announcements_time_range CHECK (start_at IS NULL OR end_at IS NULL OR end_at > start_at),
